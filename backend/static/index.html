@@ -1,0 +1,3675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0a0a0a">
+    <title>Squat Form Analyzer</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-card: #121212;
+            --bg-card-hover: #1a1a1a;
+            --bg-input: #1e1e1e;
+            --accent: #00d4ff;
+            --accent-hover: #00b8e0;
+            --accent-dim: rgba(0, 212, 255, 0.1);
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --text-muted: #666;
+            --success: #4ade80;
+            --warning: #fbbf24;
+            --danger: #f87171;
+            --border: #2a2a2a;
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 16px;
+            --shadow-card: 0 2px 8px rgba(0,0,0,0.3);
+            --transition-fast: 150ms ease;
+            --transition-normal: 250ms ease;
+            /* Legacy aliases for compatibility */
+            --bg: var(--bg-primary);
+            --surface: var(--bg-card);
+            --surface-2: var(--bg-input);
+            --text: var(--text-primary);
+            --green: #4ade80;
+            --yellow: #f0c040;
+            --orange: #f08030;
+            --red: #f04050;
+            --radius: var(--radius-lg);
+            --grade-a: var(--success);
+            --grade-b: #2dd4bf;
+            --grade-c: var(--warning);
+            --grade-d: #fb923c;
+            --grade-kw: #94a3b8;
+        }
+
+        /* Skip navigation link */
+        .skip-nav {
+            position: absolute;
+            top: -100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--accent);
+            color: #000;
+            padding: 12px 24px;
+            border-radius: 0 0 8px 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            z-index: 1000;
+            text-decoration: none;
+            transition: top 0.2s;
+        }
+
+        .skip-nav:focus {
+            top: 0;
+        }
+
+        /* Screen-reader only utility */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0,0,0,0);
+            border: 0;
+        }
+
+        /* Reduced motion preference */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+            .score-bar-fill {
+                transition: none !important;
+            }
+            .score-circle {
+                animation: none !important;
+            }
+            .onboarding-overlay {
+                animation: none !important;
+            }
+            .milestone-banner {
+                animation: none !important;
+            }
+            .skeleton-pulse {
+                animation: none !important;
+            }
+            .results-reveal {
+                animation: none !important;
+                opacity: 1 !important;
+                transform: none !important;
+            }
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+            font-size: clamp(1rem, 2.5vw, 1.125rem);
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 32px 0 24px;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        header p {
+            color: var(--text-secondary);
+            font-size: 1.05rem;
+        }
+
+        .btn-link {
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 0.9rem;
+            cursor: pointer;
+            text-decoration: underline;
+            padding: 4px 0;
+            font-family: inherit;
+        }
+
+        .btn-link:hover {
+            color: var(--accent-hover);
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 28px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-card);
+            transition: border-color var(--transition-normal), transform var(--transition-normal), box-shadow var(--transition-normal);
+        }
+
+        .card:hover {
+            border-color: #3a3a3a;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+
+        .card h2 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+        }
+
+        /* Camera Setup Guide */
+        .camera-guide {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 24px 28px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-card);
+        }
+
+        .camera-guide h2 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .camera-guide-content {
+            display: flex;
+            gap: 28px;
+            align-items: flex-start;
+        }
+
+        @media (max-width: 600px) {
+            .camera-guide-content {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+
+        .camera-guide svg {
+            flex-shrink: 0;
+            max-width: 400px;
+            width: 100%;
+            height: auto;
+        }
+
+        .camera-tips {
+            list-style: none;
+            padding: 0;
+        }
+
+        .camera-tips li {
+            padding: 6px 0;
+            font-size: 1rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            line-height: 1.5;
+        }
+
+        .camera-tips li .tip-icon {
+            color: var(--green);
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .form-grid { grid-template-columns: 1fr; }
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .squat-type-desc {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-style: italic;
+            margin-top: 4px;
+            min-height: 1.4em;
+        }
+
+        select, input[type="file"] {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 1rem;
+            outline: none;
+            transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
+            min-height: 44px;
+        }
+
+        select:hover {
+            border-color: var(--accent);
+        }
+
+        select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.25);
+        }
+
+        /* Touch targets */
+        button, select, .upload-area, input[type="file"] + label {
+            min-height: 44px;
+            min-width: 44px;
+        }
+
+        .file-drop {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-lg);
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color var(--transition-normal), background var(--transition-normal);
+            margin-bottom: 20px;
+            min-height: 44px;
+        }
+
+        .file-drop:hover, .file-drop.dragover {
+            border-color: var(--accent);
+            background: var(--accent-dim);
+        }
+
+        .file-drop:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.25);
+            outline: none;
+        }
+
+        .file-drop .icon {
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+        }
+
+        .file-drop p { color: var(--text-secondary); font-size: 1rem; }
+
+        .file-drop .filename {
+            color: var(--accent);
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 32px;
+            background: var(--accent);
+            color: #000;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background var(--transition-normal), transform var(--transition-fast), box-shadow var(--transition-normal);
+            width: 100%;
+            min-height: 44px;
+        }
+
+        .btn:hover {
+            background: var(--accent-hover);
+            box-shadow: 0 0 12px rgba(0, 212, 255, 0.3);
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.25);
+        }
+
+        /* Secondary button style */
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: transparent;
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            border-radius: var(--radius-sm);
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background var(--transition-normal), transform var(--transition-fast);
+            min-height: 44px;
+        }
+        .btn-secondary:hover {
+            background: var(--accent-dim);
+        }
+        .btn-secondary:active { transform: scale(0.97); }
+        .btn-secondary:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        /* Quick Start button */
+        .btn-quick {
+            padding: 1rem 2rem;
+            font-size: 1.15rem;
+            font-weight: 700;
+            border-radius: var(--radius-lg);
+            margin-bottom: 16px;
+            background: var(--accent);
+            color: #000;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            min-height: 56px;
+            transition: background var(--transition-normal), transform var(--transition-fast), box-shadow var(--transition-normal);
+        }
+
+        .btn-quick:hover {
+            background: var(--accent-hover);
+            box-shadow: 0 0 16px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn-quick:active { transform: scale(0.97); }
+
+        .btn-quick:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        /* Settings toggle */
+        .settings-toggle {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            cursor: pointer;
+            padding: 8px 0;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: color var(--transition-normal);
+        }
+
+        .settings-toggle:hover {
+            color: var(--text-primary);
+        }
+
+        .settings-toggle:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .settings-toggle .toggle-arrow {
+            transition: transform var(--transition-normal);
+            display: inline-block;
+        }
+
+        .settings-toggle .toggle-arrow.open {
+            transform: rotate(90deg);
+        }
+
+        .settings-collapsible {
+            overflow: hidden;
+            max-height: 0;
+            transition: max-height 0.3s ease;
+        }
+
+        .settings-collapsible.open {
+            max-height: 600px;
+        }
+
+        /* Setting row for checkboxes */
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-top: 1px solid var(--border);
+            margin-top: 8px;
+        }
+
+        .setting-row label {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .setting-row input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        /* Loading spinner */
+        .spinner {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner.active { display: block; }
+
+        .spinner .ring {
+            width: 48px;
+            height: 48px;
+            border: 4px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .spinner p { color: var(--text-secondary); font-size: 1rem; }
+
+        /* Skeleton loading state */
+        .skeleton-container {
+            display: none;
+            padding: 20px 0;
+        }
+        .skeleton-container.active { display: block; }
+
+        .skeleton-pulse {
+            background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-card-hover) 50%, var(--bg-card) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s ease-in-out infinite;
+            border-radius: var(--radius-md);
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .skeleton-score-circle {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            margin: 0 auto 16px;
+        }
+
+        .skeleton-bar {
+            height: 12px;
+            margin-bottom: 12px;
+            border-radius: 6px;
+        }
+
+        .skeleton-bar.w-60 { width: 60%; margin: 0 auto 12px; }
+        .skeleton-bar.w-80 { width: 80%; }
+        .skeleton-bar.w-40 { width: 40%; margin: 0 auto 12px; }
+
+        .skeleton-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 28px;
+            margin-bottom: 20px;
+        }
+
+        .skeleton-bars-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 500px) {
+            .skeleton-bars-grid { grid-template-columns: 1fr; }
+        }
+
+        .skeleton-bar-item .skeleton-label {
+            height: 10px;
+            width: 60%;
+            margin-bottom: 6px;
+        }
+
+        .skeleton-bar-item .skeleton-track {
+            height: 8px;
+            width: 100%;
+        }
+
+        /* Progress bar */
+        .progress-bar-container {
+            width: 100%;
+            max-width: 300px;
+            margin: 16px auto 0;
+        }
+
+        .progress-bar-track {
+            height: 8px;
+            background: var(--bg-input);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 4px;
+            width: 0%;
+            animation: indeterminate 1.5s ease-in-out infinite;
+        }
+
+        @keyframes indeterminate {
+            0% { width: 0%; margin-left: 0; }
+            50% { width: 60%; margin-left: 20%; }
+            100% { width: 0%; margin-left: 100%; }
+        }
+
+        /* Results */
+        #results { display: none; }
+        #results.visible { display: block; }
+
+        /* Staggered reveal animation */
+        @keyframes revealUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .results-reveal {
+            animation: revealUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+
+        .results-reveal:nth-child(1) { animation-delay: 0ms; }
+        .results-reveal:nth-child(2) { animation-delay: 80ms; }
+        .results-reveal:nth-child(3) { animation-delay: 160ms; }
+        .results-reveal:nth-child(4) { animation-delay: 240ms; }
+        .results-reveal:nth-child(5) { animation-delay: 320ms; }
+        .results-reveal:nth-child(6) { animation-delay: 400ms; }
+        .results-reveal:nth-child(7) { animation-delay: 480ms; }
+        .results-reveal:nth-child(8) { animation-delay: 560ms; }
+        .results-reveal:nth-child(9) { animation-delay: 640ms; }
+        .results-reveal:nth-child(10) { animation-delay: 720ms; }
+        .results-reveal:nth-child(11) { animation-delay: 800ms; }
+        .results-reveal:nth-child(12) { animation-delay: 880ms; }
+
+        .score-hero {
+            text-align: center;
+            padding: 32px 20px;
+        }
+
+        .score-circle {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 4px solid var(--accent);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            position: relative;
+        }
+
+        @media (max-width: 600px) {
+            .score-circle {
+                width: 100px;
+                height: 100px;
+            }
+            .score-value {
+                font-size: 2.5rem !important;
+            }
+        }
+
+        .score-value {
+            font-size: 3rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            line-height: 1;
+        }
+
+        .score-grade {
+            font-size: 2.4rem;
+            font-weight: 700;
+            margin-top: 8px;
+        }
+
+        .score-label {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
+        /* Competition mode badge */
+        .competition-badge {
+            display: inline-block;
+            background: var(--warning);
+            color: #000;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 8px;
+        }
+
+        /* Competition depth verdict */
+        .comp-depth-verdict {
+            font-size: 1.6rem;
+            font-weight: 800;
+            margin-top: 16px;
+            padding: 12px 24px;
+            border-radius: var(--radius-md);
+            display: inline-block;
+            letter-spacing: 0.04em;
+        }
+        .comp-depth-pass {
+            color: #000;
+            background: var(--success);
+            border: 2px solid var(--success);
+        }
+        .comp-depth-fail {
+            color: #fff;
+            background: var(--danger);
+            border: 2px solid var(--danger);
+        }
+
+        .tier-message {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-top: 12px;
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            display: inline-block;
+        }
+
+        .tier-excellent {
+            color: var(--green);
+            background: rgba(74, 222, 128, 0.1);
+            border: 1px solid rgba(74, 222, 128, 0.3);
+        }
+
+        .tier-solid {
+            color: var(--yellow);
+            background: rgba(240, 192, 64, 0.1);
+            border: 1px solid rgba(240, 192, 64, 0.3);
+        }
+
+        .tier-working {
+            color: var(--orange);
+            background: rgba(240, 128, 48, 0.1);
+            border: 1px solid rgba(240, 128, 48, 0.3);
+        }
+
+        /* Side view warning notice */
+        .side-view-warning {
+            background: var(--accent-dim);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            font-size: 0.95rem;
+            color: var(--accent);
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .side-view-warning .info-icon {
+            flex-shrink: 0;
+            font-weight: 700;
+        }
+
+        /* What You Did Well section */
+        .strengths-list {
+            list-style: none;
+            margin-top: 12px;
+            padding: 0;
+        }
+
+        .strengths-list li {
+            padding: 10px 14px;
+            background: rgba(74, 222, 128, 0.08);
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            border-left: 3px solid var(--green);
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background var(--transition-normal);
+        }
+
+        .strength-icon {
+            color: var(--green);
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .score-bar-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 500px) {
+            .score-bar-grid { grid-template-columns: 1fr; }
+        }
+
+        .score-bar-item label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .score-bar {
+            height: 8px;
+            background: var(--bg-input);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .score-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .video-section {
+            margin-top: 20px;
+        }
+
+        .video-section video {
+            width: 100%;
+            border-radius: var(--radius-sm);
+            background: #000;
+        }
+
+        .rep-list {
+            list-style: none;
+            margin-top: 12px;
+        }
+
+        .rep-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 10px 14px;
+            background: var(--bg-input);
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            font-size: 1rem;
+            flex-wrap: wrap;
+            gap: 4px;
+            transition: background var(--transition-normal);
+        }
+
+        .rep-list .rep-score {
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .rep-feedback {
+            width: 100%;
+            font-size: 0.875rem;
+            color: var(--green);
+            margin-top: 4px;
+            padding-left: 2px;
+        }
+
+        /* Velocity metrics in rep cards */
+        .rep-velocity {
+            width: 100%;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            display: flex;
+            gap: 16px;
+        }
+        .rep-velocity span {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .issue-list, .cue-list {
+            list-style: none;
+            margin-top: 12px;
+        }
+
+        .issue-list li, .cue-list li {
+            padding: 12px 16px;
+            background: var(--bg-input);
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            border-left: 3px solid var(--border);
+            transition: background var(--transition-normal);
+        }
+
+        .issue-list li[data-severity="high"] { border-left-color: var(--danger); }
+        .issue-list li[data-severity="moderate"] { border-left-color: var(--orange); }
+        .issue-list li[data-severity="low"] { border-left-color: var(--yellow); }
+
+        .severity-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+
+        .severity-high { color: var(--danger); }
+        .severity-moderate { color: var(--orange); }
+        .severity-low { color: var(--yellow); }
+
+        .issue-list .issue-name {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 4px;
+        }
+
+        .issue-list .issue-desc {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .cue-list li {
+            border-left-color: var(--accent);
+        }
+
+        .cue-list .cue-text {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 4px;
+        }
+
+        .cue-list .cue-explain {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* Progression path (collapsible) */
+        .progression-toggle {
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 0.85rem;
+            cursor: pointer;
+            padding: 6px 0 0;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: color var(--transition-fast);
+        }
+        .progression-toggle:hover { color: var(--accent-hover); }
+        .progression-toggle:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+        .progression-path {
+            display: none;
+            margin-top: 10px;
+            padding-left: 8px;
+            border-left: 2px solid var(--border);
+        }
+        .progression-path.open { display: block; }
+        .progression-step {
+            padding: 8px 12px;
+            margin-bottom: 4px;
+            position: relative;
+        }
+        .progression-step::before {
+            content: '';
+            position: absolute;
+            left: -14px;
+            top: 14px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--border);
+        }
+        .progression-step.current::before { background: var(--accent); }
+        .progression-step.goal::before { background: var(--success); }
+        .progression-step-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 2px;
+        }
+        .progression-step-label.start { color: var(--text-secondary); }
+        .progression-step-label.progress { color: var(--accent); }
+        .progression-step-label.goal { color: var(--success); }
+        .progression-step-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+        .progression-step-criteria {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .fatigue-badge {
+            display: inline-block;
+            background: var(--orange);
+            color: #000;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        /* Error card */
+        .error-card {
+            background: var(--bg-card);
+            border: 1px solid var(--danger);
+            border-radius: var(--radius-lg);
+            padding: 32px 28px;
+            text-align: center;
+            box-shadow: var(--shadow-card);
+        }
+
+        .error-icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+        }
+
+        .error-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--danger);
+            margin-bottom: 8px;
+        }
+
+        .error-message {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .error-retry-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 32px;
+            background: var(--danger);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background var(--transition-normal), transform var(--transition-fast);
+            min-height: 44px;
+        }
+        .error-retry-btn:hover { background: #e05555; }
+        .error-retry-btn:active { transform: scale(0.97); }
+        .error-retry-btn:focus-visible {
+            outline: 2px solid var(--danger);
+            outline-offset: 2px;
+        }
+
+        /* Legacy error-msg (hidden, replaced by error-card) */
+        .error-msg {
+            display: none;
+        }
+
+        /* Privacy note */
+        .privacy-note {
+            text-align: center;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 12px;
+            padding: 8px;
+        }
+
+        .privacy-note .lock-icon {
+            margin-right: 4px;
+        }
+
+        /* Footer / Disclaimer */
+        footer {
+            text-align: center;
+            padding: 24px 20px 32px;
+            margin-top: 20px;
+        }
+
+        footer p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Count-up animation for score */
+        @keyframes scoreCountUp {
+            from { opacity: 0; transform: scale(0.5); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .score-animate {
+            animation: scoreCountUp 0.5s ease-out;
+        }
+
+        /* Focus visible for keyboard users */
+        :focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        /* Subtle hover effect on cards */
+        .rep-list li:hover,
+        .issue-list li:hover,
+        .cue-list li:hover,
+        .strengths-list li:hover {
+            background: var(--bg-card-hover);
+        }
+
+        /* === Onboarding Modal === */
+        .onboarding-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .onboarding-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 36px 32px;
+            max-width: 520px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .onboarding-card h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+            text-align: center;
+        }
+
+        .onboarding-card .onboarding-subtitle {
+            color: var(--text-secondary);
+            text-align: center;
+            margin-bottom: 24px;
+            font-size: 1rem;
+        }
+
+        .onboarding-steps {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 24px;
+        }
+
+        .onboarding-steps li {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .onboarding-steps li:last-child {
+            border-bottom: none;
+        }
+
+        .onboarding-step-num {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--accent-dim);
+            border: 2px solid var(--accent);
+            color: var(--accent);
+            font-weight: 700;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .onboarding-step-text {
+            color: var(--text-primary);
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+
+        .onboarding-step-text strong {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .onboarding-step-text span {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .onboarding-grades {
+            margin-bottom: 24px;
+        }
+
+        .onboarding-grades h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+        }
+
+        .grade-legend-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .grade-legend-list li {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 0;
+            font-size: 0.95rem;
+        }
+
+        .grade-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .grade-legend-letter {
+            font-weight: 700;
+            width: 28px;
+            flex-shrink: 0;
+        }
+
+        .grade-legend-desc {
+            color: var(--text-secondary);
+        }
+
+        .onboarding-dismiss {
+            width: 100%;
+            padding: 14px 24px;
+            background: var(--accent);
+            color: #000;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 1.05rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background var(--transition-normal), transform var(--transition-fast);
+            min-height: 44px;
+        }
+
+        .onboarding-dismiss:hover {
+            background: var(--accent-hover);
+        }
+
+        .onboarding-dismiss:active {
+            transform: scale(0.97);
+        }
+
+        .onboarding-dismiss:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        /* === Score Context Legend === */
+        .score-legend {
+            margin-top: 20px;
+        }
+
+        .score-legend summary {
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            padding: 8px 0;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            user-select: none;
+        }
+
+        .score-legend summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .score-legend summary .legend-arrow {
+            transition: transform var(--transition-normal);
+            display: inline-block;
+            font-size: 0.8rem;
+        }
+
+        .score-legend[open] summary .legend-arrow {
+            transform: rotate(90deg);
+        }
+
+        .score-legend-content {
+            padding: 12px 0 4px;
+        }
+
+        .score-legend-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .score-legend-list li {
+            padding: 8px 12px;
+            background: var(--bg-input);
+            border-radius: var(--radius-sm);
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+        }
+
+        .score-legend-list li strong {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .score-legend-list li span {
+            color: var(--text-secondary);
+        }
+
+        .score-legend-note {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-style: italic;
+            margin-top: 8px;
+            padding-left: 4px;
+        }
+
+        /* === Milestone Banners === */
+        .milestone-banner {
+            background: rgba(74, 222, 128, 0.08);
+            border: 1px solid rgba(74, 222, 128, 0.3);
+            border-left: 4px solid var(--grade-a);
+            border-radius: var(--radius-sm);
+            padding: 14px 18px;
+            margin-bottom: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--grade-a);
+            box-shadow: 0 0 12px rgba(74, 222, 128, 0.06);
+            animation: milestoneSlide 0.4s ease;
+        }
+
+        @keyframes milestoneSlide {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* === Focus Section === */
+        .focus-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--accent);
+            border-radius: var(--radius-lg);
+            padding: 24px 28px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-card);
+        }
+
+        .focus-card h2 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 8px;
+        }
+
+        .focus-issue-name {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .focus-issue-cue {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .focus-exercises-heading {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 10px;
+        }
+
+        .exercise-cards {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .exercise-card {
+            background: var(--bg-input);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            transition: background var(--transition-normal);
+        }
+
+        .exercise-card:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .exercise-card .exercise-name {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .exercise-card .exercise-desc {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .exercise-card .exercise-sets {
+            font-size: 0.8rem;
+            color: var(--accent);
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        .focus-all-good {
+            font-size: 1.05rem;
+            color: var(--green);
+            font-weight: 500;
+        }
+
+        /* === Mobility Assessment === */
+        .mobility-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 24px 28px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-card);
+        }
+
+        .mobility-section h2 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+        }
+
+        .mobility-area {
+            background: var(--bg-input);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            margin-bottom: 12px;
+            border-left: 3px solid var(--accent);
+        }
+
+        .mobility-area-name {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 4px;
+        }
+
+        .mobility-area-desc {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .mobility-selftest {
+            background: rgba(0, 212, 255, 0.06);
+            border-radius: var(--radius-sm);
+            padding: 10px 14px;
+            margin-bottom: 10px;
+        }
+
+        .mobility-selftest-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--accent);
+            margin-bottom: 4px;
+        }
+
+        .mobility-selftest-text {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            line-height: 1.4;
+        }
+
+        .mobility-exercises {
+            list-style: none;
+            padding: 0;
+        }
+
+        .mobility-exercises li {
+            padding: 4px 0;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        /* === Warm-Up Protocol === */
+        .warmup-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 24px 28px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-card);
+        }
+
+        .warmup-section h2 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .warmup-time {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .warmup-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .warmup-step:last-child { border-bottom: none; }
+
+        .warmup-step-num {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--accent-dim);
+            color: var(--accent);
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .warmup-step-text {
+            flex: 1;
+        }
+        .warmup-step-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+        }
+        .warmup-step-duration {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        /* Collapsible sections */
+        .collapsible-trigger {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            cursor: pointer;
+            padding: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: color var(--transition-normal);
+            width: 100%;
+            text-align: left;
+        }
+        .collapsible-trigger:hover { color: var(--text-primary); }
+        .collapsible-trigger:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+        .collapsible-trigger .collapse-arrow {
+            transition: transform var(--transition-normal);
+            display: inline-block;
+            font-size: 0.8rem;
+        }
+        .collapsible-trigger.open .collapse-arrow {
+            transform: rotate(90deg);
+        }
+        .collapsible-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .collapsible-body.open {
+            max-height: 2000px;
+        }
+
+        /* === Sticking Point Display === */
+        .sticking-point-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 24px 28px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-card);
+        }
+
+        .sticking-point-section h2 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+        }
+
+        .sticking-point-diagram {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 12px;
+        }
+
+        .sticking-point-bar-container {
+            width: 40px;
+            height: 120px;
+            background: var(--bg-input);
+            border-radius: var(--radius-sm);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sticking-point-marker {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 6px;
+            background: var(--danger);
+            border-radius: 3px;
+        }
+
+        .sticking-point-labels {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .sticking-point-labels .sp-label {
+            margin-bottom: 4px;
+        }
+
+        .sticking-point-desc {
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .sticking-point-rec {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* === Bar Path Display === */
+        .bar-path-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 24px 28px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-card);
+        }
+
+        .bar-path-section h2 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+        }
+
+        .bar-path-container {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .bar-path-svg-container {
+            flex-shrink: 0;
+        }
+
+        .bar-path-metrics {
+            flex: 1;
+        }
+
+        .bar-path-metric {
+            margin-bottom: 10px;
+        }
+
+        .bar-path-metric-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 2px;
+        }
+
+        .bar-path-metric-value {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        /* === Report Actions === */
+        .report-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .report-actions .btn-secondary {
+            flex: 1;
+            min-width: 140px;
+        }
+
+        /* Copy success toast */
+        .copy-toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: var(--success);
+            color: #000;
+            padding: 10px 24px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: 0.95rem;
+            z-index: 1001;
+            opacity: 0;
+            transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
+            pointer-events: none;
+        }
+        .copy-toast.visible {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        /* === Progress / Session History === */
+        .progress-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 24px 28px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-card);
+        }
+
+        .progress-section h2 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+        }
+
+        .progress-chart-container {
+            max-height: 200px;
+            margin-bottom: 16px;
+        }
+
+        .progress-chart-container svg {
+            width: 100%;
+            height: auto;
+            max-height: 200px;
+        }
+
+        .session-history-list {
+            list-style: none;
+            padding: 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .session-history-list li {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            background: var(--bg-input);
+            border-radius: var(--radius-sm);
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+            transition: background var(--transition-normal);
+        }
+
+        .session-history-list li:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .session-date {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            min-width: 80px;
+        }
+
+        .session-grade-badge {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #000;
+            flex-shrink: 0;
+        }
+
+        .session-score {
+            font-weight: 700;
+            color: var(--text-primary);
+            min-width: 36px;
+        }
+
+        .session-reps {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            min-width: 50px;
+        }
+
+        .session-issue {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .clear-history-btn {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            cursor: pointer;
+            margin-top: 12px;
+            transition: border-color var(--transition-normal), color var(--transition-normal);
+            min-height: 44px;
+        }
+
+        .clear-history-btn:hover {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .clear-history-btn:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        /* === Print Stylesheet === */
+        @media print {
+            body { background: white; color: black; }
+            .btn, .btn-secondary, .btn-quick, .quick-start, .camera-guide, #history-section,
+            .onboarding-overlay, .skip-nav, .settings-toggle, .settings-collapsible,
+            .file-drop, .privacy-note, .report-actions, .progress-section,
+            .error-card, .spinner, .skeleton-container, #upload-card, .copy-toast,
+            .collapsible-trigger, .progression-toggle { display: none !important; }
+            .card, .focus-card, .mobility-section, .warmup-section,
+            .sticking-point-section, .bar-path-section {
+                border: 1px solid #ccc;
+                background: white;
+                box-shadow: none;
+                transform: none;
+            }
+            .score-bar { background: #eee; }
+            .score-bar-fill { background: #333; }
+            .score-value, .score-grade, .tier-message, h1, h2 { color: #000 !important; }
+            .score-circle { border-color: #333 !important; }
+            .text-secondary, .text-muted { color: #555 !important; }
+            header p, .score-label, .issue-desc, .cue-explain,
+            .mobility-area-desc, .warmup-step-duration { color: #555 !important; }
+            .collapsible-body, .progression-path { display: block !important; max-height: none !important; }
+        }
+
+        /* Touch optimization for interactive elements */
+        button, .btn, select, input[type="checkbox"], .toggle-switch, [role="button"] {
+            touch-action: manipulation;
+        }
+    </style>
+</head>
+<body>
+    <a href="#main-content" class="skip-nav">Skip to main content</a>
+
+    <!-- Copy Toast -->
+    <div class="copy-toast" id="copy-toast" aria-live="polite">Report copied to clipboard</div>
+
+    <!-- Onboarding Modal (shown on first visit) -->
+    <div class="onboarding-overlay" id="onboarding-overlay" style="display:none;" role="dialog" aria-modal="true" aria-label="Welcome to Squat Form Analyzer">
+        <div class="onboarding-card">
+            <h2>Welcome to Squat Form Analyzer</h2>
+            <p class="onboarding-subtitle">Upload a video of your squat and get instant feedback on your form.</p>
+
+            <ol class="onboarding-steps" aria-label="How it works">
+                <li>
+                    <span class="onboarding-step-num" aria-hidden="true">1</span>
+                    <div class="onboarding-step-text">
+                        <strong>Set Up Your Camera</strong>
+                        <span>Place your phone at hip height, 2-4 meters away, and film from the side.</span>
+                    </div>
+                </li>
+                <li>
+                    <span class="onboarding-step-num" aria-hidden="true">2</span>
+                    <div class="onboarding-step-text">
+                        <strong>Record Your Set</strong>
+                        <span>Do your squats with your full body visible. Upload the video here.</span>
+                    </div>
+                </li>
+                <li>
+                    <span class="onboarding-step-num" aria-hidden="true">3</span>
+                    <div class="onboarding-step-text">
+                        <strong>Get Your Score</strong>
+                        <span>See your overall grade, rep-by-rep breakdown, and personalized coaching cues.</span>
+                    </div>
+                </li>
+            </ol>
+
+            <div class="onboarding-grades">
+                <h3>What the Grades Mean</h3>
+                <ul class="grade-legend-list" aria-label="Grade legend">
+                    <li>
+                        <span class="grade-dot" style="background:var(--grade-a);" aria-hidden="true"></span>
+                        <span class="grade-legend-letter" style="color:var(--grade-a);">A</span>
+                        <span class="grade-legend-desc">Excellent form &mdash; minor polish only</span>
+                    </li>
+                    <li>
+                        <span class="grade-dot" style="background:var(--grade-b);" aria-hidden="true"></span>
+                        <span class="grade-legend-letter" style="color:var(--grade-b);">B</span>
+                        <span class="grade-legend-desc">Good form &mdash; one or two things to work on</span>
+                    </li>
+                    <li>
+                        <span class="grade-dot" style="background:var(--grade-c);" aria-hidden="true"></span>
+                        <span class="grade-legend-letter" style="color:var(--grade-c);">C</span>
+                        <span class="grade-legend-desc">Decent &mdash; a few areas need attention</span>
+                    </li>
+                    <li>
+                        <span class="grade-dot" style="background:var(--grade-d);" aria-hidden="true"></span>
+                        <span class="grade-legend-letter" style="color:var(--grade-d);">D</span>
+                        <span class="grade-legend-desc">Getting there &mdash; the exercises below will help</span>
+                    </li>
+                    <li>
+                        <span class="grade-dot" style="background:var(--grade-kw);" aria-hidden="true"></span>
+                        <span class="grade-legend-letter" style="color:var(--grade-kw);">KW</span>
+                        <span class="grade-legend-desc">Keep Working &mdash; you're building the foundation</span>
+                    </li>
+                </ul>
+            </div>
+
+            <button class="onboarding-dismiss" id="onboarding-dismiss" aria-label="Dismiss welcome guide and start using the app">Got it, let's go!</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>Squat Form Analyzer</h1>
+            <p>Upload a video of your squat for AI-powered form analysis and coaching</p>
+            <button class="btn-link" id="how-it-works-btn" type="button">How does this work?</button>
+        </header>
+
+        <main id="main-content">
+            <!-- Quick Start -->
+            <button class="btn-quick" id="quick-start-btn" aria-label="Quick analyze my squat: uses default settings and opens file picker">
+                <span aria-hidden="true">&#9889;</span> Quick Analyze My Squat
+            </button>
+
+            <!-- Your Progress (session history) -->
+            <section class="progress-section" id="progress-section" style="display:none;" aria-label="Your progress and session history">
+                <h2>Your Progress</h2>
+                <div class="progress-chart-container" id="progress-chart" aria-label="Score trend chart for last 10 sessions"></div>
+                <ul class="session-history-list" id="session-history-list" aria-label="Past sessions"></ul>
+                <button class="clear-history-btn" id="clear-history-btn" aria-label="Clear all session history">Clear History</button>
+            </section>
+
+            <!-- Camera Setup Guide -->
+            <section class="camera-guide" aria-label="Camera setup guide">
+                <h2 id="camera-guide-heading">Camera Setup</h2>
+                <div class="camera-guide-content">
+                    <svg width="200" height="160" viewBox="0 0 200 160" role="img" aria-label="Diagram showing proper phone placement: place phone at hip height, 2 to 4 meters away, with a side view of the person squatting">
+                        <!-- Floor -->
+                        <line x1="10" y1="140" x2="190" y2="140" stroke="#a0a0a0" stroke-width="1.5" stroke-dasharray="4,3"/>
+                        <!-- Stick figure (side view) -->
+                        <circle cx="145" cy="50" r="8" fill="none" stroke="#e0e0e0" stroke-width="2"/>
+                        <line x1="145" y1="58" x2="145" y2="95" stroke="#e0e0e0" stroke-width="2"/>
+                        <line x1="145" y1="70" x2="130" y2="82" stroke="#e0e0e0" stroke-width="2"/>
+                        <line x1="145" y1="70" x2="160" y2="82" stroke="#e0e0e0" stroke-width="2"/>
+                        <line x1="145" y1="95" x2="138" y2="118" stroke="#e0e0e0" stroke-width="2"/>
+                        <line x1="138" y1="118" x2="140" y2="140" stroke="#e0e0e0" stroke-width="2"/>
+                        <line x1="145" y1="95" x2="152" y2="118" stroke="#e0e0e0" stroke-width="2"/>
+                        <line x1="152" y1="118" x2="150" y2="140" stroke="#e0e0e0" stroke-width="2"/>
+                        <!-- Phone on surface -->
+                        <rect x="25" y="90" width="12" height="22" rx="2" fill="none" stroke="#00d4ff" stroke-width="2"/>
+                        <rect x="27" y="93" width="8" height="14" rx="1" fill="rgba(0,212,255,0.2)"/>
+                        <!-- Surface/table for phone -->
+                        <line x1="15" y1="112" x2="50" y2="112" stroke="#a0a0a0" stroke-width="1.5"/>
+                        <line x1="20" y1="112" x2="20" y2="140" stroke="#a0a0a0" stroke-width="1.5"/>
+                        <line x1="45" y1="112" x2="45" y2="140" stroke="#a0a0a0" stroke-width="1.5"/>
+                        <!-- Distance arrow -->
+                        <line x1="45" y1="148" x2="138" y2="148" stroke="#00d4ff" stroke-width="1" marker-start="url(#arrowL)" marker-end="url(#arrowR)"/>
+                        <defs>
+                            <marker id="arrowL" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto"><path d="M6,0 L0,3 L6,6" fill="none" stroke="#00d4ff" stroke-width="1"/></marker>
+                            <marker id="arrowR" markerWidth="6" markerHeight="6" refX="0" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="#00d4ff" stroke-width="1"/></marker>
+                        </defs>
+                        <text x="90" y="158" text-anchor="middle" fill="#00d4ff" font-size="11" font-family="sans-serif">2-4 m</text>
+                        <text x="145" y="28" text-anchor="middle" fill="#a0a0a0" font-size="10" font-family="sans-serif">Side View (recommended)</text>
+                        <text x="31" y="85" text-anchor="middle" fill="#a0a0a0" font-size="9" font-family="sans-serif">Hip height</text>
+                    </svg>
+                    <ul class="camera-tips">
+                        <li><span class="tip-icon" aria-hidden="true">&#10003;</span> Prop your phone at hip height, 2-4m away</li>
+                        <li><span class="tip-icon" aria-hidden="true">&#10003;</span> Stand sideways to the camera for best results</li>
+                        <li><span class="tip-icon" aria-hidden="true">&#10003;</span> Make sure your full body is visible</li>
+                        <li><span class="tip-icon" aria-hidden="true">&#10003;</span> Good lighting helps accuracy</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Upload Card -->
+            <section class="card" id="upload-card" aria-label="Upload video for analysis">
+                <h2 id="upload-heading">Upload Video</h2>
+
+                <div class="file-drop" id="file-drop" role="button" tabindex="0" aria-label="Drop zone: drag and drop your video here, or click to browse files">
+                    <div class="icon" aria-hidden="true">&#128249;</div>
+                    <p>Drag and drop your video here, or click to browse</p>
+                    <p class="filename" id="filename-display" aria-live="polite"></p>
+                    <input type="file" id="file-input" accept="video/*" hidden aria-label="Select video file to upload">
+                </div>
+                <p style="text-align:center;color:var(--text-muted);font-size:0.85rem;margin-top:-12px;margin-bottom:16px;">Best results: 10-30 second video, landscape orientation, full body visible. Film one set (3-10 reps).</p>
+
+                <!-- Settings toggle -->
+                <button class="settings-toggle" id="settings-toggle" type="button" aria-expanded="false" aria-controls="settings-panel" aria-label="Toggle analysis settings">
+                    <span class="toggle-arrow" aria-hidden="true">&#9654;</span> Customize settings
+                </button>
+
+                <div class="settings-collapsible" id="settings-panel" role="region" aria-label="Analysis settings">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="squat-type">Squat Type</label>
+                            <select id="squat-type" aria-label="Select squat type">
+                                <option value="bodyweight">Bodyweight</option>
+                                <option value="high_bar">High Bar</option>
+                                <option value="low_bar">Low Bar</option>
+                                <option value="front">Front Squat</option>
+                                <option value="goblet">Goblet</option>
+                                <option value="overhead">Overhead</option>
+                            </select>
+                            <div class="squat-type-desc" id="squat-type-desc" aria-live="polite">No equipment</div>
+                        </div>
+                        <div class="form-group">
+                            <label for="experience-level">Experience</label>
+                            <select id="experience-level" aria-label="Select your experience level">
+                                <option value="beginner">Beginner</option>
+                                <option value="intermediate">Intermediate</option>
+                                <option value="advanced">Advanced</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="camera-view">Camera View</label>
+                            <select id="camera-view" aria-label="Select camera angle used in your video">
+                                <option value="side">Side View</option>
+                                <option value="front">Front View</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="setting-row">
+                        <label for="competition-mode">Competition Mode (IPF/USAPL)</label>
+                        <input type="checkbox" id="competition-mode" aria-label="Enable competition mode for IPF/USAPL judging criteria">
+                    </div>
+                </div>
+
+                <button class="btn" id="analyze-btn" disabled aria-label="Analyze squat form from uploaded video">Analyze Squat</button>
+
+                <div class="privacy-note">
+                    <span class="lock-icon" aria-hidden="true">&#128274;</span>
+                    Your video is processed on our server and deleted immediately after analysis. No videos are stored.
+                </div>
+            </section>
+
+            <!-- Loading -->
+            <section class="spinner" id="spinner" aria-label="Analysis progress" aria-live="polite">
+                <div class="ring" aria-hidden="true"></div>
+                <p id="spinner-status">Analyzing your squat form...</p>
+                <p style="font-size:0.875rem; margin-top:8px; color:var(--text-secondary);">This may take a moment depending on video length.</p>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Analysis progress">
+                        <div class="progress-bar-fill"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Skeleton loading state -->
+            <div class="skeleton-container" id="skeleton-container" aria-label="Loading results" aria-live="polite">
+                <div class="skeleton-card" aria-hidden="true">
+                    <div style="text-align:center; padding: 20px 0;">
+                        <div class="skeleton-pulse skeleton-score-circle"></div>
+                        <div class="skeleton-pulse skeleton-bar w-40"></div>
+                        <div class="skeleton-pulse skeleton-bar w-60"></div>
+                    </div>
+                    <div class="skeleton-bars-grid">
+                        <div class="skeleton-bar-item"><div class="skeleton-pulse skeleton-label"></div><div class="skeleton-pulse skeleton-track"></div></div>
+                        <div class="skeleton-bar-item"><div class="skeleton-pulse skeleton-label"></div><div class="skeleton-pulse skeleton-track"></div></div>
+                        <div class="skeleton-bar-item"><div class="skeleton-pulse skeleton-label"></div><div class="skeleton-pulse skeleton-track"></div></div>
+                        <div class="skeleton-bar-item"><div class="skeleton-pulse skeleton-label"></div><div class="skeleton-pulse skeleton-track"></div></div>
+                        <div class="skeleton-bar-item"><div class="skeleton-pulse skeleton-label"></div><div class="skeleton-pulse skeleton-track"></div></div>
+                        <div class="skeleton-bar-item"><div class="skeleton-pulse skeleton-label"></div><div class="skeleton-pulse skeleton-track"></div></div>
+                    </div>
+                </div>
+                <div class="skeleton-card" aria-hidden="true">
+                    <div class="skeleton-pulse skeleton-bar" style="width:40%; margin-bottom:16px;"></div>
+                    <div class="skeleton-pulse skeleton-bar w-80"></div>
+                    <div class="skeleton-pulse skeleton-bar" style="width:70%;"></div>
+                </div>
+            </div>
+
+            <!-- Error -->
+            <div id="error-container" style="display:none;" aria-live="assertive">
+                <div class="error-card" id="error-card" role="alert">
+                    <div class="error-icon" aria-hidden="true">&#9888;</div>
+                    <div class="error-title" id="error-title">Analysis Failed</div>
+                    <div class="error-message" id="error-message">Something went wrong. Please try again.</div>
+                    <button class="error-retry-btn" id="error-retry-btn" aria-label="Try again">Try Again</button>
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div id="results" aria-live="polite">
+                <!-- Side View Warning -->
+                <div id="side-view-warning-container"></div>
+
+                <!-- Milestone Banners -->
+                <div id="milestone-container" aria-live="polite"></div>
+
+                <!-- Score Hero -->
+                <section class="card results-reveal" aria-label="Overall score summary">
+                    <div class="score-hero">
+                        <h2 id="score-heading" class="sr-only">Overall Score</h2>
+                        <div class="score-circle" id="score-circle">
+                            <div class="score-value" id="overall-score" aria-label="Overall score">--</div>
+                        </div>
+                        <div class="score-grade" id="overall-grade">--</div>
+                        <div class="score-label" id="rep-count-label">-- reps analyzed</div>
+                        <div id="competition-badge-container"></div>
+                        <div id="comp-depth-container"></div>
+                        <div id="tier-message-container"></div>
+                        <div id="fatigue-container"></div>
+                    </div>
+
+                    <div class="score-bar-grid" id="dimension-scores" role="group" aria-label="Dimension scores breakdown"></div>
+
+                    <!-- Score Context Legend -->
+                    <details class="score-legend" aria-label="What each score dimension measures">
+                        <summary><span class="legend-arrow" aria-hidden="true">&#9654;</span> What do these scores mean?</summary>
+                        <div class="score-legend-content">
+                            <ul class="score-legend-list">
+                                <li><strong>Depth (20%)</strong> <span>&mdash; How deep you squat</span></li>
+                                <li><strong>Knee Tracking (30%)</strong> <span>&mdash; Whether your knees stay over your toes (most important for safety)</span></li>
+                                <li><strong>Torso Position (20%)</strong> <span>&mdash; Your upper body angle</span></li>
+                                <li><strong>Balance (10%)</strong> <span>&mdash; Even weight on both legs</span></li>
+                                <li><strong>Control (10%)</strong> <span>&mdash; Smooth movement speed</span></li>
+                                <li><strong>Lockout (10%)</strong> <span>&mdash; Fully standing up between reps</span></li>
+                            </ul>
+                            <p class="score-legend-note">Scores are personalized to your body proportions and experience level.</p>
+                        </div>
+                    </details>
+
+                    <!-- Report Actions -->
+                    <div class="report-actions">
+                        <button class="btn-secondary" id="print-report-btn" aria-label="Print analysis report">
+                            <span aria-hidden="true">&#128424;</span> Print Report
+                        </button>
+                        <button class="btn-secondary" id="copy-report-btn" aria-label="Copy analysis report to clipboard">
+                            <span aria-hidden="true">&#128203;</span> Copy Report
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Your #1 Focus -->
+                <section class="focus-card results-reveal" id="focus-card" style="display:none;" aria-label="Your number one focus area">
+                    <h2>Your #1 Focus</h2>
+                    <div id="focus-content"></div>
+                </section>
+
+                <!-- What You Did Well -->
+                <section class="card results-reveal" id="strengths-card" style="display:none;" aria-label="What you did well">
+                    <h2 id="strengths-heading">What You Did Well</h2>
+                    <ul class="strengths-list" id="strengths-list"></ul>
+                </section>
+
+                <!-- Annotated Video -->
+                <section class="card video-section results-reveal" id="video-card" style="display:none;" aria-label="Annotated video playback">
+                    <h2 id="video-heading">Annotated Video</h2>
+                    <video id="annotated-video" controls aria-label="Annotated squat form analysis video"></video>
+                </section>
+
+                <!-- Bar Path -->
+                <section class="bar-path-section results-reveal" id="bar-path-section" style="display:none;" aria-label="Bar path analysis">
+                    <h2>Bar Path</h2>
+                    <div class="bar-path-container">
+                        <div class="bar-path-svg-container" id="bar-path-svg" aria-label="Bar path diagram"></div>
+                        <div class="bar-path-metrics" id="bar-path-metrics"></div>
+                    </div>
+                </section>
+
+                <!-- Sticking Point -->
+                <section class="sticking-point-section results-reveal" id="sticking-point-section" style="display:none;" aria-label="Sticking point analysis">
+                    <h2>Sticking Point</h2>
+                    <div id="sticking-point-content"></div>
+                </section>
+
+                <!-- Per-Rep Scores -->
+                <section class="card results-reveal" aria-label="Individual rep scores">
+                    <h2 id="rep-heading">Rep Scores</h2>
+                    <ul class="rep-list" id="rep-list"></ul>
+                </section>
+
+                <!-- Issues -->
+                <section class="card results-reveal" id="issues-card" style="display:none;" aria-label="Form issues found">
+                    <h2 id="issues-heading">Form Issues</h2>
+                    <ul class="issue-list" id="issue-list"></ul>
+                </section>
+
+                <!-- Coaching Cues -->
+                <section class="card results-reveal" id="cues-card" style="display:none;" aria-label="Coaching cues and tips">
+                    <h2 id="cues-heading">Coaching Cues</h2>
+                    <ol class="cue-list" id="cue-list"></ol>
+                </section>
+
+                <!-- Mobility Assessment -->
+                <section class="mobility-section results-reveal" id="mobility-section" style="display:none;" aria-label="Mobility assessment">
+                    <h2>Mobility Assessment</h2>
+                    <div id="mobility-content"></div>
+                </section>
+
+                <!-- Warm-Up Protocol -->
+                <section class="warmup-section results-reveal" id="warmup-section" style="display:none;" aria-label="Recommended warm-up protocol">
+                    <button class="collapsible-trigger" id="warmup-trigger" aria-expanded="false" aria-controls="warmup-body" aria-label="Toggle recommended warm-up">
+                        <span class="collapse-arrow" aria-hidden="true">&#9654;</span> <strong>Recommended Warm-Up</strong>
+                    </button>
+                    <div class="warmup-time" id="warmup-time"></div>
+                    <div class="collapsible-body" id="warmup-body">
+                        <div id="warmup-steps"></div>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <footer>
+            <p>
+                This tool provides AI-based estimates that may contain errors.
+                Not a substitute for professional coaching.
+                Consult a physician before starting any exercise program.
+                Always listen to your body &mdash; stop if you feel pain.
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // ===== Constants =====
+
+        const ISSUE_DISPLAY_NAMES = {
+            insufficient_depth: 'Not Deep Enough',
+            knee_valgus: 'Knees Caving In',
+            butt_wink: 'Hips Tucking Under',
+            excessive_forward_lean: 'Too Much Forward Lean',
+            good_morning: 'Hips Rising First',
+            heel_rise: 'Heels Coming Up',
+            fast_descent: 'Dropping Too Fast',
+            bouncing: 'Bouncing at Bottom',
+            asymmetric_shift: 'Shifting to One Side',
+            incomplete_lockout: 'Not Fully Standing Up',
+            excessive_forward_knee: 'Forward Knee Travel',
+            shin_angle: 'Forward Knee Travel',
+        };
+
+        const DIMENSION_LABELS = {
+            depth: 'Depth',
+            knee_tracking: 'Knee Tracking',
+            trunk: 'Torso Position',
+            symmetry: 'Balance',
+            tempo: 'Control',
+            lockout: 'Lockout',
+        };
+
+        const CORRECTIVE_EXERCISES = {
+            knee_valgus: [
+                { name: 'Banded Squats', desc: 'Place a resistance band above your knees and push out against it during squats.', sets: '3x10' },
+                { name: 'Clamshells', desc: 'Lie on your side with knees bent, open and close your top knee like a clamshell.', sets: '3x15 each side' },
+                { name: 'Monster Walks', desc: 'With a band around your ankles, walk sideways in a low squat position.', sets: '3x10 each direction' },
+            ],
+            butt_wink: [
+                { name: 'Box Squats', desc: 'Squat down to a box at your target depth, focusing on keeping your pelvis neutral.', sets: '3x8' },
+                { name: '90/90 Hip Stretch', desc: 'Sit with both legs at 90 degrees, lean forward over your front shin.', sets: '30s each side' },
+                { name: 'Goblet Squat Holds', desc: 'Hold a kettlebell at your chest and pause at the bottom of a squat.', sets: '3x10s at bottom' },
+            ],
+            excessive_forward_lean: [
+                { name: 'Goblet Squats', desc: 'Hold a weight at chest height to counterbalance and train upright posture.', sets: '3x10' },
+                { name: 'Wall Ankle Stretches', desc: 'Place your toe against a wall and drive your knee forward to improve ankle mobility.', sets: '3x30s each' },
+                { name: 'Front Foot Elevated Split Squats', desc: 'Place your front foot on a small plate to train upright torso position.', sets: '3x8' },
+            ],
+            good_morning: [
+                { name: 'Pause Squats', desc: 'Pause for 2 seconds at the bottom of each rep to break the habit.', sets: '3x5, 2s pause' },
+                { name: 'Front Squats', desc: 'Front-loaded position forces you to stay upright and drive with your legs.', sets: '3x8' },
+                { name: 'Leg Press', desc: 'Build quad strength without the torso compensation pattern.', sets: '3x10' },
+            ],
+            heel_rise: [
+                { name: 'Wall Ankle Stretches', desc: 'Improve ankle dorsiflexion by driving your knee past your toes at a wall.', sets: '3x30s' },
+                { name: 'Heel-Elevated Squats', desc: 'Place your heels on small plates while you work on ankle mobility.', sets: '3x10' },
+                { name: 'Calf Foam Rolling', desc: 'Roll out tight calves before squatting to free up ankle range of motion.', sets: '2 min each' },
+            ],
+            insufficient_depth: [
+                { name: 'Goblet Squat to Box', desc: 'Squat to a box set at your target depth, gradually lowering it over time.', sets: '3x10' },
+                { name: 'Deep Squat Hold', desc: 'Hold the bottom of a bodyweight squat, using a doorframe for balance if needed.', sets: '3x20s' },
+                { name: 'Hip 90/90 Stretch', desc: 'Sit with legs in a 90/90 position and rotate between sides to open your hips.', sets: '3x30s' },
+            ],
+            fast_descent: [
+                { name: 'Tempo Squats', desc: 'Lower yourself for a full 3-second count on every rep.', sets: '3x5, 3s down' },
+                { name: 'Pause Squats', desc: 'Add a pause at the bottom to build control through the full range.', sets: '3x5' },
+                { name: 'Eccentric Wall Sits', desc: 'Slowly slide down a wall over 5 seconds, then stand back up.', sets: '3x20s' },
+            ],
+            bouncing: [
+                { name: 'Pause Squats', desc: 'Pause for 2 seconds at the bottom, eliminating any bounce or rebound.', sets: '3x5, 2s pause' },
+                { name: 'Dead-Stop Squats', desc: 'Squat to a box and fully sit down before standing back up.', sets: '3x5' },
+                { name: 'Isometric Bottom Hold', desc: 'Hold the bottom position of your squat to build control at that range.', sets: '3x10s' },
+            ],
+        };
+
+        // Mobility assessment data
+        const MOBILITY_DATA = {
+            heel_rise: {
+                area: 'Ankles',
+                desc: 'Your ankle flexibility may be limiting your squat depth.',
+                selfTest: 'Kneel facing a wall with toes 4 inches away. Can your knee touch the wall?',
+                exercises: [
+                    'Wall ankle stretch 3x30s',
+                    'Calf foam rolling 2min',
+                    'Banded ankle distraction 2x30s',
+                ],
+            },
+            butt_wink: {
+                area: 'Hips',
+                desc: 'Your hip flexion range may be limiting your bottom position.',
+                selfTest: 'Lie on your back, pull one knee to chest. Other leg lifts? Hip flexors tight.',
+                exercises: [
+                    '90/90 hip stretch 3x30s',
+                    'Pigeon stretch 2x45s',
+                    'Deep squat hold 3x20s',
+                ],
+            },
+            knee_valgus: {
+                area: 'Hip Abductors',
+                desc: 'The outside hip muscles need strengthening.',
+                selfTest: 'Stand on one leg 30s. Hip drops or knee caves? Hip abductors are weak.',
+                exercises: [
+                    'Clamshells with band 3x15',
+                    'Lateral band walks 3x10',
+                    'Single-leg glute bridges 3x12',
+                ],
+            },
+            excessive_forward_lean: {
+                area: 'Multiple (Ankles, Hips, Upper Back)',
+                desc: 'Ankle, hip, or upper back mobility may be limiting.',
+                selfTest: 'Hold broomstick overhead and squat. Can\'t keep it over feet? Upper back is tight.',
+                exercises: [
+                    'Wall ankle stretch 3x30s',
+                    'Cat-cow 2x10',
+                    'Open book stretch 2x10',
+                ],
+            },
+            good_morning: {
+                area: 'Core / Quads',
+                desc: 'Core stability or quad strength needs work.',
+                selfTest: 'Wall sit at 90 degrees for 45s. Quads give out? Quad endurance is a factor.',
+                exercises: [
+                    'Goblet squat holds 3x10s',
+                    'Front plank 3x30s',
+                    'Wall sits 3x30s',
+                ],
+            },
+        };
+
+        // Exercise progressions for coaching cues
+        const CUE_PROGRESSIONS = {
+            knee_valgus: [
+                { label: 'Start Here', name: 'Banded Clamshells', criteria: '3x15 without band slipping' },
+                { label: 'Progress To', name: 'Banded Goblet Squats', criteria: 'Knees track over toes for 3x10' },
+                { label: 'Goal', name: 'Unassisted Barbell Squat', criteria: 'No knee cave at working weight' },
+            ],
+            butt_wink: [
+                { label: 'Start Here', name: 'Box Squats (high box)', criteria: 'Neutral pelvis at box height' },
+                { label: 'Progress To', name: 'Box Squats (low box)', criteria: 'Neutral pelvis at parallel' },
+                { label: 'Goal', name: 'Free Squat to Depth', criteria: 'No butt wink at full depth' },
+            ],
+            excessive_forward_lean: [
+                { label: 'Start Here', name: 'Goblet Squats', criteria: 'Torso stays within 30 degrees' },
+                { label: 'Progress To', name: 'Front Squats', criteria: 'Elbows stay up through full ROM' },
+                { label: 'Goal', name: 'Back Squat Upright', criteria: 'Torso matches squat type ideal angle' },
+            ],
+            good_morning: [
+                { label: 'Start Here', name: 'Pause Squats (light)', criteria: '2s pause without hips shooting up' },
+                { label: 'Progress To', name: 'Tempo Squats', criteria: '3s down, 1s up, chest stays up' },
+                { label: 'Goal', name: 'Working Weight Squat', criteria: 'Hips and shoulders rise together' },
+            ],
+            heel_rise: [
+                { label: 'Start Here', name: 'Heel-Elevated Squats', criteria: 'Full depth with heels on plates' },
+                { label: 'Progress To', name: 'Flat Shoe Squats', criteria: 'Full depth, heels stay down' },
+                { label: 'Goal', name: 'Barefoot Squat', criteria: 'Full depth, tripod foot position' },
+            ],
+            insufficient_depth: [
+                { label: 'Start Here', name: 'Goblet Squat to High Box', criteria: 'Touch and go at box height' },
+                { label: 'Progress To', name: 'Bodyweight Squat to Parallel', criteria: 'Hip crease below knee consistently' },
+                { label: 'Goal', name: 'Loaded Squat to Depth', criteria: 'Consistent depth at working weight' },
+            ],
+        };
+
+        // Sticking point recommendations
+        const STICKING_POINT_RECS = {
+            bottom: 'Focus on pause squats and improving mobility out of the hole. Pin squats from the bottom position can also help.',
+            mid: 'Strengthen your quads with front squats, leg press, and tempo squats. This is typically a quad-dominant sticking point.',
+            top: 'Work on lockout strength with rack pulls, band-resisted squats, and hip thrusters. Glute activation drills may also help.',
+        };
+
+        const GRADE_COLORS = {
+            A: 'var(--grade-a)',
+            B: 'var(--grade-b)',
+            C: 'var(--grade-c)',
+            D: 'var(--grade-d)',
+            F: 'var(--grade-kw)',
+            'Keep Working': 'var(--grade-kw)',
+        };
+
+        const STORAGE_KEYS = {
+            sessions: 'squat_form_sessions',
+            settings: 'squat_form_settings',
+            onboarded: 'squat_form_onboarded',
+        };
+
+        const MAX_SESSIONS = 50;
+
+        // Store last analysis for report generation
+        let lastAnalysis = null;
+        let lastAnalysisData = null;
+
+        // ===== DOM Elements =====
+
+        const fileDrop = document.getElementById('file-drop');
+        const fileInput = document.getElementById('file-input');
+        const filenameDisplay = document.getElementById('filename-display');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const spinner = document.getElementById('spinner');
+        const skeletonContainer = document.getElementById('skeleton-container');
+        const resultsEl = document.getElementById('results');
+        const errorContainer = document.getElementById('error-container');
+        const quickStartBtn = document.getElementById('quick-start-btn');
+        const settingsToggle = document.getElementById('settings-toggle');
+        const settingsPanel = document.getElementById('settings-panel');
+        const onboardingOverlay = document.getElementById('onboarding-overlay');
+        const onboardingDismiss = document.getElementById('onboarding-dismiss');
+        const progressSection = document.getElementById('progress-section');
+        const clearHistoryBtn = document.getElementById('clear-history-btn');
+        const competitionModeCheckbox = document.getElementById('competition-mode');
+
+        let selectedFile = null;
+
+        // ===== Squat type descriptions =====
+        const squatTypeDescriptions = {
+            bodyweight: 'No equipment',
+            high_bar: 'Barbell on upper back/traps',
+            low_bar: 'Barbell on lower back/rear shoulders',
+            front: 'Barbell on front shoulders',
+            goblet: 'Holding weight at chest',
+            overhead: 'Weight held overhead',
+        };
+
+        // ===== Settings persistence =====
+
+        function saveSettings() {
+            try {
+                const settings = {
+                    squat_type: document.getElementById('squat-type').value,
+                    experience_level: document.getElementById('experience-level').value,
+                    camera_view: document.getElementById('camera-view').value,
+                    competition_mode: competitionModeCheckbox.checked,
+                };
+                localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings));
+            } catch (e) { /* localStorage may be unavailable */ }
+        }
+
+        function restoreSettings() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEYS.settings);
+                if (!raw) return;
+                const settings = JSON.parse(raw);
+                if (settings.squat_type) {
+                    document.getElementById('squat-type').value = settings.squat_type;
+                    squatTypeDesc.textContent = squatTypeDescriptions[settings.squat_type] || '';
+                }
+                if (settings.experience_level) {
+                    document.getElementById('experience-level').value = settings.experience_level;
+                }
+                if (settings.camera_view) {
+                    document.getElementById('camera-view').value = settings.camera_view;
+                }
+                if (settings.competition_mode) {
+                    competitionModeCheckbox.checked = true;
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        // ===== Session History =====
+
+        function getSessions() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEYS.sessions);
+                return raw ? JSON.parse(raw) : [];
+            } catch (e) { return []; }
+        }
+
+        function saveSessions(sessions) {
+            try {
+                localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(sessions));
+            } catch (e) { /* ignore */ }
+        }
+
+        function addSession(analysis) {
+            const sessions = getSessions();
+            const topIssue = (analysis.top_issues && analysis.top_issues.length > 0)
+                ? (ISSUE_DISPLAY_NAMES[analysis.top_issues[0].name] || analysis.top_issues[0].name.replace(/_/g, ' '))
+                : 'None';
+            const session = {
+                id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+                date: new Date().toISOString(),
+                squat_type: document.getElementById('squat-type').value,
+                experience_level: document.getElementById('experience-level').value,
+                rep_count: analysis.rep_count || 0,
+                overall_score: Math.round(analysis.overall_score),
+                grade: analysis.grade === 'F' ? 'KW' : analysis.grade,
+                top_issue: topIssue,
+            };
+            sessions.unshift(session);
+            if (sessions.length > MAX_SESSIONS) sessions.length = MAX_SESSIONS;
+            saveSessions(sessions);
+            return session;
+        }
+
+        function gradeColor(grade) {
+            if (grade === 'A') return 'var(--grade-a)';
+            if (grade === 'B') return 'var(--grade-b)';
+            if (grade === 'C') return 'var(--grade-c)';
+            if (grade === 'D') return 'var(--grade-d)';
+            return 'var(--grade-kw)';
+        }
+
+        function gradeColorHex(grade) {
+            if (grade === 'A') return '#4ade80';
+            if (grade === 'B') return '#2dd4bf';
+            if (grade === 'C') return '#fbbf24';
+            if (grade === 'D') return '#fb923c';
+            return '#94a3b8';
+        }
+
+        function renderProgressSection() {
+            const sessions = getSessions();
+            if (sessions.length === 0) {
+                progressSection.style.display = 'none';
+                return;
+            }
+            progressSection.style.display = 'block';
+
+            // Render chart (last 10 sessions, oldest first)
+            const chartContainer = document.getElementById('progress-chart');
+            const chartSessions = sessions.slice(0, 10).reverse();
+            renderProgressChart(chartContainer, chartSessions);
+
+            // Render history list
+            const list = document.getElementById('session-history-list');
+            list.innerHTML = '';
+            for (const s of sessions) {
+                const li = document.createElement('li');
+                const d = new Date(s.date);
+                const dateStr = (d.getMonth() + 1) + '/' + d.getDate();
+                const displayGradeText = s.grade === 'F' ? 'KW' : s.grade;
+                li.innerHTML =
+                    '<span class="session-date">' + escapeHtml(dateStr) + '</span>' +
+                    '<span class="session-grade-badge" style="background:' + gradeColor(s.grade) + ';" aria-label="Grade ' + escapeHtml(displayGradeText) + '">' + escapeHtml(displayGradeText) + '</span>' +
+                    '<span class="session-score">' + s.overall_score + '</span>' +
+                    '<span class="session-reps">' + s.rep_count + ' rep' + (s.rep_count !== 1 ? 's' : '') + '</span>' +
+                    '<span class="session-issue">' + escapeHtml(s.top_issue) + '</span>';
+                list.appendChild(li);
+            }
+        }
+
+        function renderProgressChart(container, sessions) {
+            if (sessions.length < 2) {
+                container.innerHTML = '';
+                return;
+            }
+
+            const W = 600;
+            const H = 160;
+            const padL = 40;
+            const padR = 20;
+            const padT = 20;
+            const padB = 30;
+            const plotW = W - padL - padR;
+            const plotH = H - padT - padB;
+
+            const n = sessions.length;
+            const xStep = plotW / Math.max(n - 1, 1);
+
+            let svgContent = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Line chart showing your score trend over the last ' + n + ' sessions">';
+
+            // Y-axis labels
+            for (let y = 0; y <= 100; y += 25) {
+                const py = padT + plotH - (y / 100) * plotH;
+                svgContent += '<text x="' + (padL - 8) + '" y="' + (py + 4) + '" text-anchor="end" fill="#a0a0a0" font-size="10" font-family="sans-serif">' + y + '</text>';
+                svgContent += '<line x1="' + padL + '" y1="' + py + '" x2="' + (W - padR) + '" y2="' + py + '" stroke="#2a2a2a" stroke-width="1"/>';
+            }
+
+            // Line path
+            let pathPoints = [];
+            for (let i = 0; i < n; i++) {
+                const x = padL + i * xStep;
+                const y = padT + plotH - (sessions[i].overall_score / 100) * plotH;
+                pathPoints.push(x + ',' + y);
+            }
+            svgContent += '<polyline points="' + pathPoints.join(' ') + '" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+
+            // Dots and X-labels
+            for (let i = 0; i < n; i++) {
+                const x = padL + i * xStep;
+                const y = padT + plotH - (sessions[i].overall_score / 100) * plotH;
+                const color = gradeColorHex(sessions[i].grade);
+                svgContent += '<circle cx="' + x + '" cy="' + y + '" r="5" fill="' + color + '" stroke="#121212" stroke-width="2"/>';
+
+                const d = new Date(sessions[i].date);
+                const dateStr = (d.getMonth() + 1) + '/' + d.getDate();
+                svgContent += '<text x="' + x + '" y="' + (H - 6) + '" text-anchor="middle" fill="#a0a0a0" font-size="9" font-family="sans-serif">' + dateStr + '</text>';
+            }
+
+            svgContent += '</svg>';
+            container.innerHTML = svgContent;
+        }
+
+        // ===== Onboarding =====
+
+        function checkOnboarding() {
+            try {
+                if (!localStorage.getItem(STORAGE_KEYS.onboarded)) {
+                    onboardingOverlay.style.display = 'flex';
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        function dismissOnboarding() {
+            onboardingOverlay.style.display = 'none';
+            try {
+                localStorage.setItem(STORAGE_KEYS.onboarded, '1');
+            } catch (e) { /* ignore */ }
+        }
+
+        onboardingDismiss.addEventListener('click', dismissOnboarding);
+
+        // "How does this work?" link re-shows onboarding
+        document.getElementById('how-it-works-btn').addEventListener('click', () => {
+            onboardingOverlay.style.display = 'flex';
+        });
+
+        // Close onboarding on Escape
+        onboardingOverlay.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') dismissOnboarding();
+        });
+
+        // ===== Settings toggle =====
+
+        settingsToggle.addEventListener('click', () => {
+            const isOpen = settingsPanel.classList.toggle('open');
+            settingsToggle.setAttribute('aria-expanded', isOpen);
+            settingsToggle.querySelector('.toggle-arrow').classList.toggle('open', isOpen);
+        });
+
+        // ===== Quick Start =====
+
+        quickStartBtn.addEventListener('click', () => {
+            // Use defaults: beginner, bodyweight, side
+            document.getElementById('squat-type').value = 'bodyweight';
+            document.getElementById('experience-level').value = 'beginner';
+            document.getElementById('camera-view').value = 'side';
+            squatTypeDesc.textContent = squatTypeDescriptions['bodyweight'];
+            // Open the file picker
+            fileInput.click();
+        });
+
+        // ===== Squat type description update =====
+
+        const squatTypeSelect = document.getElementById('squat-type');
+        const squatTypeDesc = document.getElementById('squat-type-desc');
+        squatTypeSelect.addEventListener('change', () => {
+            squatTypeDesc.textContent = squatTypeDescriptions[squatTypeSelect.value] || '';
+            saveSettings();
+        });
+
+        document.getElementById('experience-level').addEventListener('change', saveSettings);
+        document.getElementById('camera-view').addEventListener('change', saveSettings);
+        competitionModeCheckbox.addEventListener('change', saveSettings);
+
+        // ===== File drop handling =====
+
+        fileDrop.addEventListener('click', () => fileInput.click());
+        fileDrop.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                fileInput.click();
+            }
+        });
+
+        fileDrop.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileDrop.classList.add('dragover');
+        });
+
+        fileDrop.addEventListener('dragleave', () => {
+            fileDrop.classList.remove('dragover');
+        });
+
+        fileDrop.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileDrop.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                selectFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                selectFile(fileInput.files[0]);
+            }
+        });
+
+        function selectFile(file) {
+            selectedFile = file;
+            filenameDisplay.textContent = file.name;
+            analyzeBtn.disabled = false;
+        }
+
+        // ===== Score color helper =====
+
+        function scoreColor(score) {
+            if (score >= 80) return 'var(--green)';
+            if (score >= 60) return 'var(--yellow)';
+            if (score >= 40) return 'var(--orange)';
+            return '#94a3b8';
+        }
+
+        // Grade display helper -- never show "F", show "Keep Working" instead
+        function displayGrade(grade) {
+            if (grade === 'F') return 'Keep Working';
+            return grade;
+        }
+
+        // Check if user prefers reduced motion
+        function prefersReducedMotion() {
+            return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        }
+
+        // Count-up animation for score (respects reduced motion)
+        function animateScore(element, targetScore, duration) {
+            const target = Math.round(targetScore);
+
+            if (prefersReducedMotion()) {
+                element.textContent = target;
+                return;
+            }
+
+            const start = performance.now();
+            element.classList.add('score-animate');
+
+            function update(now) {
+                const elapsed = now - start;
+                const progress = Math.min(elapsed / duration, 1);
+                // Ease out
+                const eased = 1 - Math.pow(1 - progress, 3);
+                const current = Math.round(eased * target);
+                element.textContent = current;
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                } else {
+                    element.textContent = target;
+                }
+            }
+
+            requestAnimationFrame(update);
+        }
+
+        // Escape HTML to prevent XSS in dynamic content
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.appendChild(document.createTextNode(text));
+            return div.innerHTML;
+        }
+
+        // ===== Milestone Detection =====
+
+        function detectMilestones(analysis) {
+            const sessions = getSessions();
+            const milestones = [];
+            const currentScore = Math.round(analysis.overall_score);
+            const currentGrade = analysis.grade === 'F' ? 'KW' : analysis.grade;
+
+            // First session (check length === 1 because we already saved this session)
+            if (sessions.length === 1) {
+                milestones.push('First session complete! Your form journey starts here.');
+                if (currentScore < 75) {
+                    milestones.push('Most people score 50-70 on their first try \u2014 you\'re right on track.');
+                }
+            }
+
+            // Compare to previous session (index 1 because index 0 is the current one we just saved)
+            if (sessions.length >= 2) {
+                const prevScore = sessions[1].overall_score;
+                const diff = currentScore - prevScore;
+
+                if (diff >= 15) {
+                    milestones.push('Major improvement! Up ' + diff + ' points from your last session! Keep it up!');
+                } else if (diff >= 5) {
+                    milestones.push('Up ' + diff + ' points from your last session!');
+                }
+            }
+
+            // First A grade
+            if (currentGrade === 'A') {
+                const pastAs = sessions.filter((s, i) => i > 0 && (s.grade === 'A'));
+                if (pastAs.length === 0) {
+                    milestones.push('First A grade! Excellent work!');
+                }
+            }
+
+            // First B grade
+            if (currentGrade === 'B') {
+                const pastBs = sessions.filter((s, i) => i > 0 && (s.grade === 'B'));
+                if (pastBs.length === 0) {
+                    milestones.push('First B grade! Your form is looking solid!');
+                }
+            }
+
+            return milestones;
+        }
+
+        function renderMilestones(milestones) {
+            const container = document.getElementById('milestone-container');
+            container.innerHTML = '';
+            for (const msg of milestones) {
+                const div = document.createElement('div');
+                div.className = 'milestone-banner';
+                div.setAttribute('role', 'status');
+                div.setAttribute('aria-label', 'Milestone: ' + msg);
+                div.textContent = msg;
+                container.appendChild(div);
+            }
+        }
+
+        // ===== #1 Focus Section =====
+
+        function renderFocusSection(analysis) {
+            const focusCard = document.getElementById('focus-card');
+            const focusContent = document.getElementById('focus-content');
+            focusContent.innerHTML = '';
+
+            if (!analysis.top_issues || analysis.top_issues.length === 0) {
+                focusCard.style.display = 'block';
+                focusContent.innerHTML = '<p class="focus-all-good">Your form looks great! Keep practicing to maintain it.</p>';
+                return;
+            }
+
+            focusCard.style.display = 'block';
+            const topIssue = analysis.top_issues[0];
+            const issueName = ISSUE_DISPLAY_NAMES[topIssue.name] ||
+                topIssue.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+            let html = '<div class="focus-issue-name">' + escapeHtml(issueName) + '</div>';
+
+            // Use the issue description as the coaching cue
+            if (topIssue.description) {
+                html += '<div class="focus-issue-cue">' + escapeHtml(topIssue.description) + '</div>';
+            }
+
+            // Get corrective exercises for this issue
+            const exercises = CORRECTIVE_EXERCISES[topIssue.name];
+            if (exercises && exercises.length > 0) {
+                html += '<div class="focus-exercises-heading">Corrective Exercises</div>';
+                html += '<div class="exercise-cards">';
+                for (const ex of exercises) {
+                    html += '<div class="exercise-card">' +
+                        '<div class="exercise-name">' + escapeHtml(ex.name) + '</div>' +
+                        '<div class="exercise-desc">' + escapeHtml(ex.desc) + '</div>' +
+                        '<div class="exercise-sets">' + escapeHtml(ex.sets) + '</div>' +
+                        '</div>';
+                }
+                html += '</div>';
+            }
+
+            focusContent.innerHTML = html;
+        }
+
+        // ===== Mobility Assessment =====
+
+        function renderMobilityAssessment(analysis) {
+            const section = document.getElementById('mobility-section');
+            const content = document.getElementById('mobility-content');
+            content.innerHTML = '';
+
+            if (!analysis.top_issues || analysis.top_issues.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            const issueNames = analysis.top_issues.map(i => i.name);
+            const mobilityAreas = [];
+
+            for (const issueName of issueNames) {
+                if (MOBILITY_DATA[issueName]) {
+                    mobilityAreas.push({ issue: issueName, ...MOBILITY_DATA[issueName] });
+                }
+            }
+
+            if (mobilityAreas.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+            let html = '';
+
+            for (const mob of mobilityAreas) {
+                html += '<div class="mobility-area">';
+                html += '<div class="mobility-area-name">' + escapeHtml(mob.area) + '</div>';
+                html += '<div class="mobility-area-desc">' + escapeHtml(mob.desc) + '</div>';
+                html += '<div class="mobility-selftest">';
+                html += '<div class="mobility-selftest-label">Self-Test</div>';
+                html += '<div class="mobility-selftest-text">' + escapeHtml(mob.selfTest) + '</div>';
+                html += '</div>';
+                html += '<ul class="mobility-exercises" aria-label="Recommended mobility exercises for ' + escapeHtml(mob.area) + '">';
+                for (const ex of mob.exercises) {
+                    html += '<li>' + escapeHtml(ex) + '</li>';
+                }
+                html += '</ul>';
+                html += '</div>';
+            }
+
+            content.innerHTML = html;
+        }
+
+        // ===== Warm-Up Protocol =====
+
+        function renderWarmUp(analysis) {
+            const section = document.getElementById('warmup-section');
+            const stepsContainer = document.getElementById('warmup-steps');
+            const timeEl = document.getElementById('warmup-time');
+
+            const baseSteps = [
+                { name: 'General warm-up (light jog or jump rope)', duration: '5 min' },
+                { name: 'Hip circles (both directions)', duration: '2 min' },
+                { name: 'Bodyweight squats', duration: '2 min' },
+            ];
+
+            let totalMinutes = 9;
+            const extraSteps = [];
+
+            // Add issue-specific warm-up steps
+            if (analysis.top_issues) {
+                const issueNames = analysis.top_issues.map(i => i.name);
+                if (issueNames.includes('heel_rise') || issueNames.includes('excessive_forward_lean')) {
+                    extraSteps.push({ name: 'Wall ankle stretches', duration: '2 min' });
+                    totalMinutes += 2;
+                }
+                if (issueNames.includes('butt_wink') || issueNames.includes('knee_valgus')) {
+                    extraSteps.push({ name: '90/90 hip openers', duration: '2 min' });
+                    totalMinutes += 2;
+                }
+                if (issueNames.includes('good_morning')) {
+                    extraSteps.push({ name: 'Core activation (dead bugs)', duration: '2 min' });
+                    totalMinutes += 2;
+                }
+                if (issueNames.includes('excessive_forward_lean')) {
+                    extraSteps.push({ name: 'Thoracic spine openers (cat-cow)', duration: '2 min' });
+                    totalMinutes += 2;
+                }
+            }
+
+            const allSteps = [...baseSteps, ...extraSteps];
+            section.style.display = 'block';
+            timeEl.textContent = 'Estimated time: ~' + totalMinutes + ' minutes';
+
+            let html = '';
+            for (let i = 0; i < allSteps.length; i++) {
+                html += '<div class="warmup-step">';
+                html += '<span class="warmup-step-num" aria-hidden="true">' + (i + 1) + '</span>';
+                html += '<div class="warmup-step-text">';
+                html += '<div class="warmup-step-name">' + escapeHtml(allSteps[i].name) + '</div>';
+                html += '<div class="warmup-step-duration">' + escapeHtml(allSteps[i].duration) + '</div>';
+                html += '</div>';
+                html += '</div>';
+            }
+
+            stepsContainer.innerHTML = html;
+        }
+
+        // ===== Sticking Point Display =====
+
+        function renderStickingPoint(analysis) {
+            const section = document.getElementById('sticking-point-section');
+            const content = document.getElementById('sticking-point-content');
+
+            if (!analysis.sticking_point) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+            const sp = analysis.sticking_point;
+            const depthPct = sp.depth_percent || 50;
+
+            // Determine zone
+            let zone = 'mid';
+            let zoneLabel = 'mid-range';
+            if (depthPct <= 25) { zone = 'bottom'; zoneLabel = 'out of the hole'; }
+            else if (depthPct <= 60) { zone = 'mid'; zoneLabel = 'mid-range'; }
+            else { zone = 'top'; zoneLabel = 'near lockout'; }
+
+            const rec = STICKING_POINT_RECS[zone] || '';
+            const markerTop = Math.round((1 - depthPct / 100) * 114);
+
+            let html = '<div class="sticking-point-diagram">';
+            html += '<div class="sticking-point-bar-container" aria-label="Sticking point at ' + depthPct + '% depth">';
+            html += '<div class="sticking-point-marker" style="top:' + markerTop + 'px;"></div>';
+            html += '</div>';
+            html += '<div class="sticking-point-labels">';
+            html += '<div class="sp-label" style="color:var(--text-secondary);">Top</div>';
+            html += '<div class="sp-label" style="margin-top:40px; color:var(--text-secondary);">Mid</div>';
+            html += '<div class="sp-label" style="margin-top:40px; color:var(--text-secondary);">Bottom</div>';
+            html += '</div>';
+            html += '</div>';
+            html += '<div class="sticking-point-desc">Sticking point at ' + depthPct + '% depth (' + escapeHtml(zoneLabel) + ')</div>';
+            if (sp.description) {
+                html += '<div class="sticking-point-desc" style="font-size:0.9rem; color:var(--text-secondary);">' + escapeHtml(sp.description) + '</div>';
+            }
+            html += '<div class="sticking-point-rec">' + escapeHtml(rec) + '</div>';
+
+            content.innerHTML = html;
+        }
+
+        // ===== Bar Path Display =====
+
+        function renderBarPath(analysis) {
+            const section = document.getElementById('bar-path-section');
+            const svgContainer = document.getElementById('bar-path-svg');
+            const metricsContainer = document.getElementById('bar-path-metrics');
+
+            if (!analysis.bar_path) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+            const bp = analysis.bar_path;
+
+            // Generate SVG
+            const W = 80;
+            const H = 160;
+            let svg = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Bar path diagram showing ideal versus actual path">';
+
+            // Ideal line (vertical, center)
+            svg += '<line x1="' + (W / 2) + '" y1="10" x2="' + (W / 2) + '" y2="' + (H - 10) + '" stroke="#333" stroke-width="2" stroke-dasharray="4,3"/>';
+            svg += '<text x="' + (W / 2) + '" y="' + (H - 1) + '" text-anchor="middle" fill="#666" font-size="8" font-family="sans-serif">Ideal</text>';
+
+            // Actual path if we have points
+            if (bp.points && bp.points.length >= 2) {
+                let pathD = '';
+                const maxDrift = Math.max(...bp.points.map(p => Math.abs(p.x || 0)), 10);
+                for (let i = 0; i < bp.points.length; i++) {
+                    const px = (W / 2) + ((bp.points[i].x || 0) / maxDrift) * (W / 2 - 10);
+                    const py = 10 + (i / (bp.points.length - 1)) * (H - 30);
+                    pathD += (i === 0 ? 'M' : 'L') + px.toFixed(1) + ',' + py.toFixed(1);
+                }
+                svg += '<path d="' + pathD + '" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+            } else {
+                // Simple curved path representation
+                const drift = bp.drift_cm || 3;
+                const offset = Math.min(drift * 3, W / 2 - 10);
+                svg += '<path d="M' + (W / 2) + ',10 Q' + (W / 2 + offset) + ',' + (H / 2) + ' ' + (W / 2) + ',' + (H - 20) + '" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"/>';
+            }
+
+            svg += '</svg>';
+            svgContainer.innerHTML = svg;
+
+            // Metrics
+            let mhtml = '';
+            if (bp.drift_cm != null) {
+                mhtml += '<div class="bar-path-metric">';
+                mhtml += '<div class="bar-path-metric-label">Max Drift</div>';
+                mhtml += '<div class="bar-path-metric-value">' + escapeHtml(String(bp.drift_cm)) + ' cm</div>';
+                mhtml += '</div>';
+            }
+            if (bp.efficiency != null) {
+                const effColor = bp.efficiency >= 90 ? 'var(--green)' : bp.efficiency >= 75 ? 'var(--yellow)' : 'var(--orange)';
+                mhtml += '<div class="bar-path-metric">';
+                mhtml += '<div class="bar-path-metric-label">Path Efficiency</div>';
+                mhtml += '<div class="bar-path-metric-value" style="color:' + effColor + ';">' + escapeHtml(String(Math.round(bp.efficiency))) + '%</div>';
+                mhtml += '</div>';
+            }
+            if (bp.direction) {
+                mhtml += '<div class="bar-path-metric">';
+                mhtml += '<div class="bar-path-metric-label">Drift Direction</div>';
+                mhtml += '<div class="bar-path-metric-value">' + escapeHtml(bp.direction) + '</div>';
+                mhtml += '</div>';
+            }
+
+            metricsContainer.innerHTML = mhtml;
+        }
+
+        // ===== Error Display =====
+
+        function showError(message, isNoPose) {
+            const errorTitle = document.getElementById('error-title');
+            const errorMessage = document.getElementById('error-message');
+            const msgLower = message ? message.toLowerCase() : '';
+
+            if (isNoPose) {
+                errorTitle.textContent = 'No Poses Detected';
+                errorMessage.textContent = 'Make sure your full body is visible in the video, with good lighting and a clear background. Try filming from the side at hip height.';
+            } else if (msgLower.includes('no rep') || msgLower.includes('no complete') || msgLower.includes('no squat')) {
+                errorTitle.textContent = 'No Complete Reps Found';
+                errorMessage.textContent = 'Your video needs to show at least one complete squat \u2014 from standing, down, and back to standing. Make sure your full body is visible and you complete at least one full rep.';
+            } else if (message && msgLower.includes('network')) {
+                errorTitle.textContent = 'Connection Error';
+                errorMessage.textContent = 'Could not reach the server. Please check your internet connection and try again.';
+            } else if (message && msgLower.includes('timeout')) {
+                errorTitle.textContent = 'Analysis Timed Out';
+                errorMessage.textContent = 'The video may be too long or the server is busy. Try a shorter clip (10-30 seconds works best).';
+            } else {
+                errorTitle.textContent = 'Analysis Failed';
+                errorMessage.textContent = message || 'Something went wrong. Please try again.';
+            }
+
+            errorContainer.style.display = 'block';
+        }
+
+        // Error retry button
+        document.getElementById('error-retry-btn').addEventListener('click', () => {
+            errorContainer.style.display = 'none';
+            analyzeBtn.disabled = !selectedFile;
+            // Scroll back to upload
+            document.getElementById('upload-card').scrollIntoView({ behavior: 'smooth' });
+        });
+
+        // ===== Report Generation =====
+
+        function generateTextReport(analysis) {
+            const a = analysis;
+            const isCompMode = competitionModeCheckbox.checked;
+            let report = '=== SQUAT FORM ANALYSIS REPORT ===\n\n';
+            report += 'Date: ' + new Date().toLocaleDateString() + '\n';
+            report += 'Squat Type: ' + escapeHtml(document.getElementById('squat-type').value.replace(/_/g, ' ')) + '\n';
+            report += 'Experience: ' + escapeHtml(document.getElementById('experience-level').value) + '\n';
+            if (isCompMode) report += 'Mode: Competition (IPF/USAPL)\n';
+            report += '\n';
+
+            report += 'OVERALL SCORE: ' + Math.round(a.overall_score) + '/100\n';
+            report += 'GRADE: ' + displayGrade(a.grade) + '\n';
+            report += 'Reps Analyzed: ' + (a.rep_count || 0) + '\n\n';
+
+            // Dimension scores
+            if (a.reps && a.reps.length > 0) {
+                report += '--- DIMENSION SCORES ---\n';
+                const avg = a.reps.reduce((acc, r) => ({
+                    depth: acc.depth + r.depth_score,
+                    knee: acc.knee + r.knee_tracking_score,
+                    trunk: acc.trunk + r.trunk_score,
+                    sym: acc.sym + r.symmetry_score,
+                    tempo: acc.tempo + r.tempo_score,
+                    lock: acc.lock + r.lockout_score,
+                }), { depth: 0, knee: 0, trunk: 0, sym: 0, tempo: 0, lock: 0 });
+                const n = a.reps.length;
+                report += 'Depth: ' + Math.round(avg.depth / n) + '\n';
+                report += 'Knee Tracking: ' + Math.round(avg.knee / n) + '\n';
+                report += 'Torso Position: ' + Math.round(avg.trunk / n) + '\n';
+                report += 'Balance: ' + Math.round(avg.sym / n) + '\n';
+                if (!isCompMode) report += 'Control: ' + Math.round(avg.tempo / n) + '\n';
+                report += 'Lockout: ' + Math.round(avg.lock / n) + '\n\n';
+            }
+
+            // Issues
+            if (a.top_issues && a.top_issues.length > 0) {
+                report += '--- ISSUES ---\n';
+                for (const issue of a.top_issues) {
+                    const name = ISSUE_DISPLAY_NAMES[issue.name] || issue.name.replace(/_/g, ' ');
+                    report += '- [' + issue.severity.toUpperCase() + '] ' + name + ': ' + issue.description + '\n';
+                }
+                report += '\n';
+            }
+
+            // Coaching cues
+            if (a.top_cues && a.top_cues.length > 0) {
+                report += '--- COACHING CUES ---\n';
+                for (const cue of a.top_cues) {
+                    report += '- ' + cue.cue + ': ' + cue.explanation + '\n';
+                }
+                report += '\n';
+            }
+
+            report += '--- DISCLAIMER ---\n';
+            report += 'AI-based analysis. Not a substitute for professional coaching.\n';
+
+            return report;
+        }
+
+        // Print report
+        document.getElementById('print-report-btn').addEventListener('click', () => {
+            window.print();
+        });
+
+        // Copy report
+        document.getElementById('copy-report-btn').addEventListener('click', async () => {
+            if (!lastAnalysis) return;
+            const report = generateTextReport(lastAnalysis);
+            try {
+                await navigator.clipboard.writeText(report);
+                const toast = document.getElementById('copy-toast');
+                toast.classList.add('visible');
+                setTimeout(() => toast.classList.remove('visible'), 2500);
+            } catch (e) {
+                // Fallback
+                const textarea = document.createElement('textarea');
+                textarea.value = report;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                const toast = document.getElementById('copy-toast');
+                toast.classList.add('visible');
+                setTimeout(() => toast.classList.remove('visible'), 2500);
+            }
+        });
+
+        // ===== Warm-up collapsible =====
+
+        document.getElementById('warmup-trigger').addEventListener('click', function() {
+            const body = document.getElementById('warmup-body');
+            const isOpen = body.classList.toggle('open');
+            this.classList.toggle('open', isOpen);
+            this.setAttribute('aria-expanded', isOpen);
+        });
+
+        // ===== Upload and analyze =====
+
+        analyzeBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            // Reset UI
+            resultsEl.classList.remove('visible');
+            errorContainer.style.display = 'none';
+            spinner.classList.add('active');
+            skeletonContainer.classList.add('active');
+            analyzeBtn.disabled = true;
+
+            // Save settings before analyzing
+            saveSettings();
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('squat_type', document.getElementById('squat-type').value);
+            formData.append('experience_level', document.getElementById('experience-level').value);
+            formData.append('camera_view', document.getElementById('camera-view').value);
+            if (competitionModeCheckbox.checked) {
+                formData.append('competition_mode', 'true');
+            }
+
+            try {
+                const resp = await fetch('/api/v1/analyze', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const data = await resp.json();
+
+                spinner.classList.remove('active');
+                skeletonContainer.classList.remove('active');
+                analyzeBtn.disabled = false;
+
+                if (!data.success || !data.analysis) {
+                    const errMsg = data.error || 'Analysis failed.';
+                    const isNoPose = errMsg.toLowerCase().includes('no pose') ||
+                                     errMsg.toLowerCase().includes('no person') ||
+                                     errMsg.toLowerCase().includes('not detected');
+                    showError(errMsg, isNoPose);
+                    return;
+                }
+
+                renderResults(data);
+            } catch (err) {
+                spinner.classList.remove('active');
+                skeletonContainer.classList.remove('active');
+                analyzeBtn.disabled = false;
+                showError('Network error: ' + err.message, false);
+            }
+        });
+
+        function renderResults(data) {
+            const a = data.analysis;
+            const isCompMode = competitionModeCheckbox.checked;
+
+            // Store for report generation
+            lastAnalysis = a;
+            lastAnalysisData = data;
+
+            // Save session to history
+            addSession(a);
+
+            // Side view warning
+            const sideViewContainer = document.getElementById('side-view-warning-container');
+            sideViewContainer.innerHTML = '';
+            if (a.side_view_warning) {
+                const warning = document.createElement('div');
+                warning.className = 'side-view-warning';
+                warning.setAttribute('role', 'note');
+                warning.innerHTML = '<span class="info-icon" aria-hidden="true">&#9432;</span> <span>' + escapeHtml(a.side_view_warning) + '</span>';
+                sideViewContainer.appendChild(warning);
+            }
+
+            // Milestones
+            const milestones = detectMilestones(a);
+            renderMilestones(milestones);
+
+            // Score circle border color
+            const scoreCircle = document.getElementById('score-circle');
+            scoreCircle.style.borderColor = scoreColor(a.overall_score);
+
+            // Overall score with count-up animation
+            const scoreEl = document.getElementById('overall-score');
+            scoreEl.style.color = scoreColor(a.overall_score);
+            animateScore(scoreEl, a.overall_score, 1000);
+
+            // Grade (never show "F")
+            const gradeEl = document.getElementById('overall-grade');
+            gradeEl.textContent = 'Grade: ' + displayGrade(a.grade);
+            gradeEl.style.color = scoreColor(a.overall_score);
+
+            document.getElementById('rep-count-label').textContent = a.rep_count + ' rep' + (a.rep_count !== 1 ? 's' : '') + ' analyzed';
+
+            // Competition mode badge
+            const compBadgeContainer = document.getElementById('competition-badge-container');
+            compBadgeContainer.innerHTML = '';
+            if (isCompMode) {
+                const badge = document.createElement('div');
+                badge.className = 'competition-badge';
+                badge.textContent = 'Competition Mode';
+                badge.setAttribute('aria-label', 'Competition mode enabled');
+                compBadgeContainer.appendChild(badge);
+            }
+
+            // Competition depth verdict
+            const compDepthContainer = document.getElementById('comp-depth-container');
+            compDepthContainer.innerHTML = '';
+            if (isCompMode && a.reps && a.reps.length > 0) {
+                // Check depth: average depth score >= 80 = pass
+                const avgDepth = a.reps.reduce((sum, r) => sum + r.depth_score, 0) / a.reps.length;
+                const depthPass = avgDepth >= 70;
+                const verdict = document.createElement('div');
+                verdict.className = 'comp-depth-verdict ' + (depthPass ? 'comp-depth-pass' : 'comp-depth-fail');
+                verdict.textContent = depthPass ? 'GOOD LIFT' : 'DEPTH';
+                verdict.setAttribute('aria-label', depthPass ? 'Competition verdict: good lift' : 'Competition verdict: failed for depth');
+                compDepthContainer.appendChild(verdict);
+            }
+
+            // Tier-based overall message
+            const tierContainer = document.getElementById('tier-message-container');
+            tierContainer.innerHTML = '';
+            const tierDiv = document.createElement('div');
+            tierDiv.className = 'tier-message';
+            if (a.overall_score >= 90) {
+                tierDiv.textContent = 'Excellent form!';
+                tierDiv.classList.add('tier-excellent');
+            } else if (a.overall_score >= 70) {
+                tierDiv.textContent = 'Solid set! Here\'s what to focus on next:';
+                tierDiv.classList.add('tier-solid');
+            } else {
+                tierDiv.textContent = 'Great that you\'re working on your form! Here\'s your top priority:';
+                tierDiv.classList.add('tier-working');
+            }
+            tierContainer.appendChild(tierDiv);
+
+            // Fatigue
+            const fatigueContainer = document.getElementById('fatigue-container');
+            fatigueContainer.innerHTML = '';
+            if (a.fatigue_detected) {
+                const badge = document.createElement('span');
+                badge.className = 'fatigue-badge';
+                badge.textContent = 'Your form held strong in the early reps. Fatigue crept in toward the end \u2014 try shorter sets to maintain quality throughout.';
+                fatigueContainer.appendChild(badge);
+            }
+
+            // Dimension scores (with plain English labels)
+            const dims = document.getElementById('dimension-scores');
+            dims.innerHTML = '';
+            let avgScores = {};
+            if (a.reps && a.reps.length > 0) {
+                const avg = a.reps.reduce((acc, r) => ({
+                    depth: acc.depth + r.depth_score,
+                    knee: acc.knee + r.knee_tracking_score,
+                    trunk: acc.trunk + r.trunk_score,
+                    sym: acc.sym + r.symmetry_score,
+                    tempo: acc.tempo + r.tempo_score,
+                    lock: acc.lock + r.lockout_score,
+                }), { depth: 0, knee: 0, trunk: 0, sym: 0, tempo: 0, lock: 0 });
+                const n = a.reps.length;
+                avgScores = {
+                    depth: avg.depth / n,
+                    knee: avg.knee / n,
+                    trunk: avg.trunk / n,
+                    sym: avg.sym / n,
+                    tempo: avg.tempo / n,
+                    lock: avg.lock / n,
+                };
+
+                let dimensions = [
+                    ['Depth', avgScores.depth],
+                    ['Knee Tracking', avgScores.knee],
+                    ['Torso Position', avgScores.trunk],
+                    ['Balance', avgScores.sym],
+                ];
+
+                // In competition mode, skip tempo, emphasize lockout
+                if (!isCompMode) {
+                    dimensions.push(['Control', avgScores.tempo]);
+                }
+                dimensions.push(['Lockout', avgScores.lock]);
+
+                for (const [name, score] of dimensions) {
+                    const item = document.createElement('div');
+                    item.className = 'score-bar-item';
+                    const roundedScore = Math.round(score);
+                    item.innerHTML =
+                        '<label><span>' + escapeHtml(name) + '</span><span>' + roundedScore + '</span></label>' +
+                        '<div class="score-bar" role="progressbar" aria-valuenow="' + roundedScore + '" aria-valuemin="0" aria-valuemax="100" aria-label="' + escapeHtml(name) + ' score: ' + roundedScore + ' out of 100">' +
+                        '<div class="score-bar-fill" style="width:' + score + '%;background:' + scoreColor(score) + '"></div>' +
+                        '</div>';
+                    dims.appendChild(item);
+                }
+            }
+
+            // #1 Focus section
+            renderFocusSection(a);
+
+            // What You Did Well (positive reinforcement)
+            const strengthsCard = document.getElementById('strengths-card');
+            const strengthsList = document.getElementById('strengths-list');
+            strengthsList.innerHTML = '';
+            const strengths = [];
+
+            // Include positive_highlights from backend if available
+            if (a.positive_highlights && Array.isArray(a.positive_highlights)) {
+                for (const highlight of a.positive_highlights) {
+                    strengths.push(highlight);
+                }
+            }
+
+            // Also add dimension-based strengths
+            if (avgScores.depth >= 80) strengths.push('Great depth on your squats');
+            if (avgScores.knee >= 80) strengths.push('Good knee alignment');
+            if (avgScores.trunk >= 80) strengths.push('Well-controlled torso position');
+            if (avgScores.sym >= 80) strengths.push('Nice even balance');
+            if (avgScores.tempo >= 80) strengths.push('Good movement control');
+            if (avgScores.lock >= 80) strengths.push('Strong finish at the top');
+
+            if (strengths.length > 0) {
+                strengthsCard.style.display = 'block';
+                for (const s of strengths) {
+                    const li = document.createElement('li');
+                    li.innerHTML = '<span class="strength-icon" aria-hidden="true">&#10003;</span> ' + escapeHtml(s);
+                    strengthsList.appendChild(li);
+                }
+            } else {
+                strengthsCard.style.display = 'none';
+            }
+
+            // Annotated video
+            const videoCard = document.getElementById('video-card');
+            if (data.annotated_video_url) {
+                const video = document.getElementById('annotated-video');
+                video.src = data.annotated_video_url;
+                videoCard.style.display = 'block';
+            } else {
+                videoCard.style.display = 'none';
+            }
+
+            // Bar path
+            renderBarPath(a);
+
+            // Sticking point
+            renderStickingPoint(a);
+
+            // Rep list (with plain English issue names and velocity metrics)
+            const repList = document.getElementById('rep-list');
+            repList.innerHTML = '';
+            for (let i = 0; i < a.reps.length; i++) {
+                const rep = a.reps[i];
+                const li = document.createElement('li');
+                let repHtml =
+                    '<span>Rep ' + (i + 1) + ' &mdash; Grade ' + displayGrade(rep.grade) + '</span>' +
+                    '<span class="rep-score" style="color:' + scoreColor(rep.overall_score) + '">' + Math.round(rep.overall_score) + '</span>';
+                if (rep.positive_feedback) {
+                    repHtml += '<div class="rep-feedback">' + escapeHtml(rep.positive_feedback) + '</div>';
+                }
+
+                // Velocity metrics
+                if (rep.descent_speed != null || rep.ascent_speed != null) {
+                    repHtml += '<div class="rep-velocity" aria-label="Velocity metrics for rep ' + (i + 1) + '">';
+                    if (rep.descent_speed != null) {
+                        repHtml += '<span>Down: ' + escapeHtml(String(rep.descent_speed.toFixed(2))) + 's</span>';
+                    }
+                    if (rep.ascent_speed != null) {
+                        repHtml += '<span>Up: ' + escapeHtml(String(rep.ascent_speed.toFixed(2))) + 's</span>';
+                    }
+                    if (rep.descent_speed != null && rep.ascent_speed != null && rep.descent_speed > 0) {
+                        const ratio = (rep.ascent_speed / rep.descent_speed).toFixed(2);
+                        repHtml += '<span>Ratio: ' + escapeHtml(String(ratio)) + '</span>';
+                    }
+                    repHtml += '</div>';
+                }
+
+                // Show rep issues with plain English names
+                if (rep.issues && rep.issues.length > 0) {
+                    const issueNames = rep.issues.map(issue => {
+                        const name = typeof issue === 'string' ? issue : (issue.name || '');
+                        return ISSUE_DISPLAY_NAMES[name] || name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    }).filter(n => n);
+                    if (issueNames.length > 0) {
+                        repHtml += '<div style="width:100%;font-size:0.85rem;color:var(--text-secondary);margin-top:2px;">' + escapeHtml(issueNames.join(', ')) + '</div>';
+                    }
+                }
+                li.innerHTML = repHtml;
+                repList.appendChild(li);
+            }
+
+            // Issues (with plain-language names and severity text labels)
+            const issueCard = document.getElementById('issues-card');
+            const issueList = document.getElementById('issue-list');
+            issueList.innerHTML = '';
+            if (a.top_issues && a.top_issues.length > 0) {
+                issueCard.style.display = 'block';
+                for (const issue of a.top_issues) {
+                    const li = document.createElement('li');
+                    li.setAttribute('data-severity', issue.severity);
+                    // Use friendly display name
+                    const displayName = ISSUE_DISPLAY_NAMES[issue.name] ||
+                        issue.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    // Severity text label (not just color)
+                    const severityLabel = issue.severity.charAt(0).toUpperCase() + issue.severity.slice(1);
+                    li.innerHTML =
+                        '<div class="severity-label severity-' + issue.severity + '">' + escapeHtml(severityLabel) + ' Priority</div>' +
+                        '<div class="issue-name">' + escapeHtml(displayName) + '</div>' +
+                        '<div class="issue-desc">' + escapeHtml(issue.description) + '</div>';
+                    issueList.appendChild(li);
+                }
+            } else {
+                issueCard.style.display = 'none';
+            }
+
+            // Coaching cues (with progression paths)
+            const cueCard = document.getElementById('cues-card');
+            const cueList = document.getElementById('cue-list');
+            cueList.innerHTML = '';
+            if (a.top_cues && a.top_cues.length > 0) {
+                cueCard.style.display = 'block';
+                for (let ci = 0; ci < a.top_cues.length; ci++) {
+                    const cue = a.top_cues[ci];
+                    const li = document.createElement('li');
+                    let cueHtml =
+                        '<div class="cue-text">' + escapeHtml(cue.cue) + '</div>' +
+                        '<div class="cue-explain">' + escapeHtml(cue.explanation) + '</div>';
+
+                    // Find matching progression
+                    const relatedIssue = cue.related_issue || (a.top_issues && a.top_issues[ci] ? a.top_issues[ci].name : null);
+                    const progression = relatedIssue ? CUE_PROGRESSIONS[relatedIssue] : null;
+
+                    if (progression) {
+                        const progId = 'prog-' + ci;
+                        cueHtml += '<button class="progression-toggle" aria-expanded="false" aria-controls="' + progId + '" onclick="toggleProgression(this, \'' + progId + '\')" aria-label="Toggle progression path">';
+                        cueHtml += '<span class="collapse-arrow" aria-hidden="true">&#9654;</span> Progression Path';
+                        cueHtml += '</button>';
+                        cueHtml += '<div class="progression-path" id="' + progId + '">';
+                        const labels = ['start', 'progress', 'goal'];
+                        for (let pi = 0; pi < progression.length; pi++) {
+                            const step = progression[pi];
+                            const stepClass = pi === 0 ? '' : (pi === progression.length - 1 ? ' goal' : ' current');
+                            cueHtml += '<div class="progression-step' + stepClass + '">';
+                            cueHtml += '<div class="progression-step-label ' + labels[pi] + '">' + escapeHtml(step.label) + '</div>';
+                            cueHtml += '<div class="progression-step-name">' + escapeHtml(step.name) + '</div>';
+                            cueHtml += '<div class="progression-step-criteria">' + escapeHtml(step.criteria) + '</div>';
+                            cueHtml += '</div>';
+                        }
+                        cueHtml += '</div>';
+                    }
+
+                    li.innerHTML = cueHtml;
+                    cueList.appendChild(li);
+                }
+            } else {
+                cueCard.style.display = 'none';
+            }
+
+            // Mobility assessment
+            renderMobilityAssessment(a);
+
+            // Warm-up protocol
+            renderWarmUp(a);
+
+            resultsEl.classList.add('visible');
+
+            // Update progress section with new data
+            renderProgressSection();
+        }
+
+        // Progression path toggle (global function for inline onclick)
+        function toggleProgression(btn, targetId) {
+            const target = document.getElementById(targetId);
+            if (!target) return;
+            const isOpen = target.classList.toggle('open');
+            btn.setAttribute('aria-expanded', isOpen);
+            btn.querySelector('.collapse-arrow').style.transform = isOpen ? 'rotate(90deg)' : '';
+        }
+
+        // ===== Clear History =====
+
+        clearHistoryBtn.addEventListener('click', () => {
+            if (confirm('Clear all session history? This cannot be undone.')) {
+                try {
+                    localStorage.removeItem(STORAGE_KEYS.sessions);
+                } catch (e) { /* ignore */ }
+                renderProgressSection();
+            }
+        });
+
+        // ===== Initialization =====
+
+        restoreSettings();
+        checkOnboarding();
+        renderProgressSection();
+    </script>
+</body>
+</html>

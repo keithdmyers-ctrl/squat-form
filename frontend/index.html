@@ -1,0 +1,2641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f0f0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <title>Lift Form Analyzer — Squat, Deadlift, Bench</title>
+  <style>
+    /* ===== Reset & Base ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+
+    :root {
+      /* Colors */
+      --bg-primary: #0a0a0a;
+      --bg-card: #121212;
+      --bg-card-hover: #1a1a1a;
+      --bg-input: #1e1e1e;
+      --accent: #00d4ff;
+      --accent-hover: #00b8e0;
+      --accent-glow: rgba(0, 212, 255, 0.15);
+      --accent-dim: #2a7a94;
+      --text-primary: #e0e0e0;
+      --text-secondary: #b0b0b0;
+      --text-muted: #808080;
+      --success: #4ade80;
+      --warning: #fbbf24;
+      --danger: #f87171;
+      --info: #60a5fa;
+      --border: #333333;
+      --border-hover: #444444;
+
+      /* Legacy aliases for compatibility */
+      --bg: var(--bg-primary);
+      --text: var(--text-primary);
+      --green: var(--success);
+      --yellow: var(--warning);
+      --red: var(--danger);
+      --orange: #fb923c;
+
+      /* Grade colors */
+      --grade-a: #4ade80;
+      --grade-b: #2dd4bf;
+      --grade-c: #f5d048;
+      --grade-d: #fb923c;
+      --grade-kw: #94a3b8;
+
+      /* Spacing */
+      --space-xs: 0.25rem;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --space-2xl: 3rem;
+
+      /* Radius */
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --radius: var(--radius-md);
+
+      /* Shadows */
+      --shadow-card: 0 2px 8px rgba(0,0,0,0.3);
+      --shadow-elevated: 0 4px 20px rgba(0,0,0,0.5);
+
+      /* Transitions */
+      --transition-fast: 150ms ease;
+      --transition-normal: 250ms ease;
+      --transition-slow: 400ms ease;
+
+      /* Typography */
+      --font-body: clamp(1rem, 2.5vw, 1.125rem);
+      --font-xs: 0.75rem;
+      --font-sm: 0.875rem;
+      --font-lg: 1.1rem;
+      --font-xl: 1.5rem;
+      --font-2xl: 2rem;
+      --font-grade: 2.4rem;
+    }
+
+    html { font-size: 16px; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      min-height: 100vh;
+      font-size: var(--font-body);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+
+    /* ===== Skip Navigation (Accessibility) ===== */
+    .skip-nav {
+      position: absolute;
+      top: -100%;
+      left: 0;
+      background: var(--accent);
+      color: var(--bg-primary);
+      padding: 0.75rem var(--space-lg);
+      z-index: 1000;
+      font-weight: 600;
+      text-decoration: none;
+      border-radius: 0 0 var(--radius-sm) 0;
+    }
+
+    .skip-nav:focus {
+      top: 0;
+    }
+
+    /* ===== Focus ring for keyboard navigation ===== */
+    *:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* ===== Layout ===== */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: var(--space-md);
+    }
+
+    header {
+      text-align: center;
+      padding: var(--space-xl) var(--space-md) var(--space-md);
+    }
+
+    header h1 {
+      font-size: var(--font-2xl);
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.5px;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: var(--space-xs);
+    }
+
+    /* ===== Cards ===== */
+    .card {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-lg);
+      border: 1px solid transparent;
+      box-shadow: var(--shadow-card);
+      transition: transform var(--transition-normal), box-shadow var(--transition-normal), border-color var(--transition-normal);
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-elevated);
+      border-color: var(--border-hover);
+    }
+
+    .card h2 {
+      font-size: var(--font-lg);
+      font-weight: 600;
+      margin-bottom: var(--space-md);
+      color: var(--text-primary);
+    }
+
+    /* ===== Onboarding Overlay ===== */
+    .onboarding-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+
+    .onboarding-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      padding: var(--space-xl);
+      max-width: 520px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-elevated);
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .onboarding-card h2 {
+      font-size: 1.4rem;
+      color: var(--accent);
+      margin-bottom: var(--space-sm);
+    }
+
+    .onboarding-card > p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: var(--space-lg);
+    }
+
+    .onboarding-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: var(--space-lg);
+    }
+
+    .onboarding-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .step-number {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: var(--bg-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+
+    .step-text {
+      font-size: 0.9rem;
+      color: var(--text-primary);
+      line-height: 1.4;
+    }
+
+    .step-text strong {
+      display: block;
+      margin-bottom: 0.1rem;
+    }
+
+    .grade-legend {
+      background: var(--bg-input);
+      border-radius: var(--radius-sm);
+      padding: var(--space-md);
+      margin-bottom: var(--space-lg);
+    }
+
+    .grade-legend h3 {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: var(--space-sm);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .grade-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-size: 0.85rem;
+      color: var(--text-primary);
+      margin-bottom: 0.35rem;
+    }
+
+    .grade-badge {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.75rem;
+      flex-shrink: 0;
+      color: var(--bg-primary);
+    }
+
+    .grade-badge.grade-a { background: var(--grade-a); }
+    .grade-badge.grade-b { background: var(--grade-b); }
+    .grade-badge.grade-c { background: var(--grade-c); }
+    .grade-badge.grade-d { background: var(--grade-d); }
+    .grade-badge.grade-kw { background: var(--grade-kw); color: var(--text-primary); }
+
+    /* ===== Quick Start ===== */
+    .quick-start {
+      text-align: center;
+      margin-bottom: var(--space-md);
+    }
+
+    .quick-start .btn-large {
+      font-size: 1.15rem;
+      padding: 0.9rem 2.5rem;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .quick-tip {
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      margin-top: var(--space-sm);
+      text-align: center;
+    }
+
+    .quick-start-note {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      margin-top: var(--space-sm);
+    }
+
+    .btn-link {
+      background: none;
+      border: none;
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 0.25rem;
+      min-height: 44px;
+      min-width: 44px;
+      text-decoration: underline;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-link:hover {
+      color: var(--accent-hover);
+    }
+
+    /* ===== Setup Section ===== */
+    #setup-section .setup-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-md);
+    }
+
+    @media (max-width: 600px) {
+      #setup-section .setup-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .form-group label {
+      font-size: var(--font-sm);
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .form-group input[type="file"],
+    .form-group select {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      padding: 0.6rem 0.75rem;
+      font-size: 0.9rem;
+      transition: border-color var(--transition-fast);
+      min-height: 44px;
+    }
+
+    .form-group input[type="file"]:hover,
+    .form-group select:hover {
+      border-color: var(--border-hover);
+    }
+
+    .form-group input[type="file"]:focus,
+    .form-group select:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-color: var(--accent);
+    }
+
+    .form-group select {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.75rem center;
+      padding-right: 2rem;
+    }
+
+    .file-input-wrapper {
+      grid-column: 1 / -1;
+    }
+
+    /* Styled file input as drop zone */
+    .file-input-wrapper .file-drop-zone {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xs);
+      padding: var(--space-lg) var(--space-md);
+      background: var(--bg-input);
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: border-color var(--transition-fast), background var(--transition-fast);
+      min-height: 80px;
+    }
+
+    .file-input-wrapper .file-drop-zone:hover,
+    .file-input-wrapper .file-drop-zone.drag-over {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    .file-input-wrapper .file-drop-zone .drop-icon {
+      font-size: 1.5rem;
+      color: var(--text-muted);
+      line-height: 1;
+    }
+
+    .file-input-wrapper .file-drop-zone .drop-label {
+      font-size: var(--font-sm);
+      color: var(--text-secondary);
+    }
+
+    .file-input-wrapper .file-drop-zone .drop-sublabel {
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+    }
+
+    .file-input-wrapper .file-drop-zone .file-name {
+      font-size: var(--font-sm);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .file-input-wrapper .file-drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      min-height: unset;
+    }
+
+    .upload-guidance {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: var(--space-sm);
+      text-align: center;
+    }
+
+    .form-hint {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: var(--space-xs);
+    }
+
+    /* Milestone celebration animation */
+    @keyframes milestoneGlow {
+      0% { box-shadow: 0 0 12px rgba(74, 222, 128, 0.1); }
+      50% { box-shadow: 0 0 24px rgba(74, 222, 128, 0.3); }
+      100% { box-shadow: 0 0 12px rgba(74, 222, 128, 0.1); }
+    }
+
+    .milestone-banner {
+      animation: milestoneGlow 2s ease-in-out 3;
+    }
+
+    .setup-guide {
+      grid-column: 1 / -1;
+      background: var(--bg-input);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem var(--space-md);
+      font-size: var(--font-sm);
+      color: var(--text-secondary);
+      border-left: 3px solid var(--accent-dim);
+      margin-top: var(--space-sm);
+      cursor: pointer;
+    }
+
+    /* Settings collapsible content */
+    #settings-content {
+      transition: max-height var(--transition-normal);
+    }
+
+    /* ===== Toggle Switch ===== */
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-md);
+      padding: var(--space-sm) 0;
+    }
+
+    .setting-row label {
+      font-size: var(--font-sm);
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 48px;
+      height: 26px;
+      flex-shrink: 0;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      transition: background var(--transition-fast), border-color var(--transition-fast);
+    }
+
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      height: 20px;
+      width: 20px;
+      left: 2px;
+      bottom: 2px;
+      background: var(--text-secondary);
+      border-radius: 50%;
+      transition: transform var(--transition-fast), background var(--transition-fast);
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+    }
+
+    .toggle-switch input:checked + .toggle-slider::before {
+      transform: translateX(22px);
+      background: var(--accent);
+    }
+
+    .toggle-switch input:focus-visible + .toggle-slider {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* ===== Camera Setup Illustration ===== */
+    .camera-guide {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: var(--space-lg);
+      background: var(--bg-input);
+      border-radius: var(--radius-sm);
+      padding: var(--space-md) 1.25rem;
+      margin-top: var(--space-xs);
+    }
+
+    .camera-guide svg {
+      flex-shrink: 0;
+      width: 180px;
+      height: 120px;
+    }
+
+    .camera-guide-text {
+      font-size: var(--font-sm);
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .camera-guide-text strong {
+      color: var(--accent);
+      display: block;
+      margin-bottom: var(--space-xs);
+    }
+
+    @media (max-width: 500px) {
+      .camera-guide {
+        flex-direction: column;
+        text-align: center;
+      }
+    }
+
+    /* ===== Buttons -- minimum 44x44 touch targets ===== */
+    .btn, .btn-primary, .btn-sm, button {
+      min-height: 44px;
+      min-width: 44px;
+      padding: var(--space-sm) var(--space-md);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-sm);
+      padding: 0.7rem var(--space-xl);
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    /* Button hover and press effects */
+    .btn:hover:not(:disabled) {
+      filter: brightness(1.1);
+    }
+
+    .btn:active:not(:disabled) { transform: scale(0.97); }
+
+    .btn:focus-visible, .btn-sm:focus-visible, button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--bg-primary);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+      filter: none;
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn-primary:disabled[title] {
+      cursor: help;
+    }
+
+    .btn-wrapper {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: center;
+      margin-top: var(--space-sm);
+    }
+
+    /* ===== Progress Section ===== */
+    #progress-section {
+      display: none;
+    }
+
+    .progress-bar-track {
+      width: 100%;
+      height: 8px;
+      background: var(--bg-input);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 0.75rem;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--success));
+      border-radius: 4px;
+      width: 0%;
+      transition: width var(--transition-normal);
+    }
+
+    #progress-percent {
+      font-size: var(--font-xl);
+      font-weight: 700;
+      color: var(--accent);
+      text-align: center;
+    }
+
+    #progress-status {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: var(--space-xs);
+    }
+
+    /* ===== Error ===== */
+    #error-section {
+      display: none;
+    }
+
+    .error-message {
+      background: var(--bg-card);
+      border: 1px solid var(--danger);
+      border-radius: var(--radius);
+      padding: var(--space-lg);
+      color: var(--text-primary);
+      font-size: 0.9rem;
+    }
+
+    .error-card-content {
+      text-align: center;
+    }
+
+    .error-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(248, 113, 113, 0.15);
+      color: var(--danger);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: var(--space-md);
+    }
+
+    .error-title {
+      font-size: var(--font-lg);
+      font-weight: 700;
+      color: var(--danger);
+      margin-bottom: var(--space-sm);
+    }
+
+    .error-detail {
+      font-size: var(--font-sm);
+      color: var(--text-secondary);
+      margin-bottom: var(--space-lg);
+      line-height: 1.5;
+    }
+
+    .error-tips {
+      text-align: left;
+      list-style: none;
+      margin: 0 auto var(--space-lg);
+      max-width: 360px;
+      font-size: var(--font-sm);
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .error-tips li {
+      padding: 0.25rem 0;
+      padding-left: 1.2rem;
+      position: relative;
+    }
+
+    .error-tips li::before {
+      content: '\2192';
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+    }
+
+    .error-tips strong {
+      color: var(--text-primary);
+    }
+
+    .error-actions {
+      display: flex;
+      gap: var(--space-sm);
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    /* ===== Skeleton Loading ===== */
+    .skeleton-results {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-2xl) var(--space-md);
+    }
+
+    .skeleton-score-circle {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+    }
+
+    .skeleton-bar {
+      height: 12px;
+      border-radius: var(--radius-sm);
+    }
+
+    .skeleton-pulse {
+      background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-card-hover) 50%, var(--bg-card) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s ease-in-out infinite;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* ===== Results Section ===== */
+    #results-section {
+      display: none;
+    }
+
+    #results-section:focus {
+      outline: none;
+    }
+
+    .results-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-lg);
+    }
+
+    @media (max-width: 900px) {
+      .results-layout {
+        grid-template-columns: 1fr;
+      }
+      .results-layout .scores-panel {
+        order: -1;
+      }
+      .results-layout .video-panel {
+        order: 1;
+      }
+    }
+
+    /* Score bar fill animation */
+    .score-bar-fill {
+      transition: width var(--transition-slow) cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    /* Staggered result reveal */
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .results-section > * {
+      animation: fadeSlideUp var(--transition-slow) ease both;
+    }
+    .results-section > *:nth-child(1) { animation-delay: 0ms; }
+    .results-section > *:nth-child(2) { animation-delay: 80ms; }
+    .results-section > *:nth-child(3) { animation-delay: 160ms; }
+    .results-section > *:nth-child(4) { animation-delay: 240ms; }
+    .results-section > *:nth-child(5) { animation-delay: 320ms; }
+    .results-section > *:nth-child(6) { animation-delay: 400ms; }
+    .results-section > *:nth-child(7) { animation-delay: 480ms; }
+
+    /* -- Video Player -- */
+    .video-panel {
+      position: relative;
+    }
+
+    .video-container {
+      position: relative;
+      width: 100%;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      background: #000;
+    }
+
+    .video-container video {
+      width: 100%;
+      display: block;
+    }
+
+    .video-container canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .video-controls {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-top: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .video-controls .btn-sm {
+      padding: 0.35rem 0.75rem;
+      font-size: var(--font-sm);
+      border: 1px solid var(--border-hover);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: border-color var(--transition-fast);
+      min-height: 44px;
+      min-width: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .video-controls .btn-sm:hover {
+      border-color: var(--accent);
+    }
+
+    .video-controls .btn-sm.active {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .speed-controls {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      font-size: var(--font-sm);
+      color: var(--text-muted);
+    }
+
+    .rep-selector {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      flex-wrap: wrap;
+    }
+
+    .rep-selector label {
+      font-size: var(--font-sm);
+      color: var(--text-muted);
+      margin-right: var(--space-xs);
+    }
+
+    .rep-selector .btn-sm {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    /* -- Scores Panel -- */
+    .scores-panel {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .overall-score-card {
+      display: flex;
+      align-items: center;
+      gap: var(--space-lg);
+      padding: 1.25rem;
+      flex-wrap: wrap;
+    }
+
+    .score-circle {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      border: 4px solid;
+    }
+
+    @media (max-width: 600px) {
+      .score-circle {
+        width: 100px;
+        height: 100px;
+      }
+      .score-circle .grade {
+        font-size: var(--font-2xl) !important;
+      }
+    }
+
+    .score-circle .grade {
+      font-size: var(--font-grade);
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .score-circle .score-value {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .score-breakdown {
+      flex: 1;
+    }
+
+    .score-breakdown h3 {
+      font-size: var(--font-sm);
+      color: var(--text-muted);
+      margin-bottom: var(--space-sm);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .score-bar-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-bottom: 0.35rem;
+    }
+
+    .score-bar-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      width: 85px;
+      flex-shrink: 0;
+    }
+
+    .score-bar-track {
+      flex: 1;
+      height: 6px;
+      background: var(--bg-input);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .score-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+    }
+
+    .score-bar-value {
+      font-size: 0.8rem;
+      font-weight: 600;
+      width: 28px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* -- Score Legend -- */
+    .score-legend {
+      width: 100%;
+      margin-top: 0.75rem;
+    }
+
+    .score-legend summary {
+      cursor: pointer;
+      font-size: 0.8rem;
+      color: var(--accent);
+      font-weight: 500;
+      padding: var(--space-xs) 0;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .score-legend summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .score-legend summary::before {
+      content: '\25B6';
+      font-size: 0.6rem;
+      transition: transform var(--transition-fast);
+    }
+
+    .score-legend[open] summary::before {
+      transform: rotate(90deg);
+    }
+
+    .legend-content {
+      padding: 0.75rem;
+      background: var(--bg-input);
+      border-radius: var(--radius-sm);
+      margin-top: var(--space-sm);
+    }
+
+    .legend-row {
+      font-size: 0.8rem;
+      color: var(--text-primary);
+      margin-bottom: 0.35rem;
+      line-height: 1.4;
+    }
+
+    .legend-row strong {
+      color: var(--accent);
+    }
+
+    .legend-note {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: var(--space-sm);
+      font-style: italic;
+    }
+
+    /* -- Tier Message -- */
+    .tier-message {
+      width: 100%;
+    }
+
+    /* -- Focus Section -- */
+    .focus-section {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      border-left: 4px solid var(--accent);
+      margin-bottom: var(--space-md);
+      border: 1px solid transparent;
+      border-left: 4px solid var(--accent);
+      transition: transform var(--transition-normal), box-shadow var(--transition-normal), border-color var(--transition-normal);
+    }
+
+    .focus-section:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-elevated);
+      border-color: var(--border-hover);
+      border-left-color: var(--accent);
+    }
+
+    .focus-section.focus-great {
+      border-left-color: var(--success);
+    }
+
+    .focus-section.focus-great:hover {
+      border-left-color: var(--success);
+    }
+
+    .focus-section h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: var(--space-sm);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .focus-cue {
+      font-size: var(--font-lg);
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.35rem;
+    }
+
+    .focus-why {
+      font-size: var(--font-sm);
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin-bottom: 0.75rem;
+    }
+
+    .focus-exercises h4 {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: var(--space-sm);
+    }
+
+    .exercise-card {
+      background: var(--bg-input);
+      border-radius: var(--radius-sm);
+      padding: 0.65rem 0.85rem;
+      margin-bottom: 0.4rem;
+      transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+    }
+
+    .exercise-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-elevated);
+    }
+
+    .exercise-card strong {
+      color: var(--text-primary);
+      font-size: var(--font-sm);
+    }
+
+    .exercise-sets {
+      font-size: 0.75rem;
+      color: var(--accent);
+      font-weight: 600;
+      margin-left: 0.35rem;
+    }
+
+    .exercise-card p {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-top: 0.15rem;
+      line-height: 1.4;
+    }
+
+    /* -- Milestone Banner -- */
+    .milestone-banner {
+      background: rgba(74, 222, 128, 0.08);
+      border: 1px solid var(--success);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem var(--space-md);
+      margin-bottom: var(--space-md);
+      box-shadow: 0 0 12px rgba(74, 222, 128, 0.1);
+    }
+
+    .milestone-item {
+      font-size: 0.9rem;
+      color: var(--success);
+      font-weight: 600;
+      line-height: 1.5;
+    }
+
+    /* -- Rep Cards -- */
+    .rep-cards-section h3 {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.75rem;
+    }
+
+    .rep-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: var(--space-sm);
+    }
+
+    .rep-card {
+      background: var(--bg-input);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem;
+      text-align: center;
+      cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-normal), box-shadow var(--transition-normal);
+      border: 1px solid transparent;
+    }
+
+    .rep-card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-hover);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-elevated);
+    }
+
+    .rep-card:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .rep-card.active {
+      border-color: var(--accent);
+    }
+
+    .rep-card .rep-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .rep-card .rep-grade {
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+
+    .rep-card .rep-score {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .rep-card .rep-issues {
+      display: flex;
+      gap: 4px;
+      justify-content: center;
+      margin-top: 0.35rem;
+      flex-wrap: wrap;
+    }
+
+    .issue-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .issue-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    /* -- Coaching Cues -- */
+    .coaching-section h3 {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.75rem;
+    }
+
+    .cue-card {
+      background: var(--bg-input);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem var(--space-md);
+      margin-bottom: var(--space-sm);
+      border-left: 3px solid var(--accent);
+    }
+
+    .cue-card .cue-text {
+      font-size: var(--font-lg);
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .cue-card .cue-explanation {
+      font-size: var(--font-sm);
+      color: var(--text-secondary);
+      margin-top: 0.2rem;
+    }
+
+    .cue-card .cue-issue {
+      font-size: 0.75rem;
+      color: var(--accent-dim);
+      margin-top: 0.15rem;
+    }
+
+    /* -- Positive Feedback -- */
+    .positive-section {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-lg);
+    }
+
+    /* -- Validation Warning (shown before analysis for video issues) -- */
+    .validation-warning {
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid var(--warning);
+      border-left: 4px solid var(--warning);
+      border-radius: var(--radius-sm);
+      padding: var(--space-sm) var(--space-md);
+      color: var(--warning);
+      font-size: var(--font-sm);
+      font-weight: 600;
+      line-height: 1.5;
+      margin-bottom: var(--space-sm);
+    }
+
+    /* -- Fatigue Warning -- */
+    .fatigue-warning {
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid var(--warning);
+      border-left: 4px solid var(--warning);
+      border-radius: var(--radius-sm);
+      padding: var(--space-md);
+      color: var(--text-primary);
+      font-size: var(--font-sm);
+      line-height: 1.5;
+      display: none;
+    }
+
+    .fatigue-warning::before {
+      content: 'Fatigue Detected';
+      display: block;
+      font-weight: 700;
+      color: var(--warning);
+      margin-bottom: 0.25rem;
+      font-size: 0.9rem;
+    }
+
+    /* -- Tier Separator (between action items and detail sections) -- */
+    .tier-separator {
+      border: none;
+      border-top: 1px solid var(--border, #2a2a2a);
+      margin: var(--space-lg) 0;
+      opacity: 0.5;
+    }
+
+    /* ===== History Section ===== */
+    .history-section {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-lg);
+    }
+
+    .history-section h2 {
+      font-size: var(--font-lg);
+      font-weight: 600;
+      margin-bottom: var(--space-md);
+      color: var(--text-primary);
+    }
+
+    .history-chart {
+      margin-bottom: var(--space-md);
+    }
+
+    .history-list-items {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .history-item {
+      display: grid;
+      grid-template-columns: 70px 40px 40px 60px 1fr;
+      gap: var(--space-sm);
+      align-items: center;
+      padding: var(--space-sm) 0.65rem;
+      background: var(--bg-input);
+      border-radius: var(--radius-sm);
+      font-size: 0.8rem;
+    }
+
+    .history-date {
+      color: var(--text-muted);
+    }
+
+    .history-score {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .history-reps {
+      color: var(--text-muted);
+    }
+
+    .history-issue {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 500px) {
+      .history-item {
+        grid-template-columns: 60px 35px 35px 1fr;
+      }
+      .history-issue {
+        display: none;
+      }
+    }
+
+    /* ===== Weight Input Row ===== */
+    .weight-input-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .weight-input-row input[type="number"] {
+      width: 90px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      padding: 0.5rem 0.6rem;
+      font-size: var(--font-sm);
+      -moz-appearance: textfield;
+    }
+
+    .weight-input-row input[type="number"]::-webkit-inner-spin-button,
+    .weight-input-row input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .weight-unit-toggle {
+      display: inline-flex;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+
+    .weight-unit-toggle button {
+      background: var(--bg-input);
+      border: none;
+      color: var(--text-muted);
+      padding: 0.45rem 0.65rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: background var(--transition-fast), color var(--transition-fast);
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    .weight-unit-toggle button.active {
+      background: var(--accent);
+      color: var(--bg-primary);
+      font-weight: 600;
+    }
+
+    /* ===== Pre-screen Modal ===== */
+    /* prescreen styles removed -- merged into onboarding modal */
+
+    /* ===== Download Video Button ===== */
+    #download-video-btn {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      font-size: 0.8rem;
+      cursor: pointer;
+      padding: 0.35rem 0.75rem;
+      border-radius: var(--radius-sm);
+      transition: background var(--transition-fast), border-color var(--transition-fast);
+      white-space: nowrap;
+    }
+
+    #download-video-btn:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-hover);
+    }
+
+    #download-video-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* ===== Header History Badge ===== */
+    #header-history-link {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-weight: 500;
+      transition: background var(--transition-fast), border-color var(--transition-fast);
+      display: none;
+      margin-top: var(--space-xs);
+    }
+
+    #header-history-link:hover {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+    }
+
+    /* ===== Footer ===== */
+    footer {
+      text-align: center;
+      padding: var(--space-xl) var(--space-md);
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      border-top: 1px solid var(--border);
+      margin-top: var(--space-xl);
+    }
+
+    /* ===== Confirm Modal ===== */
+    .confirm-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9998;
+      animation: fadeIn 0.15s ease-out;
+    }
+
+    .confirm-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-xl);
+      max-width: 380px;
+      width: 90%;
+      box-shadow: var(--shadow-elevated);
+      text-align: center;
+    }
+
+    .confirm-card h3 {
+      font-size: var(--font-lg);
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: var(--space-sm);
+    }
+
+    .confirm-card p {
+      font-size: var(--font-sm);
+      color: var(--text-secondary);
+      margin-bottom: var(--space-lg);
+      line-height: 1.5;
+    }
+
+    .confirm-actions {
+      display: flex;
+      gap: var(--space-sm);
+      justify-content: center;
+    }
+
+    .confirm-actions .btn-danger {
+      background: var(--danger);
+      color: white;
+      border: none;
+    }
+
+    .confirm-actions .btn-danger:hover {
+      filter: brightness(0.9);
+    }
+
+    .confirm-actions .btn-cancel-action {
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .confirm-actions .btn-cancel-action:hover {
+      border-color: var(--border-hover);
+      background: var(--bg-card-hover);
+    }
+
+    /* ===== Feature Discovery ===== */
+    .feature-discovery {
+      margin-top: 0.75rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      text-align: left;
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .feature-discovery summary {
+      cursor: pointer;
+      color: var(--accent);
+      font-weight: 500;
+      text-align: center;
+    }
+
+    .feature-discovery ul {
+      margin-top: var(--space-sm);
+      padding-left: 1.2rem;
+      line-height: 1.8;
+    }
+
+    /* ===== Onboarding Close Button ===== */
+    .onboarding-close-x {
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+      font-size: 1.2rem;
+      min-width: 44px;
+      min-height: 44px;
+      text-decoration: none;
+      color: var(--text-muted);
+    }
+
+    /* ===== Onboarding Card (positioned) ===== */
+    .onboarding-card--positioned {
+      position: relative;
+    }
+
+    /* ===== Card Hover (interactive only) ===== */
+    .card--static:hover {
+      transform: none;
+      box-shadow: var(--shadow-card);
+      border-color: transparent;
+    }
+
+    /* ===== Grade Legend Note ===== */
+    .grade-legend-note {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: var(--space-sm);
+    }
+
+    /* ===== Form Checklist ===== */
+    .form-checklist-summary {
+      font-weight: 600;
+      color: var(--accent);
+      font-size: 0.85rem;
+    }
+
+    .form-checklist-content {
+      margin-top: var(--space-sm);
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+
+    .form-checklist-content p {
+      margin-bottom: 0.4rem;
+    }
+
+    .form-checklist-content p:last-child {
+      margin-bottom: 0;
+    }
+
+    /* ===== Live Settings Layout ===== */
+    .live-settings {
+      display: flex;
+      gap: var(--space-md);
+      flex-wrap: wrap;
+      max-width: 720px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .live-settings .form-group {
+      flex: 1;
+      min-width: 140px;
+    }
+
+    /* ===== Live Panel Note ===== */
+    .live-panel-note {
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+      text-align: center;
+      margin-bottom: var(--space-sm);
+    }
+
+    /* ===== Progress ETA ===== */
+    .progress-eta {
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      margin-top: var(--space-xs);
+    }
+
+    /* ===== Weight Label Optional ===== */
+    .weight-optional-label {
+      font-weight: 400;
+      color: var(--text-muted);
+      font-size: 0.8em;
+    }
+
+    /* ===== Utility ===== */
+    .hidden { display: none !important; }
+    .w-full { width: 100%; }
+
+    .color-green { color: var(--success); }
+    .color-yellow { color: var(--warning); }
+    .color-orange { color: var(--orange); }
+    .color-red { color: var(--danger); }
+
+    .bg-green { background: var(--success); }
+    .bg-yellow { background: var(--warning); }
+    .bg-orange { background: var(--orange); }
+    .bg-red { background: var(--danger); }
+    .bg-accent { background: var(--accent); }
+
+    .border-green { border-color: var(--success); }
+    .border-yellow { border-color: var(--warning); }
+    .border-orange { border-color: var(--orange); }
+    .border-red { border-color: var(--danger); }
+
+    /* ===== Print Stylesheet ===== */
+    @media print {
+      body { background: white; color: black; }
+      .btn, .quick-start, .camera-guide, #history-section, .onboarding-overlay,
+      .video-container, .skip-nav, .video-controls, .rep-selector,
+      #progress-section, #error-section, #share-section, .toggle-switch,
+      .setting-row, .btn-link, .btn-wrapper, #setup-section { display: none !important; }
+      .card, .focus-section, .exercise-card {
+        border: 1px solid #ccc;
+        background: white;
+        box-shadow: none;
+        page-break-inside: avoid;
+      }
+      .card:hover, .rep-card:hover, .exercise-card:hover, .focus-section:hover {
+        transform: none;
+        box-shadow: none;
+      }
+      .score-circle { border-color: #333; }
+      .grade { color: #333; }
+      .score-bar-track { background: #eee; }
+      .score-bar-fill { background: #333; }
+      .results-section > * { animation: none !important; }
+    }
+
+    /* ===== Reduced Motion (Accessibility) ===== */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+
+      .progress-bar-fill {
+        transition: none;
+      }
+
+      .score-bar-fill {
+        transition: none;
+      }
+
+      .btn-primary:hover:not(:disabled) {
+        transform: none;
+      }
+
+      .btn:active {
+        transform: none;
+      }
+
+      .card:hover, .rep-card:hover, .exercise-card:hover, .focus-section:hover {
+        transform: none;
+      }
+
+      .skeleton-pulse {
+        animation: none;
+      }
+
+      .results-section > * {
+        animation: none;
+      }
+
+      .onboarding-overlay .onboarding-card {
+        animation: none;
+      }
+    }
+
+    /* Competition mode — scoped to results section only */
+    .competition-mode .score-circle { border-color: #e11d48; }
+    .competition-mode .competition-badge { background: #e11d48; }
+    .competition-mode .competition-judgment.depth-call { border-color: #e11d48; }
+
+    /* ===== Post-Results CTA ===== */
+    .post-results-cta {
+      display: flex;
+      gap: var(--space-md);
+      justify-content: center;
+      flex-wrap: wrap;
+      padding: var(--space-lg);
+      margin-top: var(--space-lg);
+    }
+
+    .post-results-cta .btn {
+      padding: 0.75rem var(--space-xl);
+      font-size: 1rem;
+    }
+
+    .btn-secondary {
+      background: var(--bg-input);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+
+    .btn-secondary:hover {
+      background: var(--accent-glow);
+    }
+
+    /* Touch optimization for interactive elements */
+    button, .btn, select, input[type="checkbox"], .toggle-switch, [role="button"] {
+      touch-action: manipulation;
+    }
+
+    .btn-cancel {
+      background: var(--danger);
+      color: white;
+      border: none;
+      padding: 0.5rem 1.5rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.9rem;
+      margin-top: var(--space-sm);
+    }
+    .btn-cancel:hover { opacity: 0.9; }
+
+    .storage-warning {
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid var(--warning);
+      color: var(--warning);
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--radius-sm);
+      font-size: 0.8rem;
+      margin-top: var(--space-sm);
+    }
+
+    .onboarding-note {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin: var(--space-sm) 0;
+    }
+
+    .onboarding-disclaimer {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin: var(--space-sm) 0 var(--space-md) 0;
+      line-height: 1.5;
+      opacity: 0.8;
+    }
+
+    /* ===== Mode Toggle ===== */
+    .mode-toggle {
+      display: flex;
+      gap: 0;
+      margin-bottom: var(--space-lg);
+      background: var(--bg-card);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .mode-tab {
+      flex: 1;
+      padding: 0.75rem var(--space-lg);
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      position: relative;
+    }
+
+    .mode-tab:hover {
+      color: var(--text-primary);
+      background: var(--bg-card-hover);
+    }
+
+    .mode-tab.active {
+      color: var(--bg-primary);
+      background: var(--accent);
+    }
+
+    .mode-tab:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+
+    /* ===== Exercise Toggle (segmented control) ===== */
+    .exercise-toggle {
+      display: flex;
+      gap: 0;
+      margin-bottom: var(--space-md);
+      background: var(--bg-card);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .exercise-tab {
+      flex: 1;
+      padding: 0.5rem var(--space-md);
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .exercise-tab:hover {
+      color: var(--text-primary);
+      background: var(--bg-card-hover);
+    }
+
+    .exercise-tab.active {
+      color: var(--bg-primary);
+      background: var(--accent);
+    }
+
+    .exercise-tab:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+
+    /* ===== Variant Group Transitions ===== */
+    .variant-group {
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+      transition: max-height 0.3s ease, opacity 0.2s ease;
+    }
+
+    .variant-group.visible {
+      max-height: 80px;
+      opacity: 1;
+    }
+
+    /* ===== Settings: always visible on desktop ===== */
+    @media (min-width: 768px) {
+      #settings-content { display: block !important; }
+      #show-settings-btn { display: none; }
+    }
+
+    /* ===== History Item Hover ===== */
+    .history-item {
+      transition: background var(--transition-fast);
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+    }
+
+    .history-item:hover {
+      background: var(--bg-card-hover);
+    }
+
+    .history-item.selected {
+      background: var(--accent-glow);
+      border-color: transparent;
+    }
+
+    /* ===== Live Mode ===== */
+    .live-container {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
+    }
+
+    .live-video-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 720px;
+      margin: 0 auto;
+      background: var(--bg-card);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      aspect-ratio: 16 / 9;
+    }
+
+    .live-video-wrapper video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      /* Mirror transform controlled by JS based on camera facing mode */
+    }
+
+    .live-video-wrapper canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      /* Mirror transform controlled by JS based on camera facing mode */
+    }
+
+    .live-status {
+      position: absolute;
+      top: var(--space-sm);
+      left: var(--space-sm);
+      display: flex;
+      gap: var(--space-sm);
+      z-index: 2;
+    }
+
+    .phase-badge {
+      display: inline-block;
+      padding: 0.3rem 0.75rem;
+      background: rgba(0, 0, 0, 0.7);
+      color: var(--accent);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-sm);
+      font-weight: 600;
+      backdrop-filter: blur(4px);
+    }
+
+    .phase-badge.phase-descending { color: var(--warning); }
+    .phase-badge.phase-bottom { color: var(--success); }
+    .phase-badge.phase-ascending { color: #fb923c; }
+    .phase-badge.phase-standing { color: var(--accent); }
+    .phase-badge.phase-calibrated { color: var(--success); }
+
+    .rep-badge {
+      display: inline-block;
+      padding: 0.3rem 0.75rem;
+      background: rgba(0, 0, 0, 0.7);
+      color: var(--text-primary);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-sm);
+      font-weight: 600;
+      backdrop-filter: blur(4px);
+    }
+
+    .live-score-display {
+      position: absolute;
+      top: var(--space-sm);
+      right: var(--space-sm);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.75);
+      border-radius: var(--radius-md);
+      padding: var(--space-sm) var(--space-md);
+      backdrop-filter: blur(4px);
+      z-index: 2;
+      animation: live-score-pop 0.4s ease-out;
+    }
+
+    @keyframes live-score-pop {
+      0% { transform: scale(0.8); opacity: 0; }
+      60% { transform: scale(1.05); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .live-score-value {
+      font-size: var(--font-2xl);
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    .live-score-grade {
+      font-size: var(--font-lg);
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .live-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      flex-wrap: wrap;
+    }
+
+    .audio-toggle {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      cursor: pointer;
+      font-size: var(--font-sm);
+      color: var(--text-secondary);
+      user-select: none;
+    }
+
+    .audio-toggle input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .audio-toggle-label {
+      white-space: nowrap;
+    }
+
+    .live-feedback {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    .live-feedback-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--space-md) var(--space-lg);
+      text-align: center;
+      animation: live-score-pop 0.3s ease-out;
+    }
+
+    .live-feedback-text {
+      color: var(--text-primary);
+      font-size: 1rem;
+      font-weight: 500;
+    }
+
+    /* Live mode stop button -- scoped to live panel to avoid overriding the analysis cancel button */
+    #live-stop.btn-cancel {
+      background: var(--bg-card);
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      font-weight: 600;
+      padding: 0.7rem var(--space-xl);
+    }
+
+    #live-stop.btn-cancel:hover {
+      background: rgba(248, 113, 113, 0.1);
+      opacity: 1;
+    }
+
+    @media (max-width: 600px) {
+      .live-video-wrapper {
+        aspect-ratio: 4 / 3;
+      }
+
+      .live-controls {
+        flex-direction: column;
+        gap: var(--space-md);
+      }
+
+      .mode-tab {
+        font-size: var(--font-sm);
+        padding: 0.6rem var(--space-md);
+      }
+    }
+  </style>
+</head>
+<body>
+  <noscript>
+    <div style="padding: 2rem; text-align: center; color: #e0e0e0; background: #0a0a0a; min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+      <p>Squat Form Analyzer requires JavaScript to run. Please enable JavaScript in your browser settings.</p>
+    </div>
+  </noscript>
+
+  <!-- Onboarding Overlay (first-time visitors) -->
+  <div id="onboarding-overlay" class="onboarding-overlay" role="dialog" aria-modal="true" aria-label="Welcome to Lift Form Analyzer">
+    <div class="onboarding-card onboarding-card--positioned">
+      <button id="onboarding-close-x" class="btn-link onboarding-close-x" aria-label="Close">&#10005;</button>
+      <h2>Welcome to Lift Form Analyzer</h2>
+      <p>Upload a video of your squat, deadlift, or bench press and get instant feedback on your form.</p>
+
+      <div class="onboarding-steps">
+        <div class="onboarding-step">
+          <div class="step-number">1</div>
+          <div class="step-text"><strong>Set up your camera</strong>Prop your phone at hip height, 2-4m away, side view</div>
+        </div>
+        <div class="onboarding-step">
+          <div class="step-number">2</div>
+          <div class="step-text"><strong>Film or upload your set</strong>Use Upload Mode with a recorded video, or try Live Mode for real-time coaching at the gym</div>
+        </div>
+        <div class="onboarding-step">
+          <div class="step-number">3</div>
+          <div class="step-text"><strong>Get your score</strong>See what you did well and one thing to improve</div>
+        </div>
+        <div class="onboarding-step">
+          <div class="step-number">4</div>
+          <div class="step-text"><strong>Try Live Mode</strong>Want real-time coaching? Switch to Live Mode for per-rep audio feedback while you train. (Currently supports squats — deadlift and bench coming soon.)</div>
+        </div>
+      </div>
+
+      <div class="grade-legend">
+        <h3>What the grades mean</h3>
+        <div class="grade-row"><span class="grade-badge grade-a">A</span> Excellent form -- minor polish only</div>
+        <div class="grade-row"><span class="grade-badge grade-b">B</span> Good form -- one or two things to work on</div>
+        <div class="grade-row"><span class="grade-badge grade-c">C</span> Decent -- a few areas need attention</div>
+        <div class="grade-row"><span class="grade-badge grade-d">D</span> Getting there -- the exercises below will help</div>
+        <div class="grade-row"><span class="grade-badge grade-kw">KW</span> Keep Working -- you're building the foundation</div>
+        <p class="grade-legend-note">
+          Score (0-100) measures technique quality. 80+ = solid form. Grade is the letter equivalent.
+        </p>
+      </div>
+
+      <p class="onboarding-note">First analysis takes about 30-60 seconds while the AI model loads.</p>
+
+      <p class="onboarding-disclaimer">This tool provides general form feedback, not medical advice. If you have pain, injuries, or medical conditions, consult a healthcare professional before following any exercise recommendations.</p>
+
+      <button id="onboarding-dismiss" class="btn btn-primary w-full" aria-label="Get started">Got it, let's go!</button>
+    </div>
+  </div>
+
+  <!-- Skip Navigation Link (Accessibility) -->
+  <a href="#main-content" class="skip-nav">Skip to main content</a>
+
+  <header>
+    <h1>Lift Form Analyzer</h1>
+    <p>AI-powered form analysis for squat, deadlift &amp; bench &mdash; your video never leaves your device <button class="btn-link" id="reshow-onboarding" aria-label="Show how it works">(How does this work?)</button></p>
+    <button id="header-history-link" aria-label="View session history">History (<span id="header-history-count">0</span>)</button>
+  </header>
+
+  <main id="main-content">
+    <div class="container">
+
+      <!-- Mode Toggle -->
+      <div class="mode-toggle" role="tablist" aria-label="Analysis mode">
+        <button id="mode-upload" class="mode-tab active" role="tab" aria-selected="true" aria-controls="upload-panel">
+          Upload Video
+        </button>
+        <button id="mode-live" class="mode-tab" role="tab" aria-selected="false" aria-controls="live-panel">
+          Live Mode
+        </button>
+      </div>
+
+      <!-- Upload Panel (default) -->
+      <div id="upload-panel" role="tabpanel" aria-labelledby="mode-upload" tabindex="0">
+
+      <!-- Quick Start -->
+      <div class="quick-start">
+        <button id="quick-start-btn" class="btn btn-primary btn-large" aria-label="Quick analyze with default settings">
+          Quick Analyze My Lift
+        </button>
+        <p class="quick-tip" aria-label="Camera positioning tip">
+          <strong>Tip:</strong> Film from the side, at hip height, 2-4m away. Full body in frame.
+        </p>
+        <p class="quick-start-note">Uses recommended settings for beginners. <button class="btn-link" id="show-settings-btn">Customize settings</button></p>
+        <button id="try-example-btn" class="btn btn-secondary" aria-label="Try with an example squat video">
+          Try Example Video
+        </button>
+
+        <details class="feature-discovery">
+          <summary>What else can this app do?</summary>
+          <ul>
+            <li><strong>Live Mode:</strong> Real-time coaching with voice cues while you train</li>
+            <li><strong>Session History:</strong> Track your progress over time</li>
+            <li><strong>1RM Estimate:</strong> Enter your weight to estimate your one-rep max</li>
+            <li><strong>Flexibility Check:</strong> Get personalized stretches based on your form issues</li>
+            <li><strong>RPE Estimation:</strong> See how hard each rep was based on movement speed</li>
+            <li><strong>Share Results:</strong> Share your score with friends or a coach</li>
+            <li><strong>Export Data:</strong> Download CSV or JSON for your training log</li>
+            <li><strong>Competition Mode:</strong> IPF/USAPL judging standards (intermediate+ level)</li>
+          </ul>
+        </details>
+      </div>
+
+      <!-- Setup Section -->
+      <section id="setup-section" class="card card--static" aria-label="Upload and configure">
+        <h2>Upload &amp; Configure</h2>
+
+        <!-- Exercise type segmented control (always visible) -->
+        <div class="exercise-toggle" role="radiogroup" aria-label="Exercise type">
+          <button type="button" class="exercise-tab active" data-exercise="squat" role="radio" aria-checked="true">Squat</button>
+          <button type="button" class="exercise-tab" data-exercise="deadlift" role="radio" aria-checked="false">Deadlift</button>
+          <button type="button" class="exercise-tab" data-exercise="bench_press" role="radio" aria-checked="false">Bench Press</button>
+        </div>
+
+        <!-- Hidden select for JS compatibility -->
+        <select id="exercise-type" aria-label="Select exercise type" style="display: none;">
+          <option value="squat">Squat</option>
+          <option value="deadlift">Deadlift</option>
+          <option value="bench_press">Bench Press</option>
+        </select>
+
+        <div id="settings-content" style="display: none;">
+          <div class="setup-grid">
+            <div class="form-group file-input-wrapper">
+              <label for="video-input">Video File</label>
+              <div class="file-drop-zone" id="file-drop-zone">
+                <span class="drop-icon" aria-hidden="true">&#8593;</span>
+                <span class="drop-label" id="drop-label">Tap to select or drag a video here</span>
+                <span class="drop-sublabel">MP4, MOV, WebM -- 10-30 seconds recommended</span>
+                <input type="file" id="video-input" accept="video/*" aria-describedby="video-input-help" />
+              </div>
+              <p class="upload-guidance">Best results: landscape orientation, full body visible. Film one set (3-10 reps).</p>
+            </div>
+            <div class="form-group variant-group visible" id="squat-type-group">
+              <label for="squat-type">Squat Type</label>
+              <select id="squat-type" aria-label="Select squat type">
+                <option value="bodyweight">Bodyweight (no weight)</option>
+                <option value="high_bar">High Bar (bar on upper back — most common)</option>
+                <option value="low_bar">Low Bar (bar on mid-back — powerlifting)</option>
+                <option value="front">Front Squat (bar on front shoulders)</option>
+                <option value="goblet">Goblet (dumbbell/kettlebell at chest)</option>
+                <option value="overhead">Overhead (bar held overhead — advanced)</option>
+              </select>
+              <p class="form-hint">Not sure? Pick "Bodyweight" if using no weight, or "High Bar" if you have a barbell on your upper back.</p>
+            </div>
+            <div class="form-group variant-group" id="deadlift-type-group">
+              <label for="deadlift-type">Deadlift Type</label>
+              <select id="deadlift-type" aria-label="Select deadlift type">
+                <option value="conventional">Conventional (feet hip-width, hands outside knees)</option>
+                <option value="sumo">Sumo (wide stance, hands inside knees)</option>
+                <option value="romanian">Romanian / RDL (slight knee bend, bar stays off floor)</option>
+              </select>
+              <p class="form-hint">Conventional is the standard deadlift. Sumo uses a wide stance. Romanian focuses on the hip hinge with less knee bend.</p>
+            </div>
+            <div class="form-group variant-group" id="bench-type-group">
+              <label for="bench-type">Bench Type</label>
+              <select id="bench-type" aria-label="Select bench press type">
+                <option value="flat">Flat Bench (standard grip)</option>
+                <option value="close_grip">Close Grip (more triceps)</option>
+                <option value="wide_grip">Wide Grip (more chest)</option>
+              </select>
+              <p class="form-hint">Not sure? Pick "Flat Bench" — it's the standard bench press.</p>
+            </div>
+            <div class="form-group">
+              <label for="experience-level">Experience Level</label>
+              <select id="experience-level" aria-label="Select experience level" aria-describedby="experience-hint">
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
+              </select>
+              <p class="form-hint" id="experience-hint">New to squatting or &lt;6 months of consistent practice</p>
+            </div>
+            <div class="form-group">
+              <label for="weight-input">Weight <span class="weight-optional-label">(optional — estimates your max lift)</span></label>
+              <div class="weight-input-row">
+                <input type="number" id="weight-input" min="0" max="2000" step="5" placeholder="--" aria-label="Weight being squatted">
+                <div class="weight-unit-toggle" role="group" aria-label="Weight unit">
+                  <button type="button" class="weight-unit-btn active" data-unit="lbs" aria-label="Pounds">lbs</button>
+                  <button type="button" class="weight-unit-btn" data-unit="kg" aria-label="Kilograms">kg</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Competition Mode Toggle -->
+            <div id="competition-toggle-container" class="setting-row file-input-wrapper" style="display: none;">
+              <label for="competition-mode">Competition Mode (IPF/USAPL)</label>
+              <div class="toggle-switch">
+                <input type="checkbox" id="competition-mode" aria-label="Enable competition mode for IPF/USAPL judging standards">
+                <span class="toggle-slider"></span>
+              </div>
+            </div>
+
+            <!-- Camera Setup Guide with SVG Illustration -->
+            <div class="camera-guide" aria-label="Camera positioning guide">
+              <svg viewBox="0 0 240 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration showing proper camera positioning: phone at hip height, 2-4 meters away, side view">
+                <!-- Floor -->
+                <line x1="10" y1="140" x2="230" y2="140" stroke="#444" stroke-width="1" />
+                <!-- Stick figure (profile view) -->
+                <!-- Head -->
+                <circle cx="60" cy="40" r="10" fill="none" stroke="#4cc9f0" stroke-width="2" />
+                <!-- Torso -->
+                <line x1="60" y1="50" x2="60" y2="90" stroke="#4cc9f0" stroke-width="2" />
+                <!-- Arms -->
+                <line x1="60" y1="60" x2="45" y2="78" stroke="#4cc9f0" stroke-width="1.5" />
+                <line x1="60" y1="60" x2="75" y2="78" stroke="#4cc9f0" stroke-width="1.5" />
+                <!-- Legs -->
+                <line x1="60" y1="90" x2="50" y2="120" stroke="#4cc9f0" stroke-width="2" />
+                <line x1="50" y1="120" x2="45" y2="140" stroke="#4cc9f0" stroke-width="2" />
+                <line x1="60" y1="90" x2="70" y2="120" stroke="#4cc9f0" stroke-width="2" />
+                <line x1="70" y1="120" x2="75" y2="140" stroke="#4cc9f0" stroke-width="2" />
+                <!-- Phone on surface (at hip height) -->
+                <rect x="180" y="78" width="14" height="24" rx="2" fill="none" stroke="#06d6a0" stroke-width="1.5" />
+                <!-- Phone screen dot -->
+                <circle cx="187" cy="85" r="2" fill="#06d6a0" />
+                <!-- Surface for phone -->
+                <line x1="170" y1="102" x2="204" y2="102" stroke="#888" stroke-width="1.5" />
+                <line x1="175" y1="102" x2="175" y2="140" stroke="#888" stroke-width="1" />
+                <line x1="199" y1="102" x2="199" y2="140" stroke="#888" stroke-width="1" />
+                <!-- Distance arrow -->
+                <line x1="80" y1="148" x2="170" y2="148" stroke="#ffd166" stroke-width="1" marker-start="url(#arrowL)" marker-end="url(#arrowR)" />
+                <text x="125" y="158" text-anchor="middle" fill="#ffd166" font-size="10">2-4 m</text>
+                <!-- Arrow markers -->
+                <defs>
+                  <marker id="arrowR" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                    <path d="M0,0 L6,3 L0,6 Z" fill="#ffd166" />
+                  </marker>
+                  <marker id="arrowL" markerWidth="6" markerHeight="6" refX="1" refY="3" orient="auto">
+                    <path d="M6,0 L0,3 L6,6 Z" fill="#ffd166" />
+                  </marker>
+                </defs>
+                <!-- Label -->
+                <text x="187" y="72" text-anchor="middle" fill="#06d6a0" font-size="9" font-weight="600">Side View</text>
+                <text x="187" y="62" text-anchor="middle" fill="#06d6a0" font-size="8">(recommended)</text>
+              </svg>
+              <div class="camera-guide-text">
+                <strong>Camera Setup</strong>
+                Prop your phone at hip height, 2&ndash;4 meters away, perpendicular to your side.
+                Ensure your full body is visible from head to feet. Good lighting and a clear background help accuracy.
+              </div>
+            </div>
+
+            <details class="setup-guide">
+              <summary class="form-checklist-summary">New to this exercise? Quick form checklist</summary>
+              <div class="form-checklist-content">
+                <p><strong>Squat:</strong> Feet shoulder-width apart, toes slightly out. Lower yourself until thighs are at least parallel to the floor. Keep chest up, weight on whole foot. Stand back up by pushing the floor away.</p>
+                <p><strong>Deadlift:</strong> Stand with feet hip-width, bar over mid-foot. Hinge at hips, grip bar outside your knees, brace core, then stand up by pushing floor away. Keep the bar close to your body.</p>
+                <p><strong>Bench Press:</strong> Lie on bench, feet flat on floor. Grip bar slightly wider than shoulders. Lower to chest, pause briefly, then press up until arms are straight.</p>
+              </div>
+            </details>
+            <div class="setup-guide" id="video-input-help">
+              <strong>Tip:</strong> Record your full set from the side view for best results. Front-angle recordings enable additional knee tracking analysis.
+            </div>
+            <div class="btn-wrapper">
+              <button id="analyze-btn" class="btn btn-primary" disabled title="Select a video file first" aria-label="Analyze squat form">Analyze</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      </div><!-- /upload-panel -->
+
+      <!-- Live Mode Panel -->
+      <div id="live-panel" role="tabpanel" aria-labelledby="mode-live" tabindex="0" style="display: none;">
+        <div class="live-container">
+          <p class="live-panel-note">Live mode currently supports squats. Use Upload Video for deadlift and bench press.</p>
+          <!-- Live Settings -->
+          <div class="live-settings">
+            <div class="form-group">
+              <label for="live-squat-type">Squat Type</label>
+              <select id="live-squat-type" aria-label="Select squat type for live session">
+                <option value="bodyweight">Bodyweight (no weight)</option>
+                <option value="high_bar">High Bar (bar on upper back — most common)</option>
+                <option value="low_bar">Low Bar (bar on mid-back — powerlifting)</option>
+                <option value="front">Front Squat (bar on front shoulders)</option>
+                <option value="goblet">Goblet (dumbbell/kettlebell at chest)</option>
+                <option value="overhead">Overhead (bar held overhead — advanced)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="live-experience-level">Experience Level</label>
+              <select id="live-experience-level" aria-label="Select experience level for live session">
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="live-weight-input">Weight <span class="weight-optional-label">(optional — estimates your max lift)</span></label>
+              <div class="weight-input-row">
+                <input type="number" id="live-weight-input" min="0" max="2000" step="5" placeholder="--" aria-label="Weight being squatted (live)">
+                <div class="weight-unit-toggle" role="group" aria-label="Weight unit (live)">
+                  <button type="button" class="live-weight-unit-btn active" data-unit="lbs" aria-label="Pounds">lbs</button>
+                  <button type="button" class="live-weight-unit-btn" data-unit="kg" aria-label="Kilograms">kg</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="live-video-wrapper">
+            <video id="live-video" autoplay playsinline muted aria-label="Live webcam feed"></video>
+            <canvas id="live-overlay" aria-hidden="true"></canvas>
+            <div class="live-status">
+              <span id="live-phase" class="phase-badge">Stand Still to Calibrate</span>
+              <span id="live-rep-count" class="rep-badge">0 reps</span>
+            </div>
+            <div class="live-score-display" id="live-score-display" style="display: none;">
+              <span class="live-score-value" id="live-score-value">--</span>
+              <span class="live-score-grade" id="live-score-grade">--</span>
+            </div>
+          </div>
+          <div class="live-controls">
+            <button id="live-start" class="btn btn-primary btn-large">Start Session</button>
+            <button id="live-stop" class="btn btn-cancel btn-large" style="display: none;">Stop Session</button>
+            <button id="live-switch-camera" class="btn btn-primary btn-sm" style="display: none;" aria-label="Switch camera">Switch Camera</button>
+            <label class="audio-toggle">
+              <input type="checkbox" id="audio-enabled" checked>
+              <span class="audio-toggle-label">Voice coaching cues</span>
+            </label>
+          </div>
+          <div class="live-feedback" id="live-feedback" aria-live="polite" style="display: none;">
+            <div class="live-feedback-card" id="live-feedback-card">
+              <span class="live-feedback-text" id="live-feedback-text"></span>
+            </div>
+          </div>
+        </div>
+      </div><!-- /live-panel -->
+
+      <!-- Progress Section -->
+      <section id="progress-section" class="card card--static" aria-label="Analysis progress">
+        <h2>Analyzing...</h2>
+        <div id="progress-percent" aria-hidden="true">0%</div>
+        <div class="progress-bar-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Analysis progress">
+          <div id="progress-bar" class="progress-bar-fill"></div>
+        </div>
+        <div id="progress-status" aria-live="polite" role="status">Initializing pose estimator...</div>
+        <div id="progress-eta" class="progress-eta" aria-live="polite"></div>
+        <button id="cancel-btn" class="btn-cancel" style="display: none;" aria-label="Cancel analysis">Cancel Analysis</button>
+      </section>
+
+      <!-- Error Section -->
+      <section id="error-section" class="card card--static" aria-label="Error message">
+        <div class="error-message" id="error-message" role="alert"></div>
+      </section>
+
+      <div id="storage-warning" class="storage-warning" style="display: none;" role="alert">
+        Session history is full. Older sessions may not be saved. <button class="btn-link" id="clear-storage-btn">Clear history</button>
+      </div>
+
+      <!-- Results Section -->
+      <section id="results-section" aria-label="Analysis results" aria-live="polite">
+        <div class="results-layout">
+
+          <!-- Left: Video Player -->
+          <div class="video-panel">
+            <div class="card">
+              <div class="video-container">
+                <video id="result-video" muted playsinline aria-label="Analyzed squat video"></video>
+                <canvas id="overlay-canvas" aria-hidden="true"></canvas>
+              </div>
+              <div class="video-controls">
+                <button id="play-pause-btn" class="btn-sm" aria-label="Play or pause video">Play</button>
+                <button id="prev-frame-btn" class="btn-sm" aria-label="Previous frame">&larr;</button>
+                <button id="next-frame-btn" class="btn-sm" aria-label="Next frame">&rarr;</button>
+                <div class="speed-controls">
+                  <span>Speed:</span>
+                  <button class="btn-sm speed-btn" data-speed="0.25" aria-label="Set playback speed to 0.25x">0.25x</button>
+                  <button class="btn-sm speed-btn" data-speed="0.5" aria-label="Set playback speed to 0.5x">0.5x</button>
+                  <button class="btn-sm speed-btn active" data-speed="1" aria-label="Set playback speed to 1x">1x</button>
+                </div>
+              </div>
+              <div class="video-controls rep-selector" id="rep-selector" aria-label="Jump to specific rep">
+                <label>Jump to rep:</label>
+                <!-- Rep buttons injected by JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Scores -->
+          <div class="scores-panel">
+            <!-- Overall Score -->
+            <div class="card overall-score-card" id="overall-score-card">
+              <div class="score-circle" id="score-circle" role="img" aria-label="Overall score">
+                <span class="grade" id="overall-grade">--</span>
+                <span class="score-value" id="overall-score-value">--</span>
+              </div>
+            </div>
+
+            <!-- Fatigue Warning (safety-critical, shown right after score) -->
+            <div class="fatigue-warning" id="fatigue-warning" role="alert">
+              Your form held strong in the early reps. Fatigue crept in toward the end — try shorter sets to maintain quality throughout.
+            </div>
+
+            <!-- Positive Feedback (injected by JS) -->
+
+            <!-- Coaching Cues -->
+            <div class="card coaching-section" id="coaching-section" aria-label="Coaching cues">
+              <h3>Coaching Cues</h3>
+              <div id="coaching-cues">
+                <!-- Cues injected by JS -->
+              </div>
+            </div>
+
+            <!-- Visual separator between action items and details -->
+            <hr class="tier-separator" />
+
+            <!-- Score Breakdown (collapsed by default via JS) -->
+            <div class="card score-breakdown" id="score-breakdown">
+              <h3>Score Breakdown</h3>
+              <!-- Bars injected by JS -->
+            </div>
+
+            <!-- Rep Cards -->
+            <div class="card rep-cards-section" id="rep-cards-section" aria-label="Per-rep scores">
+              <h3>Per-Rep Scores</h3>
+              <div class="rep-cards-grid" id="rep-cards-grid">
+                <!-- Cards injected by JS -->
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Session History -->
+      <section id="history-section" class="history-section" aria-label="Your progress" style="display: none;">
+        <h2>Your Progress</h2>
+        <div id="history-chart" class="history-chart" aria-label="Score trend chart"></div>
+        <div id="history-list" class="history-list"></div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer>
+    <p>
+      This app provides AI-based estimates that may contain errors.
+      Not a substitute for professional medical advice or coaching.
+      Consult a physician before beginning any exercise program.
+      Always listen to your body &mdash; stop if you feel pain.
+    </p>
+  </footer>
+
+  <script type="module" src="/src/main.ts"></script>
+  <script>
+    // Register service worker for PWA support (offline caching of WASM/models)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

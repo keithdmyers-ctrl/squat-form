@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "squat-form-analyzer"
+version = "1.1.0"
+description = "AI-powered squat form analysis using MediaPipe pose estimation"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Keith Myers", email = "keithdmyers@gmail.com"},
+]
+dependencies = [
+    "mediapipe>=0.10",
+    "opencv-python-headless>=4.8",
+    "numpy>=1.24",
+    "fastapi>=0.100",
+    "uvicorn[standard]",
+    "python-multipart",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "httpx>=0.24",
+]
+
+[tool.setuptools.packages.find]
+include = ["squat_form*"]

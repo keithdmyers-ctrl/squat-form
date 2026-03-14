@@ -1,0 +1,20 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+node_modules/
+.env
+# MediaPipe WASM/model files (copied from node_modules by postinstall)
+frontend/public/mediapipe/
+*.mp4
+*.avi
+*.mov
+annotated_videos/
+.DS_Store
+*.swp
+*.swo

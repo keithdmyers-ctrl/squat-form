@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="64" fill="#0a0a0a"/>
+  <text x="256" y="200" text-anchor="middle" font-family="Arial, sans-serif" font-size="160" font-weight="800" fill="#00d4ff">SQ</text>
+  <rect x="96" y="280" width="320" height="24" rx="12" fill="#1e1e1e"/>
+  <rect x="96" y="280" width="240" height="24" rx="12" fill="#00d4ff"/>
+  <text x="256" y="370" text-anchor="middle" font-family="Arial, sans-serif" font-size="48" font-weight="600" fill="#a0a0a0">FORM</text>
+</svg>

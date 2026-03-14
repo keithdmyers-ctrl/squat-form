@@ -25,7 +25,7 @@ A camera-based tool that evaluates squat form using pose estimation and provides
 Phase 1 (Video Upload):
   Phone/Web Camera --> Record Video --> Upload to Web App
     --> FastAPI Backend
-    --> FFmpeg (frame extraction)
+    --> OpenCV (frame extraction)
     --> MediaPipe Pose (per-frame landmarks)
     --> Angle Calculator (hip, knee, ankle, trunk)
     --> Form Analyzer (rule-based thresholds + phase detection)
@@ -195,15 +195,16 @@ The "correct" torso angle depends on limb proportions:
 ### Joint Angle Calculation
 
 ```python
-import numpy as np
+import math
 
 def calculate_angle(a, b, c):
-    """Angle at point b, given points a, b, c as (x, y) tuples."""
-    a, b, c = np.array(a), np.array(b), np.array(c)
-    ba = a - b
-    bc = c - b
-    cosine = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
-    return np.degrees(np.arccos(np.clip(cosine, -1.0, 1.0)))
+    """Angle at vertex b, given points a, b, c as (x, y, z) tuples."""
+    bax, bay, baz = a[0] - b[0], a[1] - b[1], a[2] - b[2]
+    bcx, bcy, bcz = c[0] - b[0], c[1] - b[1], c[2] - b[2]
+    len_ba = math.sqrt(bax*bax + bay*bay + baz*baz)
+    len_bc = math.sqrt(bcx*bcx + bcy*bcy + bcz*bcz)
+    cos_angle = (bax*bcx + bay*bcy + baz*bcz) / (len_ba * len_bc)
+    return math.degrees(math.acos(max(-1.0, min(1.0, cos_angle))))
 
 # Primary angles
 knee_angle = calculate_angle(hip, knee, ankle)        # Flexion at knee
@@ -271,11 +272,13 @@ Apply phase-specific checks:
 | Dimension | Weight | Scoring |
 |-----------|--------|---------|
 | Depth | 25% | Full depth=100, parallel=80, above parallel=40-60 |
-| Knee tracking | 25% | Aligned with toes=100, mild valgus=60, significant valgus=20 |
-| Trunk angle | 15% | Within type-specific norm=100, penalize per degree over |
-| Symmetry | 15% | L/R hip and knee angle match within 5 deg=100 |
-| Tempo/control | 10% | 1.5-3s descent=100, too fast or jerky=lower |
-| Lockout | 10% | Full extension=100 |
+| Knee tracking | 20% | Aligned with toes=100, mild valgus=60, significant valgus=20 |
+| Trunk angle | 20% | Within type-specific norm=100, penalize per degree over |
+| Symmetry | 10% | L/R hip and knee angle match within 5 deg=100 |
+| Tempo | 10% | 1.5-3s descent=100, too fast or jerky=lower |
+| Lockout | 15% | Full extension=100 |
+
+> **Note:** These are the default weights. When frontal camera data is unavailable, dynamic weight redistribution adjusts the weights automatically (e.g., symmetry weight is redistributed to the dimensions that can be measured from a side view).
 
 **Set score** = average of per-rep scores, with a fatigue penalty if last 2 reps score > 15 points below first 2.
 
@@ -328,36 +331,36 @@ Apply phase-specific checks:
 **Goal:** User uploads a squat video, gets back an annotated analysis with scores and coaching cues.
 
 **Week 1-2: Core Pipeline**
-- [ ] Project scaffolding (Python package, FastAPI app)
-- [ ] Video ingestion: accept upload (mp4/mov), extract frames with FFmpeg
-- [ ] MediaPipe integration: extract 33 landmarks per frame with confidence scores
-- [ ] Joint angle calculator: knee, hip, ankle, trunk angles per frame
-- [ ] Squat phase detector: state machine (standing/descending/bottom/ascending)
-- [ ] Rep counter: count complete reps from phase transitions
+- [x] Project scaffolding (Python package, FastAPI app)
+- [x] Video ingestion: accept upload (mp4/mov), extract frames with OpenCV
+- [x] MediaPipe integration: extract 33 landmarks per frame with confidence scores
+- [x] Joint angle calculator: knee, hip, ankle, trunk angles per frame
+- [x] Squat phase detector: state machine (standing/descending/bottom/ascending)
+- [x] Rep counter: count complete reps from phase transitions
 
 **Week 3: Form Analysis Engine**
-- [ ] Depth checker: compare hip-to-knee height at bottom
-- [ ] Knee tracking analyzer: frontal-plane valgus/varus detection
-- [ ] Trunk angle analyzer: compare to type-specific norms
-- [ ] Butt wink detector: pelvic tilt change at bottom
-- [ ] Heel rise detector: heel landmark displacement
-- [ ] Good-morning detector: hip-knee lag on ascent
-- [ ] Per-rep scoring algorithm (weighted composite)
-- [ ] Calibration step: capture standing proportions for personalized thresholds
+- [x] Depth checker: compare hip-to-knee height at bottom
+- [x] Knee tracking analyzer: frontal-plane valgus/varus detection
+- [x] Trunk angle analyzer: compare to type-specific norms
+- [x] Butt wink detector: pelvic tilt change at bottom
+- [x] Heel rise detector: heel landmark displacement
+- [x] Good-morning detector: hip-knee lag on ascent
+- [x] Per-rep scoring algorithm (weighted composite)
+- [x] Calibration step: capture standing proportions for personalized thresholds
 
 **Week 4: Output & Visualization**
-- [ ] Annotated video rendering: skeleton overlay with color-coded joints
-- [ ] Angle labels on key frames
-- [ ] Summary report generation (JSON + rendered HTML/PDF)
-- [ ] Per-rep cards with screenshots
-- [ ] Corrective cue mapping (error -> coaching phrase)
+- [x] Annotated video rendering: skeleton overlay with color-coded joints
+- [x] Angle labels on key frames
+- [x] Summary report generation (JSON + rendered HTML)
+- [x] Per-rep summary cards
+- [x] Corrective cue mapping (error -> coaching phrase)
 
 **Week 5-6: Web Interface**
-- [ ] Simple web UI: upload video, view results
-- [ ] Camera setup guide (positioning instructions)
-- [ ] Squat type selector (bodyweight, high bar, low bar, front, goblet)
-- [ ] Experience level selector (beginner/intermediate/advanced)
-- [ ] Results page: annotated video player, timeline scrubber, report cards
+- [x] Simple web UI: upload video, view results
+- [x] Camera setup guide (positioning instructions)
+- [x] Squat type selector (bodyweight, high bar, low bar, front, goblet, overhead)
+- [x] Experience level selector (beginner/intermediate/advanced)
+- [x] Results page: annotated video player, report cards
 - [ ] Deploy as web app
 
 **Phase 1 Deliverable:** Working web app where users upload a squat video and receive a detailed form analysis with annotated video, scores, and coaching cues.
@@ -366,10 +369,10 @@ Apply phase-specific checks:
 
 **Goal:** Run analysis in the browser using TensorFlow.js/MediaPipe Web. No server needed for inference.
 
-- [ ] Port angle calculation and form analysis logic to TypeScript
-- [ ] Integrate MediaPipe Web (BlazePose) for in-browser pose estimation
-- [ ] Video file analysis in browser (process uploaded file client-side)
-- [ ] Webcam preview with live skeleton overlay (precursor to real-time)
+- [x] Port angle calculation and form analysis logic to TypeScript
+- [x] Integrate MediaPipe Web (BlazePose) for in-browser pose estimation
+- [x] Video file analysis in browser (process uploaded file client-side)
+- [x] Webcam preview with live skeleton overlay and real-time coaching
 - [ ] Progressive Web App (PWA) setup for mobile install
 
 ### Phase 2: Real-Time Mobile Feedback -- ~6-8 weeks
@@ -377,24 +380,24 @@ Apply phase-specific checks:
 **Goal:** Live coaching during squats via phone camera.
 
 **Weeks 1-3: On-Device Pipeline**
-- [ ] React Native app (or native) with camera integration
-- [ ] On-device MediaPipe inference at 30 FPS
-- [ ] Real-time angle computation and phase detection
+- [ ] Native mobile app with camera integration
+- [x] On-device MediaPipe inference (browser-based via MediaPipe Web)
+- [x] Real-time angle computation and phase detection
 - [ ] Latency optimization (target < 100ms pipeline)
 
 **Weeks 4-5: Feedback System**
-- [ ] Audio cue engine: text-to-speech or pre-recorded clips
-- [ ] Visual overlay: traffic light indicator, simplified skeleton
+- [x] Audio cue engine: text-to-speech via Web Speech API
+- [x] Visual overlay: skeleton overlay with phase indicator
 - [ ] Haptic feedback on form deviation
-- [ ] Feedback prioritization (one cue per rep, ranked by injury risk)
-- [ ] Post-set summary screen
+- [x] Feedback prioritization (one cue per rep, ranked by injury risk)
+- [x] Post-set summary screen
 
 **Weeks 6-8: Polish & Progress**
 - [ ] User accounts and session storage
-- [ ] Progress tracking dashboard
-- [ ] Session history with trends
+- [x] Progress tracking dashboard (localStorage-based)
+- [x] Session history with trends
 - [ ] Side-by-side comparison tool
-- [ ] Corrective exercise recommendations based on detected weaknesses
+- [x] Corrective exercise recommendations based on detected weaknesses
 - [ ] Coach sharing (export/share analysis with a trainer)
 
 ### Phase 3: Advanced Features (Future)
@@ -419,18 +422,18 @@ Apply phase-specific checks:
 | Language | Python 3.11+ | MediaPipe native support, fast prototyping |
 | Web framework | FastAPI | Async, auto-docs, file upload support |
 | Pose estimation | MediaPipe Pose | 33 landmarks, z-coordinate, best mobile path |
-| Video processing | OpenCV + FFmpeg | Frame extraction, video annotation |
-| Angle computation | NumPy | Vector math for joint angles |
-| Visualization | OpenCV drawing + Matplotlib | Skeleton overlay, charts |
-| Frontend | React (or simple HTML/JS) | Video upload, results display |
-| Storage | SQLite (local) or PostgreSQL | Session history, user data |
+| Video processing | OpenCV | Frame extraction, video annotation |
+| Angle computation | math (stdlib) | 3D vector math for joint angles |
+| Visualization | OpenCV drawing | Skeleton overlay on annotated video |
+| Frontend | TypeScript + Vite | Browser-based analysis, no server needed |
+| Storage | localStorage (browser) | Session history, user data |
 | Deployment | Docker + cloud (Railway/Fly.io/Render) | Simple deployment |
 
 ### Phase 2 (Real-Time Mobile)
 
 | Component | Technology | Rationale |
 |-----------|-----------|-----------|
-| Mobile framework | React Native or native Swift/Kotlin | Cross-platform or best performance |
+| Mobile framework | Native Swift/Kotlin (future) | Best performance for on-device inference |
 | Pose estimation | MediaPipe SDK (Android/iOS) | On-device, 33 landmarks |
 | Audio | Pre-recorded clips + TTS fallback | Low-latency coaching cues |
 | State management | Zustand or Redux | Session state, settings |
@@ -441,13 +444,12 @@ Apply phase-specific checks:
 ```
 # Phase 1 Python requirements
 mediapipe>=0.10
-opencv-python>=4.8
+opencv-python-headless>=4.8
 numpy>=1.24
 fastapi>=0.100
-uvicorn
+uvicorn[standard]
 python-multipart  # file uploads
-ffmpeg-python     # video processing
-pillow            # image handling
+pydantic>=2.0     # data models
 ```
 
 ---

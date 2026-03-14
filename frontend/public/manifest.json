@@ -1,0 +1,19 @@
+{
+  "name": "Lift Form Analyzer",
+  "short_name": "LiftForm",
+  "description": "AI-powered form analysis for squat, deadlift & bench press with real-time coaching",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0f0f0f",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["fitness", "health", "sports"]
+}

@@ -1,0 +1,40 @@
+/* Minimal reset and base styles - backup/override for index.html styles */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Additional responsive overrides */
+@media (max-width: 480px) {
+  header h1 {
+    font-size: 1.5rem;
+  }
+
+  .card {
+    padding: 1rem;
+  }
+
+  .score-circle {
+    width: 70px;
+    height: 70px;
+  }
+
+  .score-circle .grade {
+    font-size: 1.4rem;
+  }
+
+  /* Stack rep cards in 2 columns on small screens for readability */
+  .rep-cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 0.5rem;
+  }
+
+  /* Larger touch targets for video controls on mobile */
+  .video-controls .btn-sm {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.5rem 0.75rem;
+  }
+}
