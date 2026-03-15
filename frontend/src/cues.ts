@@ -13,6 +13,8 @@ export interface CorrectiveExercise {
   sets: string;
   /** Optional inline SVG illustration (stick figure). */
   svg?: string;
+  /** Optional YouTube video URL demonstrating the exercise. */
+  videoUrl?: string;
 }
 
 // ─── Stick-Figure SVG Illustrations ───
@@ -30,105 +32,105 @@ const SVG_PAUSE_SQUAT = `<svg viewBox="0 0 80 50" xmlns="http://www.w3.org/2000/
 
 const CORRECTIVE_EXERCISES: Record<string, CorrectiveExercise[]> = {
   knee_valgus: [
-    { name: 'Banded Squats', description: 'Loop a resistance band above your knees. Squat while actively pushing your knees into the band.', sets: '3x10' },
-    { name: 'Clamshells', description: 'Lie on your side with knees bent. Open your top knee like a clamshell while keeping feet together.', sets: '3x15 each side', svg: SVG_CLAMSHELL },
-    { name: 'Monster Walks', description: 'With a band above your knees, take wide steps sideways keeping tension on the band.', sets: '3x10 each direction' },
+    { name: 'Banded Squats', description: 'Loop a resistance band above your knees. Squat while actively pushing your knees into the band.', sets: '3x10', videoUrl: 'https://www.youtube.com/watch?v=BKqYPNFHbmA' },
+    { name: 'Clamshells', description: 'Lie on your side with knees bent. Open your top knee like a clamshell while keeping feet together.', sets: '3x15 each side', svg: SVG_CLAMSHELL, videoUrl: 'https://www.youtube.com/watch?v=cP0bYqzqPCk' },
+    { name: 'Monster Walks', description: 'With a band above your knees, take wide steps sideways keeping tension on the band.', sets: '3x10 each direction', videoUrl: 'https://www.youtube.com/watch?v=jMCRMnmMBHY' },
   ],
   butt_wink: [
-    { name: 'Box Squats', description: 'Squat to a box set at the depth where your lower back stays flat. Pause, then stand.', sets: '3x8', svg: SVG_PAUSE_SQUAT },
+    { name: 'Box Squats', description: 'Squat to a box set at the depth where your lower back stays flat. Pause, then stand.', sets: '3x8', svg: SVG_PAUSE_SQUAT, videoUrl: 'https://www.youtube.com/watch?v=rMWYh5SQplM' },
     { name: '90/90 Hip Stretch', description: 'Sit with one leg bent 90 degrees in front and one behind. Lean forward gently to stretch the hip.', sets: '30 sec each side' },
-    { name: 'Goblet Squat Holds', description: 'Hold a goblet squat at the bottom position, using the weight to push your knees out and keep your torso upright.', sets: '3x10 sec at bottom' },
+    { name: 'Goblet Squat Holds', description: 'Hold a goblet squat at the bottom position, using the weight to push your knees out and keep your torso upright.', sets: '3x10 sec at bottom', videoUrl: 'https://www.youtube.com/watch?v=MeIiIdhvXT4' },
   ],
   excessive_forward_lean: [
-    { name: 'Goblet Squats', description: 'Hold a weight at your chest and squat, focusing on keeping your torso as upright as possible.', sets: '3x10', svg: SVG_GOBLET_SQUAT },
-    { name: 'Wall Ankle Stretches', description: 'Face a wall with one foot forward. Drive your knee toward the wall while keeping your heel down.', sets: '3x30 sec each', svg: SVG_WALL_ANKLE },
+    { name: 'Goblet Squats', description: 'Hold a weight at your chest and squat, focusing on keeping your torso as upright as possible.', sets: '3x10', svg: SVG_GOBLET_SQUAT, videoUrl: 'https://www.youtube.com/watch?v=MeIiIdhvXT4' },
+    { name: 'Wall Ankle Stretches', description: 'Face a wall with one foot forward. Drive your knee toward the wall while keeping your heel down.', sets: '3x30 sec each', svg: SVG_WALL_ANKLE, videoUrl: 'https://www.youtube.com/watch?v=IikP_teeLkI' },
     { name: 'Front Foot Elevated Split Squats', description: 'Place your front foot on a small platform. Lower into a split squat, focusing on an upright torso.', sets: '3x8' },
   ],
   good_morning: [
-    { name: 'Pause Squats', description: 'Squat down and hold the bottom position for 2 seconds, then drive up leading with your chest.', sets: '3x5, 2 sec pause' },
-    { name: 'Front Squats', description: 'Squat with the bar in front position. This forces an upright torso and builds quad strength.', sets: '3x8' },
+    { name: 'Pause Squats', description: 'Squat down and hold the bottom position for 2 seconds, then drive up leading with your chest.', sets: '3x5, 2 sec pause', videoUrl: 'https://www.youtube.com/watch?v=GERFUqKvpLI' },
+    { name: 'Front Squats', description: 'Squat with the bar in front position. This forces an upright torso and builds quad strength.', sets: '3x8', videoUrl: 'https://www.youtube.com/watch?v=m4ytaCJZpl0' },
     { name: 'Leg Press', description: 'Use a leg press machine to build quad strength so your legs can keep up with your back.', sets: '3x10' },
   ],
   heel_rise: [
-    { name: 'Wall Ankle Stretches', description: 'Face a wall with one foot forward. Drive your knee toward the wall while keeping your heel down.', sets: '3x30 sec', svg: SVG_WALL_ANKLE },
-    { name: 'Heel-Elevated Squats', description: 'Place small plates or a wedge under your heels and squat. This temporarily bypasses ankle limitations.', sets: '3x10' },
+    { name: 'Wall Ankle Stretches', description: 'Face a wall with one foot forward. Drive your knee toward the wall while keeping your heel down.', sets: '3x30 sec', svg: SVG_WALL_ANKLE, videoUrl: 'https://www.youtube.com/watch?v=IikP_teeLkI' },
+    { name: 'Heel-Elevated Squats', description: 'Place small plates or a wedge under your heels and squat. This temporarily bypasses ankle limitations.', sets: '3x10', videoUrl: 'https://www.youtube.com/watch?v=drPbXjGVsWA' },
     { name: 'Calf Foam Rolling', description: 'Roll a foam roller slowly up and down each calf, pausing on tight spots.', sets: '2 min each' },
   ],
   insufficient_depth: [
-    { name: 'Goblet Squat to Box', description: 'Hold a weight at your chest and squat down to a box or bench at your target depth.', sets: '3x10' },
+    { name: 'Goblet Squat to Box', description: 'Hold a weight at your chest and squat down to a box or bench at your target depth.', sets: '3x10', videoUrl: 'https://www.youtube.com/watch?v=MeIiIdhvXT4' },
     { name: 'Deep Squat Hold', description: 'Hold the bottom of a squat while holding a doorframe or pole for support. Focus on opening your hips.', sets: '3x20 sec' },
     { name: 'Hip 90/90 Stretch', description: 'Sit with one leg bent 90 degrees in front and one behind. Lean forward to stretch hip flexors and rotators.', sets: '3x30 sec' },
   ],
   excessive_forward_knee_travel: [
     { name: 'Wall Squats', description: 'Stand facing a wall with toes a few inches away. Squat while keeping your knees from touching the wall, forcing you to sit back.', sets: '3x10' },
-    { name: 'Box Squats with Sit-Back Cue', description: 'Squat to a box behind you, emphasizing sitting your hips back first rather than letting your knees drift forward.', sets: '3x8' },
-    { name: 'Ankle Mobility Drills', description: 'Perform banded ankle distractions by wrapping a band low around one ankle and driving your knee forward over your toes to build controlled range.', sets: '3x30 sec each side' },
+    { name: 'Box Squats with Sit-Back Cue', description: 'Squat to a box behind you, emphasizing sitting your hips back first rather than letting your knees drift forward.', sets: '3x8', videoUrl: 'https://www.youtube.com/watch?v=rMWYh5SQplM' },
+    { name: 'Ankle Mobility Drills', description: 'Perform banded ankle distractions by wrapping a band low around one ankle and driving your knee forward over your toes to build controlled range.', sets: '3x30 sec each side', videoUrl: 'https://www.youtube.com/watch?v=IikP_teeLkI' },
   ],
   fast_descent: [
-    { name: 'Tempo Squats', description: 'Squat with a deliberate 3-second descent. Count "one-thousand-one, two, three" on the way down.', sets: '3x5, 3 sec down' },
-    { name: 'Pause Squats', description: 'Squat down slowly and hold the bottom for 2 seconds before standing up.', sets: '3x5, 2 sec pause' },
+    { name: 'Tempo Squats', description: 'Squat with a deliberate 3-second descent. Count "one-thousand-one, two, three" on the way down.', sets: '3x5, 3 sec down', videoUrl: 'https://www.youtube.com/watch?v=kVAP9jO-MFk' },
+    { name: 'Pause Squats', description: 'Squat down slowly and hold the bottom for 2 seconds before standing up.', sets: '3x5, 2 sec pause', videoUrl: 'https://www.youtube.com/watch?v=GERFUqKvpLI' },
     { name: 'Eccentric Wall Sits', description: 'Slide slowly down a wall into a seated position over 5 seconds, then hold.', sets: '3x20 sec' },
   ],
   slow_descent: [
-    { name: 'Tempo Squats with Prescribed Speed', description: 'Squat with a deliberate 2-second descent — no slower. Use a metronome or counting to maintain a brisk, controlled pace.', sets: '3x8, 2 sec down' },
-    { name: 'Dynamic Box Squats', description: 'Sit back to a box quickly but under control, then explode up. Trains a faster, more aggressive descent while keeping form.', sets: '3x5' },
+    { name: 'Tempo Squats with Prescribed Speed', description: 'Squat with a deliberate 2-second descent — no slower. Use a metronome or counting to maintain a brisk, controlled pace.', sets: '3x8, 2 sec down', videoUrl: 'https://www.youtube.com/watch?v=kVAP9jO-MFk' },
+    { name: 'Dynamic Box Squats', description: 'Sit back to a box quickly but under control, then explode up. Trains a faster, more aggressive descent while keeping form.', sets: '3x5', videoUrl: 'https://www.youtube.com/watch?v=rMWYh5SQplM' },
     { name: 'Drop Squats', description: 'From standing, quickly drop into a quarter-squat catching position. Builds comfort with a faster descent under load.', sets: '3x8' },
   ],
   bouncing: [
-    { name: 'Pause Squats', description: 'Squat down and hold the bottom for 2 seconds before pushing back up. No bouncing allowed.', sets: '3x5, 2 sec pause', svg: SVG_PAUSE_SQUAT },
+    { name: 'Pause Squats', description: 'Squat down and hold the bottom for 2 seconds before pushing back up. No bouncing allowed.', sets: '3x5, 2 sec pause', svg: SVG_PAUSE_SQUAT, videoUrl: 'https://www.youtube.com/watch?v=GERFUqKvpLI' },
     { name: 'Dead-Stop Squats', description: 'Squat to a box, sit down completely, pause for a full second, then stand. Removes all momentum.', sets: '3x5' },
     { name: 'Isometric Bottom Hold', description: 'Hold the bottom of a squat without moving. Build strength in the weakest position.', sets: '3x10 sec' },
   ],
   asymmetric_hips: [
-    { name: 'Bulgarian Split Squats', description: 'Place one foot on a bench behind you. Squat on the front leg to build single-leg strength.', sets: '3x8 each side' },
+    { name: 'Bulgarian Split Squats', description: 'Place one foot on a bench behind you. Squat on the front leg to build single-leg strength.', sets: '3x8 each side', videoUrl: 'https://www.youtube.com/watch?v=2C-uNgKwPLE' },
     { name: 'Single-Leg Leg Press', description: 'Use one leg at a time on the leg press to identify and fix strength imbalances.', sets: '3x10 each side' },
     { name: 'Side-Lying Hip Abduction', description: 'Lie on your side and raise your top leg slowly. Strengthens hip stabilizers.', sets: '3x15 each side' },
   ],
   asymmetric_shift: [
-    { name: 'Bulgarian Split Squats', description: 'Place one foot on a bench behind you. Squat on the front leg to build single-leg strength.', sets: '3x8 each side' },
+    { name: 'Bulgarian Split Squats', description: 'Place one foot on a bench behind you. Squat on the front leg to build single-leg strength.', sets: '3x8 each side', videoUrl: 'https://www.youtube.com/watch?v=2C-uNgKwPLE' },
     { name: 'Single-Leg Leg Press', description: 'Use one leg at a time on the leg press to identify and fix strength imbalances.', sets: '3x10 each side' },
     { name: 'Side-Lying Hip Abduction', description: 'Lie on your side and raise your top leg slowly. Strengthens hip stabilizers.', sets: '3x15 each side' },
   ],
   incomplete_lockout: [
-    { name: 'Glute Bridges', description: 'Lie on your back with knees bent. Drive hips up and squeeze glutes hard at the top.', sets: '3x12', svg: SVG_GLUTE_BRIDGE },
-    { name: 'Hip Thrusts', description: 'With your upper back on a bench, drive hips up and hold the top position for a second.', sets: '3x10' },
+    { name: 'Glute Bridges', description: 'Lie on your back with knees bent. Drive hips up and squeeze glutes hard at the top.', sets: '3x12', svg: SVG_GLUTE_BRIDGE, videoUrl: 'https://www.youtube.com/watch?v=OUgsJ8-Vi0E' },
+    { name: 'Hip Thrusts', description: 'With your upper back on a bench, drive hips up and hold the top position for a second.', sets: '3x10', videoUrl: 'https://www.youtube.com/watch?v=xDmFkJxPzeM' },
     { name: 'Standing Hip Extensions', description: 'Stand on one leg and extend the other leg behind you, squeezing your glute.', sets: '3x12 each side' },
   ],
   trunk_angle_increase_on_ascent: [
-    { name: 'Pause Squats', description: 'Pause at the bottom and focus on driving your chest up first as you stand.', sets: '3x5, 2 sec pause' },
-    { name: 'Front Squats', description: 'The front-loaded position forces you to keep your chest up throughout the movement.', sets: '3x8' },
-    { name: 'Tempo Squats', description: 'Use a slow controlled ascent (3 seconds up) to practice keeping your torso angle constant.', sets: '3x5, 3 sec up' },
+    { name: 'Pause Squats', description: 'Pause at the bottom and focus on driving your chest up first as you stand.', sets: '3x5, 2 sec pause', videoUrl: 'https://www.youtube.com/watch?v=GERFUqKvpLI' },
+    { name: 'Front Squats', description: 'The front-loaded position forces you to keep your chest up throughout the movement.', sets: '3x8', videoUrl: 'https://www.youtube.com/watch?v=m4ytaCJZpl0' },
+    { name: 'Tempo Squats', description: 'Use a slow controlled ascent (3 seconds up) to practice keeping your torso angle constant.', sets: '3x5, 3 sec up', videoUrl: 'https://www.youtube.com/watch?v=kVAP9jO-MFk' },
   ],
 
   // ─── Deadlift Corrective Exercises ───
 
   rounded_back: [
     { name: 'Paused Deadlifts', description: 'Pull to knee height and hold for 2 seconds, focusing on keeping your chest up and back flat. Then complete the pull.', sets: '3x3' },
-    { name: 'Romanian Deadlifts', description: 'Hinge at the hips with a slight knee bend, lowering the bar along your legs. Focus on maintaining a neutral spine throughout.', sets: '3x8' },
-    { name: 'Band Pull-Aparts', description: 'Hold a band at shoulder width and pull it apart by squeezing your shoulder blades together. Builds upper back strength to resist rounding.', sets: '3x15' },
+    { name: 'Romanian Deadlifts', description: 'Hinge at the hips with a slight knee bend, lowering the bar along your legs. Focus on maintaining a neutral spine throughout.', sets: '3x8', videoUrl: 'https://www.youtube.com/watch?v=jEy_czb3RKA' },
+    { name: 'Band Pull-Aparts', description: 'Hold a band at shoulder width and pull it apart by squeezing your shoulder blades together. Builds upper back strength to resist rounding.', sets: '3x15', videoUrl: 'https://www.youtube.com/watch?v=JObYtU7Y7ag' },
   ],
   hip_shoot: [
-    { name: 'Deficit Deadlifts', description: 'Stand on a 1-2 inch platform and deadlift. The extra range of motion forces you to use your legs more off the floor.', sets: '3x5' },
-    { name: 'Front Squats', description: 'Squat with the bar in front position. Builds the quad strength needed to drive with your legs rather than your back.', sets: '3x8' },
+    { name: 'Deficit Deadlifts', description: 'Stand on a 1-2 inch platform and deadlift. The extra range of motion forces you to use your legs more off the floor.', sets: '3x5', videoUrl: 'https://www.youtube.com/watch?v=Bvo0882MVKQ' },
+    { name: 'Front Squats', description: 'Squat with the bar in front position. Builds the quad strength needed to drive with your legs rather than your back.', sets: '3x8', videoUrl: 'https://www.youtube.com/watch?v=m4ytaCJZpl0' },
     { name: 'Tempo Deadlifts', description: 'Pull with a deliberate 3-second concentric. This forces you to stay patient and keep your hips and shoulders rising together.', sets: '3x3' },
   ],
   hitching: [
-    { name: 'Block Pulls', description: 'Deadlift from blocks set just below knee height. Builds strength in the top portion of the pull where hitching occurs.', sets: '3x5' },
-    { name: 'Rack Pulls', description: 'Pull from pins set in a rack at knee height. Overload the lockout portion to build finishing strength.', sets: '3x5' },
-    { name: "Farmer's Walks", description: "Pick up heavy dumbbells or farmer's walk handles and walk for distance. Builds the grip endurance that prevents grip-related hitching.", sets: '3x30 sec' },
+    { name: 'Block Pulls', description: 'Deadlift from blocks set just below knee height. Builds strength in the top portion of the pull where hitching occurs.', sets: '3x5', videoUrl: 'https://www.youtube.com/watch?v=uSBrieTJjrA' },
+    { name: 'Rack Pulls', description: 'Pull from pins set in a rack at knee height. Overload the lockout portion to build finishing strength.', sets: '3x5', videoUrl: 'https://www.youtube.com/watch?v=uSBrieTJjrA' },
+    { name: "Farmer's Walks", description: "Pick up heavy dumbbells or farmer's walk handles and walk for distance. Builds the grip endurance that prevents grip-related hitching.", sets: '3x30 sec', videoUrl: 'https://www.youtube.com/watch?v=Fkzk_RqlYig' },
   ],
   asymmetric_pull: [
-    { name: 'Single-Leg Romanian Deadlifts', description: 'Stand on one leg and hinge forward, lowering a dumbbell or kettlebell toward the floor. Builds unilateral hip and hamstring strength to correct side-to-side imbalances.', sets: '3x8 each side' },
+    { name: 'Single-Leg Romanian Deadlifts', description: 'Stand on one leg and hinge forward, lowering a dumbbell or kettlebell toward the floor. Builds unilateral hip and hamstring strength to correct side-to-side imbalances.', sets: '3x8 each side', videoUrl: 'https://www.youtube.com/watch?v=_1els2E0YcY' },
     { name: 'Suitcase Deadlifts', description: 'Deadlift a weight held in one hand at your side. Forces your core and hips to resist lateral shifting throughout the pull.', sets: '3x8 each side' },
     { name: 'Single-Arm Dumbbell Rows', description: 'Row a dumbbell with one arm at a time, bracing on a bench. Identifies and corrects back strength imbalances that cause asymmetric pulling.', sets: '3x10 each side' },
   ],
   fast_descent_deadlift: [
-    { name: 'Tempo Romanian Deadlifts', description: 'Perform RDLs with a slow 4-second lowering phase. Builds eccentric control through the hip hinge pattern.', sets: '3x6, 4 sec down' },
+    { name: 'Tempo Romanian Deadlifts', description: 'Perform RDLs with a slow 4-second lowering phase. Builds eccentric control through the hip hinge pattern.', sets: '3x6, 4 sec down', videoUrl: 'https://www.youtube.com/watch?v=jEy_czb3RKA' },
     { name: 'Controlled Eccentric Deadlifts', description: 'After locking out a deadlift, lower the bar over 3-4 seconds back to the floor. Focus on maintaining tension and bar path.', sets: '3x5, 3-4 sec down' },
     { name: 'Pause-at-Knee Deadlifts', description: 'Lower the bar from lockout and pause for 2 seconds when it reaches your knees, then continue to the floor. Builds control at the hardest part of the descent.', sets: '3x5, 2 sec pause' },
   ],
   insufficient_rom_deadlift: [
-    { name: 'Deficit Deadlifts', description: 'Stand on a 1-2 inch platform and deadlift from the floor. The added range of motion builds strength and mobility in the bottom position.', sets: '3x5' },
+    { name: 'Deficit Deadlifts', description: 'Stand on a 1-2 inch platform and deadlift from the floor. The added range of motion builds strength and mobility in the bottom position.', sets: '3x5', videoUrl: 'https://www.youtube.com/watch?v=Bvo0882MVKQ' },
     { name: 'Hip Hinge Drills', description: 'Stand with your back to a wall and push your hips back until they touch the wall. Step further from the wall each set to increase hinge depth.', sets: '3x10' },
     { name: 'Standing Hamstring Stretches', description: 'Place one foot on a low box and hinge forward with a flat back until you feel a stretch in the back of your thigh. Improves the flexibility needed for a full pull from the floor.', sets: '3x30 sec each side' },
   ],
@@ -136,19 +138,19 @@ const CORRECTIVE_EXERCISES: Record<string, CorrectiveExercise[]> = {
   // ─── Bench Press Corrective Exercises ───
 
   no_pause: [
-    { name: 'Spoto Press', description: 'Lower the bar to 1 inch above your chest and hold for 1 second before pressing. Builds strength and control at the bottom.', sets: '3x5' },
+    { name: 'Spoto Press', description: 'Lower the bar to 1 inch above your chest and hold for 1 second before pressing. Builds strength and control at the bottom.', sets: '3x5', videoUrl: 'https://www.youtube.com/watch?v=SNFBlMlIXEY' },
     { name: 'Long Pause Bench', description: 'Lower the bar to your chest and hold for a full 3 seconds before pressing. Eliminates the stretch reflex and builds raw strength.', sets: '3x5' },
-    { name: 'Floor Press', description: 'Bench press while lying on the floor. Your elbows touch the ground at the bottom, creating a natural pause point.', sets: '3x8' },
+    { name: 'Floor Press', description: 'Bench press while lying on the floor. Your elbows touch the ground at the bottom, creating a natural pause point.', sets: '3x8', videoUrl: 'https://www.youtube.com/watch?v=Aoyg4WKyfrI' },
   ],
   uneven_press: [
-    { name: 'Dumbbell Bench Press', description: 'Press with dumbbells instead of a barbell. Each arm must work independently, exposing and correcting imbalances.', sets: '3x10' },
+    { name: 'Dumbbell Bench Press', description: 'Press with dumbbells instead of a barbell. Each arm must work independently, exposing and correcting imbalances.', sets: '3x10', videoUrl: 'https://www.youtube.com/watch?v=VmB1G1K7v94' },
     { name: 'Single-Arm Dumbbell Press', description: 'Press one dumbbell at a time while lying on the bench. Focus on the weaker side first, then match reps with the stronger side.', sets: '3x8 each side' },
     { name: 'Banded Press', description: 'Attach a band to the barbell for accommodating resistance. The band forces even pressing speed as it gets harder at the top.', sets: '3x10' },
   ],
   press_stall: [
-    { name: 'Spoto Press', description: 'Pause the bar 1 inch off your chest for 1-2 seconds, then press. Builds strength right at the sticking point.', sets: '3x5' },
-    { name: 'Pin Press', description: 'Set safety pins at your sticking point height. Start each rep from the pins (dead stop) and press to lockout.', sets: '3x5' },
-    { name: 'Close-Grip Bench', description: 'Bench with a narrower grip (hands just inside shoulder width). Builds tricep strength needed to push through the mid-range sticking point.', sets: '3x8' },
+    { name: 'Spoto Press', description: 'Pause the bar 1 inch off your chest for 1-2 seconds, then press. Builds strength right at the sticking point.', sets: '3x5', videoUrl: 'https://www.youtube.com/watch?v=SNFBlMlIXEY' },
+    { name: 'Pin Press', description: 'Set safety pins at your sticking point height. Start each rep from the pins (dead stop) and press to lockout.', sets: '3x5', videoUrl: 'https://www.youtube.com/watch?v=Wo0oWVNJHXc' },
+    { name: 'Close-Grip Bench', description: 'Bench with a narrower grip (hands just inside shoulder width). Builds tricep strength needed to push through the mid-range sticking point.', sets: '3x8', videoUrl: 'https://www.youtube.com/watch?v=nEF0bv2FW94' },
   ],
 };
 

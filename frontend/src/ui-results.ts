@@ -268,6 +268,7 @@ export function showResults(analysis: SetAnalysis, frameData: FrameData, session
   // --- Tier 4: Actions ---
   renderShareButtons(analysis);
   renderPostResultsCTA();
+  renderAboutAnalysisLink();
 
   // Move focus to results after rendering for screen reader users
   setTimeout(() => {
@@ -323,6 +324,32 @@ export function renderPostResultsCTA(): void {
   section.appendChild(ctaDiv);
 }
 
+/** Render "About this analysis" link at the bottom of results that opens the transparency section. */
+function renderAboutAnalysisLink(): void {
+  const scoresPanel = document.querySelector('.scores-panel');
+  if (!scoresPanel) return;
+
+  // Remove existing link if present
+  const existing = document.getElementById('about-analysis-link');
+  if (existing) existing.remove();
+
+  const link = document.createElement('button');
+  link.id = 'about-analysis-link';
+  link.className = 'about-analysis-link';
+  link.type = 'button';
+  link.innerHTML = '\u2139\uFE0F About this analysis';
+  link.setAttribute('aria-label', 'Learn what this analysis can and cannot detect');
+  link.addEventListener('click', () => {
+    const details = document.getElementById('transparency-section') as HTMLDetailsElement | null;
+    if (details) {
+      details.open = true;
+      details.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+
+  scoresPanel.appendChild(link);
+}
+
 export function renderOverallScore(analysis: SetAnalysis): void {
   const circle = $('score-circle');
   const color = gradeColor(analysis.grade);
@@ -340,6 +367,33 @@ export function renderOverallScore(analysis: SetAnalysis): void {
 
   // Animate score count-up from 0 to final score
   animateScoreCountUp(scoreEl, analysis.overallScore, 1000);
+
+  // Overall set confidence indicator
+  renderSetConfidence(analysis);
+}
+
+/** Render an overall set-level confidence indicator near the main score display. */
+function renderSetConfidence(analysis: SetAnalysis): void {
+  const container = $('overall-score-card');
+
+  // Remove existing confidence indicator
+  const existing = container.querySelector('.set-confidence');
+  if (existing) existing.remove();
+
+  // Compute average confidence across all reps that have it
+  const repsWithConf = analysis.reps.filter(r => r.avgConfidence !== undefined && r.avgConfidence !== null);
+  if (repsWithConf.length === 0) return;
+
+  const avgConf = repsWithConf.reduce((sum, r) => sum + (r.avgConfidence ?? 0), 0) / repsWithConf.length;
+  const tier = confidenceTier(avgConf);
+
+  const el = document.createElement('div');
+  el.className = 'set-confidence';
+  el.setAttribute('aria-label', `Pose detection confidence: ${tier.label} (${Math.round(avgConf * 100)}%)`);
+  el.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; opacity: 0.8; margin-top: 0.35rem;';
+  el.innerHTML = `<span style="color: ${tier.color}; font-size: 0.55rem;" aria-hidden="true">&#9679;</span> <span style="color: ${tier.color}; font-weight: 600;">${tier.label} confidence</span> <span style="color: var(--text-muted, #888); font-size: 0.7rem;">(${Math.round(avgConf * 100)}%)</span>`;
+
+  container.appendChild(el);
 }
 
 export function renderScoreBreakdown(analysis: SetAnalysis): void {
@@ -595,7 +649,7 @@ export function renderFocusSection(analysis: SetAnalysis, fps: number = 0): void
             <div class="exercise-card" style="display: flex; gap: 0.5rem; align-items: flex-start;">
               ${ex.svg ? `<div style="flex-shrink: 0;">${ex.svg}</div>` : ''}
               <div>
-                <strong>${escapeHtml(ex.name)}</strong> <span class="exercise-sets">${escapeHtml(ex.sets)}</span>
+                <strong>${escapeHtml(ex.name)}</strong> <span class="exercise-sets">${escapeHtml(ex.sets)}</span>${ex.videoUrl ? ` <a href="${escapeHtml(ex.videoUrl)}" target="_blank" rel="noopener" class="video-link" title="Watch demo video">&#9654; Watch</a>` : ''}
                 <p>${escapeHtml(ex.description)}</p>
               </div>
             </div>
@@ -773,6 +827,26 @@ export function renderPositiveFeedback(analysis: SetAnalysis): void {
   positiveSection.innerHTML = html;
 }
 
+// ─── Confidence Badge Helpers ───
+
+/** Return confidence tier info (label, CSS color variable) from a 0-1 confidence value. */
+function confidenceTier(confidence: number): { label: string; color: string; className: string } {
+  if (confidence >= 0.7) {
+    return { label: 'High', color: 'var(--success, #4ade80)', className: 'confidence-high' };
+  } else if (confidence >= 0.4) {
+    return { label: 'Medium', color: 'var(--warning, #fbbf24)', className: 'confidence-medium' };
+  } else {
+    return { label: 'Low', color: 'var(--danger, #f87171)', className: 'confidence-low' };
+  }
+}
+
+/** Generate HTML for a small confidence badge/pill. */
+function renderConfidenceBadge(confidence: number | undefined): string {
+  if (confidence === undefined || confidence === null) return '';
+  const tier = confidenceTier(confidence);
+  return `<span class="confidence-badge ${tier.className}" style="display: inline-flex; align-items: center; gap: 3px; font-size: 0.65rem; color: ${tier.color}; opacity: 0.85; margin-top: 0.2rem; white-space: nowrap;" title="Pose detection confidence: ${Math.round(confidence * 100)}%"><span style="font-size: 0.5rem;" aria-hidden="true">&#9679;</span> ${tier.label}</span>`;
+}
+
 // ─── Per-Rep Narrative ───
 
 /** Dimension labels for per-rep best dimension display. */
@@ -934,6 +1008,9 @@ function renderRepCards(analysis: SetAnalysis): void {
       velocityHtml = renderVelocityMini(rep.velocity, analysis.competitionMode);
     }
 
+    // Confidence badge for this rep
+    const confidenceHtml = renderConfidenceBadge(rep.avgConfidence);
+
     // Best dimension for this rep
     const bestDim = getBestDimension(rep);
     const bestDimHtml = `<div style="font-size: 0.65rem; color: var(--success, #4ade80); margin-top: 0.25rem; white-space: nowrap;" title="Strongest dimension this rep">Best: ${escapeHtml(bestDim.label)} (${bestDim.score})</div>`;
@@ -948,6 +1025,7 @@ function renderRepCards(analysis: SetAnalysis): void {
       <div class="rep-label">Rep ${i + 1}</div>
       <div class="rep-grade" style="color: ${color}">${rep.grade}</div>
       <div class="rep-score">${rep.overallScore}</div>
+      ${confidenceHtml}
       ${bestDimHtml}
       ${positiveLine}
       <div class="rep-issues">${issueLabelsHtml}</div>
@@ -1018,7 +1096,7 @@ export function renderBarPathMini(barPath: BarPathData): string {
   return `
     <div style="margin-top: 0.35rem; text-align: center;" title="Bar path: ${barPath.pathEfficiency}% efficient, ${(barPath.lateralDrift * 100).toFixed(1)}cm drift">
       <svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bar path visualization">
-        <line x1="${midX}" y1="${padding}" x2="${midX}" y2="${height - padding}" stroke="#333" stroke-width="0.5" stroke-dasharray="2,2" />
+        <line x1="${midX}" y1="${padding}" x2="${midX}" y2="${height - padding}" stroke="var(--border, #333)" stroke-width="0.5" stroke-dasharray="2,2" />
         <polyline points="${points.join(' ')}" fill="none" stroke="${driftColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
       <div style="font-size: 0.7rem; color: var(--text-muted, #888);">${(barPath.lateralDrift * 100).toFixed(0)}% drift</div>
@@ -1291,7 +1369,7 @@ export function renderMobilityAssessment(analysis: SetAnalysis): void {
         <p style="font-size: 0.85rem; color: var(--text, #e0e0e0); margin-bottom: 0.5rem;">${escapeHtml(f.limitation)}</p>
         <details style="margin-bottom: 0.5rem;">
           <summary style="cursor: pointer; font-size: 0.8rem; color: var(--accent, #00d4ff); font-weight: 500;">Self-test: Can you pass this?</summary>
-          <p style="font-size: 0.8rem; color: var(--text-muted, #888); margin-top: 0.35rem; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 6px;">${escapeHtml(f.test)}</p>
+          <p style="font-size: 0.8rem; color: var(--text-muted, #888); margin-top: 0.35rem; padding: 0.5rem; background: var(--bg-input, #1e1e1e); border-radius: 6px;">${escapeHtml(f.test)}</p>
         </details>
         <div>
           <strong style="font-size: 0.8rem; color: var(--text-muted, #888);">Recommended:</strong>

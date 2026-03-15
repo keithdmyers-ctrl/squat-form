@@ -300,4 +300,7 @@ export interface SessionRecord {
   avg_tempo?: number;
   avg_lockout?: number;
   estimated_1rm?: number;
+  bodyweight?: number;
+  bodyweight_unit?: string;  // 'kg' | 'lbs'
+  rpe?: number;  // 6-10 scale, 0.5 increments
 }

@@ -20,6 +20,9 @@ export function saveSession(
   estimated1rm?: number,
   exerciseType?: string,
   exerciseVariant?: string,
+  bodyweight?: number,
+  bodyweightUnit?: string,
+  rpe?: number,
 ): void {
   const sessions = getSessions();
 
@@ -52,6 +55,9 @@ export function saveSession(
     avg_tempo: avg('tempoScore'),
     avg_lockout: avg('lockoutScore'),
     estimated_1rm: estimated1rm,
+    bodyweight: bodyweight && bodyweight > 0 ? bodyweight : undefined,
+    bodyweight_unit: bodyweightUnit,
+    rpe: rpe && rpe >= 6 && rpe <= 10 ? rpe : undefined,
   });
   if (sessions.length > MAX_SESSIONS) sessions.length = MAX_SESSIONS;
   try {
@@ -76,6 +82,7 @@ export function getSessions(): SessionRecord[] {
 export function saveSettings(
   squatType: string, experienceLevel: string, weight?: string, weightUnit?: string,
   exerciseType?: string, deadliftType?: string, benchType?: string,
+  bodyweight?: string, bodyweightUnit?: string, rpe?: string,
 ): void {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
@@ -86,6 +93,9 @@ export function saveSettings(
       exercise_type: exerciseType ?? 'squat',
       deadlift_type: deadliftType ?? 'conventional',
       bench_type: benchType ?? 'flat',
+      bodyweight: bodyweight ?? '',
+      bodyweight_unit: bodyweightUnit ?? 'lbs',
+      rpe: rpe ?? '',
     }));
   } catch {
     // localStorage full -- silently continue
@@ -95,6 +105,7 @@ export function saveSettings(
 export function loadSettings(): {
   squat_type: string; experience_level: string; weight?: string; weight_unit?: string;
   exercise_type?: string; deadlift_type?: string; bench_type?: string;
+  bodyweight?: string; bodyweight_unit?: string; rpe?: string;
 } | null {
   try {
     return JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');

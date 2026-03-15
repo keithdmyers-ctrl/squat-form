@@ -47,6 +47,9 @@ const resultVideo = document.getElementById('result-video') as HTMLVideoElement;
 const overlayCanvas = document.getElementById('overlay-canvas') as HTMLCanvasElement;
 const weightInput = document.getElementById('weight-input') as HTMLInputElement;
 const liveWeightInput = document.getElementById('live-weight-input') as HTMLInputElement;
+const bodyweightInput = document.getElementById('bodyweight-input') as HTMLInputElement | null;
+const bodyweightUnitSelect = document.getElementById('bodyweight-unit') as HTMLSelectElement | null;
+const rpeInput = document.getElementById('rpe-input') as HTMLSelectElement | null;
 
 let selectedFile: File | null = null;
 let quickStartPending = false;
@@ -79,6 +82,15 @@ if (savedSettings) {
   if (savedSettings.weight_unit) {
     setWeightUnit(savedSettings.weight_unit);
   }
+  if (savedSettings.bodyweight && bodyweightInput) {
+    bodyweightInput.value = savedSettings.bodyweight;
+  }
+  if (savedSettings.bodyweight_unit && bodyweightUnitSelect) {
+    bodyweightUnitSelect.value = savedSettings.bodyweight_unit;
+  }
+  if (savedSettings.rpe && rpeInput) {
+    rpeInput.value = savedSettings.rpe;
+  }
 }
 
 /** Get the currently selected weight unit from the upload settings panel. */
@@ -102,6 +114,7 @@ function persistSettings(): void {
   saveSettings(
     squatTypeSelect.value, experienceSelect.value, weightInput.value, getWeightUnit(),
     exerciseTypeSelect?.value, deadliftTypeSelect?.value, benchTypeSelect?.value,
+    bodyweightInput?.value, bodyweightUnitSelect?.value, rpeInput?.value,
   );
 }
 
@@ -158,6 +171,9 @@ if (deadliftTypeSelect) deadliftTypeSelect.addEventListener('change', persistSet
 if (benchTypeSelect) benchTypeSelect.addEventListener('change', persistSettings);
 experienceSelect.addEventListener('change', persistSettings);
 weightInput.addEventListener('input', persistSettings);
+if (bodyweightInput) bodyweightInput.addEventListener('input', persistSettings);
+if (bodyweightUnitSelect) bodyweightUnitSelect.addEventListener('change', persistSettings);
+if (rpeInput) rpeInput.addEventListener('change', persistSettings);
 
 // Update experience hint when selection changes
 const experienceHints: Record<string, string> = {
@@ -606,10 +622,17 @@ async function runAnalysis(file: File): Promise<void> {
     const variantName = exerciseType === 'deadlift' ? (deadliftTypeSelect?.value ?? 'conventional')
       : exerciseType === 'bench_press' ? (benchTypeSelect?.value ?? 'flat')
       : squatTypeSelect.value;
+    const rawBodyweight = bodyweightInput ? parseFloat(bodyweightInput.value) : 0;
+    const bodyweight = isFinite(rawBodyweight) ? rawBodyweight : 0;
+    const bwUnit = bodyweightUnitSelect?.value ?? 'lbs';
+    const rawRpe = rpeInput ? parseFloat(rpeInput.value) : 0;
+    const rpe = isFinite(rawRpe) && rawRpe >= 6 && rawRpe <= 10 ? rawRpe : undefined;
+
     saveSession(
       analysis, squatTypeSelect.value, experienceSelect.value,
       weight, unit, oneRMEstimate?.average,
       exerciseType, variantName,
+      bodyweight, bwUnit, rpe,
     );
 
     // Step 7: Display results with session context

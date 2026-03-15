@@ -13,6 +13,11 @@ import {
 import { exportSessionsCSV, downloadCSV } from './csv-export';
 import { renderComparisonView } from './ui-comparison';
 
+// ─── Chart Mode State ───
+
+type ChartMode = 'score' | 'weight' | 'rpe' | 'bodyweight';
+let currentChartMode: ChartMode = 'score';
+
 // ─── Session History View ───
 
 export function renderHistorySection(sessions: SessionRecord[]): void {
@@ -38,10 +43,10 @@ export function renderHistorySection(sessions: SessionRecord[]): void {
 
   section.style.display = 'block';
 
-  // Render chart
+  // Render chart with mode toggle
   const chartContainer = document.getElementById('history-chart');
   if (chartContainer) {
-    chartContainer.innerHTML = renderHistoryChart(sessions);
+    renderChartWithToggle(chartContainer, sessions);
   }
 
   // Render list
@@ -51,7 +56,89 @@ export function renderHistorySection(sessions: SessionRecord[]): void {
   }
 }
 
-function renderHistoryChart(sessions: SessionRecord[]): string {
+function renderChartWithToggle(container: HTMLElement, sessions: SessionRecord[]): void {
+  // Build mode toggle buttons
+  const modes: { key: ChartMode; label: string }[] = [
+    { key: 'score', label: 'Score' },
+    { key: 'weight', label: 'Weight' },
+    { key: 'rpe', label: 'RPE' },
+    { key: 'bodyweight', label: 'Bodyweight' },
+  ];
+
+  let toggleHtml = '<div class="chart-mode-toggle" role="group" aria-label="Chart metric">';
+  for (const mode of modes) {
+    const active = mode.key === currentChartMode ? ' active' : '';
+    toggleHtml += `<button type="button" class="chart-mode-btn${active}" data-chart-mode="${mode.key}" aria-pressed="${mode.key === currentChartMode}">${mode.label}</button>`;
+  }
+  toggleHtml += '</div>';
+
+  const chartSvg = renderHistoryChart(sessions, currentChartMode);
+  container.innerHTML = toggleHtml + '<div id="history-chart-svg">' + chartSvg + '</div>';
+
+  // Wire up toggle buttons
+  container.querySelectorAll<HTMLButtonElement>('.chart-mode-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      currentChartMode = (btn.dataset.chartMode ?? 'score') as ChartMode;
+      // Update active states
+      container.querySelectorAll<HTMLButtonElement>('.chart-mode-btn').forEach((b) => {
+        b.classList.toggle('active', b.dataset.chartMode === currentChartMode);
+        b.setAttribute('aria-pressed', String(b.dataset.chartMode === currentChartMode));
+      });
+      // Re-render just the chart SVG
+      const svgContainer = document.getElementById('history-chart-svg');
+      if (svgContainer) {
+        svgContainer.innerHTML = renderHistoryChart(sessions, currentChartMode);
+      }
+    });
+  });
+}
+
+function renderHistoryChart(sessions: SessionRecord[], mode: ChartMode): string {
+  if (mode === 'score') {
+    return renderScoreChart(sessions);
+  }
+
+  // For other modes, filter sessions to those with data
+  const getData = (s: SessionRecord): number | undefined => {
+    switch (mode) {
+      case 'weight': return s.weight;
+      case 'rpe': return s.rpe;
+      case 'bodyweight': return s.bodyweight;
+    }
+  };
+
+  const getLabel = (): string => {
+    switch (mode) {
+      case 'weight': return 'Weight';
+      case 'rpe': return 'RPE';
+      case 'bodyweight': return 'Bodyweight';
+    }
+  };
+
+  const getUnit = (s: SessionRecord): string => {
+    switch (mode) {
+      case 'weight': return s.weight_unit ?? '';
+      case 'rpe': return '';
+      case 'bodyweight': return s.bodyweight_unit ?? '';
+    }
+  };
+
+  const filtered = sessions.slice(0, 10).filter(s => getData(s) != null);
+
+  if (filtered.length < 2) {
+    return `<p style="color: var(--text-muted); font-size: 0.875rem; text-align: center; padding: 1rem;">Need 2+ sessions with ${getLabel().toLowerCase()} data to show this chart.</p>`;
+  }
+
+  const recent = filtered.reverse(); // oldest first for left-to-right
+
+  if (mode === 'rpe') {
+    return renderRpeChart(recent);
+  }
+
+  return renderAutoScaleChart(recent, mode, getData, getUnit, getLabel());
+}
+
+function renderScoreChart(sessions: SessionRecord[]): string {
   const recent = sessions.slice(0, 10).reverse(); // oldest first for left-to-right
   if (recent.length < 2) {
     return '<p style="color: var(--text-muted); font-size: 0.875rem; text-align: center; padding: 1rem;">Complete 2+ sessions to see your trend chart.</p>';
@@ -80,15 +167,15 @@ function renderHistoryChart(sessions: SessionRecord[]): string {
   let gridHtml = '';
   for (const val of yLines) {
     const y = padT + ((100 - val) / 100) * chartH;
-    gridHtml += `<line x1="${padL}" y1="${y}" x2="${svgWidth - padR}" y2="${y}" stroke="#333" stroke-width="0.5" />`;
-    gridHtml += `<text x="${padL - 5}" y="${y + 4}" text-anchor="end" fill="#888" font-size="9">${val}</text>`;
+    gridHtml += `<line x1="${padL}" y1="${y}" x2="${svgWidth - padR}" y2="${y}" stroke="var(--border, #333)" stroke-width="0.5" />`;
+    gridHtml += `<text x="${padL - 5}" y="${y + 4}" text-anchor="end" fill="var(--text-muted, #888)" font-size="9">${val}</text>`;
   }
 
   // Data points
   let dotsHtml = '';
   for (const p of points) {
     const color = p.score >= 80 ? 'var(--success)' : p.score >= 60 ? 'var(--warning)' : 'var(--danger)';
-    dotsHtml += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${color}" stroke="#0f0f0f" stroke-width="1.5"><title>Score: ${p.score} (${p.grade})</title></circle>`;
+    dotsHtml += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${color}" stroke="var(--bg-primary, #0f0f0f)" stroke-width="1.5"><title>Score: ${p.score} (${p.grade})</title></circle>`;
   }
 
   // X-axis labels (first and last date)
@@ -100,10 +187,139 @@ function renderHistoryChart(sessions: SessionRecord[]): string {
       ${gridHtml}
       <path d="${pathD}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
       ${dotsHtml}
+      <text x="${padL}" y="${svgHeight - 5}" fill="var(--text-muted, #888)" font-size="9">${firstDate}</text>
+      <text x="${svgWidth - padR}" y="${svgHeight - 5}" text-anchor="end" fill="var(--text-muted, #888)" font-size="9">${lastDate}</text>
+    </svg>
+  `;
+}
+
+function renderRpeChart(recent: SessionRecord[]): string {
+  const svgWidth = 400;
+  const svgHeight = 160;
+  const padL = 35;
+  const padR = 15;
+  const padT = 20;
+  const padB = 35;
+  const chartW = svgWidth - padL - padR;
+  const chartH = svgHeight - padT - padB;
+
+  const minY = 6;
+  const maxY = 10;
+  const range = maxY - minY;
+
+  const points = recent.map((s, i) => {
+    const val = s.rpe ?? 6;
+    const x = padL + (i / (recent.length - 1)) * chartW;
+    const y = padT + ((maxY - val) / range) * chartH;
+    return { x, y, value: val, date: s.date };
+  });
+
+  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+  // Y-axis gridlines at 6, 7, 8, 9, 10
+  const yLines = [6, 7, 8, 9, 10];
+  let gridHtml = '';
+  for (const val of yLines) {
+    const y = padT + ((maxY - val) / range) * chartH;
+    gridHtml += `<line x1="${padL}" y1="${y}" x2="${svgWidth - padR}" y2="${y}" stroke="#333" stroke-width="0.5" />`;
+    gridHtml += `<text x="${padL - 5}" y="${y + 4}" text-anchor="end" fill="#888" font-size="9">${val}</text>`;
+  }
+
+  let dotsHtml = '';
+  for (const p of points) {
+    const color = p.value >= 9 ? 'var(--danger)' : p.value >= 8 ? 'var(--warning)' : 'var(--success)';
+    dotsHtml += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${color}" stroke="#0f0f0f" stroke-width="1.5"><title>RPE: ${p.value}</title></circle>`;
+  }
+
+  const firstDate = formatShortDate(recent[0].date);
+  const lastDate = formatShortDate(recent[recent.length - 1].date);
+
+  return `
+    <svg viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="RPE trend over last ${recent.length} sessions" style="width: 100%; height: auto;">
+      ${gridHtml}
+      <path d="${pathD}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      ${dotsHtml}
       <text x="${padL}" y="${svgHeight - 5}" fill="#888" font-size="9">${firstDate}</text>
       <text x="${svgWidth - padR}" y="${svgHeight - 5}" text-anchor="end" fill="#888" font-size="9">${lastDate}</text>
     </svg>
   `;
+}
+
+function renderAutoScaleChart(
+  recent: SessionRecord[],
+  mode: ChartMode,
+  getData: (s: SessionRecord) => number | undefined,
+  getUnit: (s: SessionRecord) => string,
+  label: string,
+): string {
+  const svgWidth = 400;
+  const svgHeight = 160;
+  const padL = 45;
+  const padR = 15;
+  const padT = 20;
+  const padB = 35;
+  const chartW = svgWidth - padL - padR;
+  const chartH = svgHeight - padT - padB;
+
+  const values = recent.map(s => getData(s) ?? 0);
+  const dataMin = Math.min(...values);
+  const dataMax = Math.max(...values);
+
+  // Add some padding to the range
+  const rangePad = (dataMax - dataMin) * 0.1 || 5;
+  const minY = Math.max(0, Math.floor(dataMin - rangePad));
+  const maxY = Math.ceil(dataMax + rangePad);
+  const range = maxY - minY || 1;
+
+  const points = recent.map((s, i) => {
+    const val = getData(s) ?? 0;
+    const x = padL + (i / (recent.length - 1)) * chartW;
+    const y = padT + ((maxY - val) / range) * chartH;
+    const unit = getUnit(s);
+    return { x, y, value: val, date: s.date, unit };
+  });
+
+  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+  // Y-axis: ~5 gridlines
+  const step = niceStep(range, 5);
+  let gridHtml = '';
+  for (let val = Math.ceil(minY / step) * step; val <= maxY; val += step) {
+    const y = padT + ((maxY - val) / range) * chartH;
+    gridHtml += `<line x1="${padL}" y1="${y}" x2="${svgWidth - padR}" y2="${y}" stroke="#333" stroke-width="0.5" />`;
+    gridHtml += `<text x="${padL - 5}" y="${y + 4}" text-anchor="end" fill="#888" font-size="9">${Math.round(val)}</text>`;
+  }
+
+  let dotsHtml = '';
+  for (const p of points) {
+    const color = 'var(--accent)';
+    const unitStr = p.unit ? ` ${p.unit}` : '';
+    dotsHtml += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${color}" stroke="#0f0f0f" stroke-width="1.5"><title>${label}: ${p.value}${unitStr}</title></circle>`;
+  }
+
+  const firstDate = formatShortDate(recent[0].date);
+  const lastDate = formatShortDate(recent[recent.length - 1].date);
+
+  return `
+    <svg viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${label} trend over last ${recent.length} sessions" style="width: 100%; height: auto;">
+      ${gridHtml}
+      <path d="${pathD}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      ${dotsHtml}
+      <text x="${padL}" y="${svgHeight - 5}" fill="#888" font-size="9">${firstDate}</text>
+      <text x="${svgWidth - padR}" y="${svgHeight - 5}" text-anchor="end" fill="#888" font-size="9">${lastDate}</text>
+    </svg>
+  `;
+}
+
+/** Compute a "nice" step size for gridlines given a data range and desired count. */
+function niceStep(range: number, targetLines: number): number {
+  const rough = range / targetLines;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rough)));
+  const residual = rough / magnitude;
+  if (residual <= 1.5) return magnitude;
+  if (residual <= 3) return 2 * magnitude;
+  if (residual <= 7) return 5 * magnitude;
+  return 10 * magnitude;
 }
 
 function renderHistoryList(container: HTMLElement, sessions: SessionRecord[]): void {
@@ -125,13 +341,23 @@ function renderHistoryList(container: HTMLElement, sessions: SessionRecord[]): v
       : s.exercise_type === 'bench_press' ? 'BP'
       : 'SQ';
 
+    // Build extra metric info based on current chart mode
+    let metricHtml = '';
+    if (currentChartMode === 'weight' && s.weight != null) {
+      metricHtml = `<span style="font-size: 0.7rem; color: var(--accent);">${s.weight}${s.weight_unit ?? ''}</span>`;
+    } else if (currentChartMode === 'rpe' && s.rpe != null) {
+      metricHtml = `<span style="font-size: 0.7rem; color: var(--accent);">RPE ${s.rpe}</span>`;
+    } else if (currentChartMode === 'bodyweight' && s.bodyweight != null) {
+      metricHtml = `<span style="font-size: 0.7rem; color: var(--accent);">${s.bodyweight}${s.bodyweight_unit ?? ''}</span>`;
+    }
+
     html += `
       <div class="history-item" data-compare-idx="${idx}" style="cursor: pointer;" role="button" tabindex="0" aria-label="Session ${dateStr}: ${exerciseLabel}, ${s.grade}, ${s.overall_score} points">
         <span class="history-date">${escapeHtml(dateStr)}</span>
         <span style="font-size: 0.7rem; color: var(--accent-dim); font-weight: 600;">${exerciseLabel}</span>
         <span class="history-grade" style="color: ${color}; font-weight: 700;">${escapeHtml(s.grade)}</span>
         <span class="history-score">${s.overall_score}</span>
-        <span class="history-reps">${s.rep_count} reps</span>
+        <span class="history-reps">${s.rep_count} reps${metricHtml ? ' ' : ''}${metricHtml}</span>
         <span class="history-issue">${escapeHtml(topIssue)}</span>
       </div>
     `;
@@ -141,7 +367,7 @@ function renderHistoryList(container: HTMLElement, sessions: SessionRecord[]): v
   html += '<div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap;">';
   html += `<button id="compare-btn" class="btn btn-sm" style="font-size: 0.8rem; background: var(--accent); color: var(--bg-primary);${displaySessions.length < 2 ? ' opacity: 0.4; cursor: not-allowed;' : ''}" aria-label="Compare selected sessions" disabled>Compare (0/2)</button>`;
   html += '<button id="export-csv-btn" class="btn btn-sm" style="font-size: 0.8rem; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary);" aria-label="Export session history as CSV">Export CSV</button>';
-  html += '<button id="clear-history-btn" class="btn btn-sm" style="font-size: 0.8rem; background: #222; border: 1px solid #444; color: var(--text-muted);" aria-label="Clear session history">Clear History</button>';
+  html += '<button id="clear-history-btn" class="btn btn-sm" style="font-size: 0.8rem; background: var(--bg-input, #222); border: 1px solid var(--border-hover, #444); color: var(--text-muted);" aria-label="Clear session history">Clear History</button>';
   html += '</div>';
 
   container.innerHTML = html;

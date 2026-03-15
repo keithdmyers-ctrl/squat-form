@@ -10,6 +10,16 @@
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
   <link rel="apple-touch-icon" href="icon.svg" />
   <title>Lift Form Analyzer — Squat, Deadlift, Bench</title>
+  <script>
+    (function() {
+      var theme = localStorage.getItem('squat_form_theme');
+      if (theme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', '#f5f5f7');
+      }
+    })();
+  </script>
   <style>
     /* ===== Reset & Base ===== */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -82,6 +92,94 @@
       --font-2xl: 2rem;
       --font-grade: 2.4rem;
     }
+
+    /* ===== Light Theme Overrides ===== */
+    [data-theme="light"] {
+      --bg-primary: #f5f5f7;
+      --bg-card: #ffffff;
+      --bg-card-hover: #f0f0f5;
+      --bg-input: #e8e8ed;
+      --bg-hover: #d1d1d6;
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --accent-glow: rgba(0, 113, 227, 0.1);
+      --accent-dim: #4a9eda;
+      --text-primary: #1d1d1f;
+      --text-secondary: #424245;
+      --text-muted: #86868b;
+      --success: #34a853;
+      --warning: #d97706;
+      --danger: #dc2626;
+      --info: #2563eb;
+      --border: #d2d2d7;
+      --border-hover: #b0b0b8;
+      --bg: var(--bg-primary);
+      --text: var(--text-primary);
+      --green: var(--success);
+      --yellow: var(--warning);
+      --red: var(--danger);
+      --orange: #ea580c;
+      --grade-a: #16a34a;
+      --grade-b: #0d9488;
+      --grade-c: #ca8a04;
+      --grade-d: #ea580c;
+      --grade-kw: #64748b;
+      --shadow-card: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+      --shadow-elevated: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    [data-theme="light"] .card {
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    [data-theme="light"] .file-drop-zone,
+    [data-theme="light"] .file-input-wrapper .file-drop-zone {
+      border-color: var(--border);
+      background: var(--bg-card);
+    }
+
+    [data-theme="light"] .btn-primary {
+      background: var(--accent);
+    }
+
+    [data-theme="light"] .grade-badge {
+      color: #ffffff;
+    }
+
+    [data-theme="light"] .step-number {
+      color: #ffffff;
+    }
+
+    [data-theme="light"] .skeleton-pulse {
+      background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-input) 50%, var(--bg-card) 75%);
+      background-size: 200% 100%;
+    }
+
+    /* ===== Theme Toggle ===== */
+    .theme-toggle {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm, 6px);
+      color: var(--text-primary);
+      cursor: pointer;
+      padding: 0.4rem 0.6rem;
+      font-size: 1.1rem;
+      transition: background 150ms ease, border-color 150ms ease;
+      line-height: 1;
+      min-height: 44px;
+      min-width: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      vertical-align: middle;
+    }
+    .theme-toggle:hover {
+      background: var(--bg-card-hover, var(--bg-input));
+      border-color: var(--border-hover, var(--border));
+    }
+    /* Show sun icon in dark mode, moon icon in light mode */
+    [data-theme="light"] .theme-icon-dark { display: none; }
+    :root:not([data-theme="light"]) .theme-icon-light { display: none; }
 
     html { font-size: 16px; }
 
@@ -1186,6 +1284,20 @@
       margin-left: 0.35rem;
     }
 
+    .video-link {
+      font-size: 0.75rem;
+      color: var(--accent);
+      text-decoration: none;
+      margin-left: 0.5rem;
+      opacity: 0.85;
+      transition: opacity var(--transition-normal);
+    }
+
+    .video-link:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+
     .exercise-card p {
       font-size: 0.8rem;
       color: var(--text-secondary);
@@ -1390,6 +1502,36 @@
 
     .history-chart {
       margin-bottom: var(--space-md);
+    }
+
+    .chart-mode-toggle {
+      display: flex;
+      gap: 0.25rem;
+      margin-bottom: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .chart-mode-btn {
+      background: var(--bg-input);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.2rem 0.6rem;
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+    }
+
+    .chart-mode-btn:hover {
+      border-color: var(--border-hover);
+      color: var(--text-secondary);
+    }
+
+    .chart-mode-btn.active {
+      background: var(--accent);
+      color: var(--bg-primary);
+      border-color: var(--accent);
+      font-weight: 600;
     }
 
     .history-list-items {
@@ -2182,6 +2324,133 @@
         padding: 0.6rem var(--space-md);
       }
     }
+
+    /* ===== Transparency / Capabilities Section ===== */
+    .transparency-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: var(--space-lg);
+      box-shadow: var(--shadow-card);
+    }
+
+    .transparency-section summary {
+      cursor: pointer;
+      padding: var(--space-lg);
+      font-weight: 600;
+      font-size: var(--font-lg);
+      color: var(--accent);
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .transparency-section summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .transparency-section summary::before {
+      content: '\25B6';
+      font-size: 0.65rem;
+      transition: transform var(--transition-fast);
+    }
+
+    .transparency-section[open] summary::before {
+      transform: rotate(90deg);
+    }
+
+    .transparency-content {
+      padding: 0 var(--space-lg) var(--space-lg);
+    }
+
+    .transparency-content h3 {
+      font-size: var(--font-sm);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: var(--space-sm);
+      margin-top: var(--space-lg);
+    }
+
+    .transparency-content h3:first-child {
+      margin-top: 0;
+    }
+
+    .transparency-content h3.cap-heading {
+      color: var(--success);
+    }
+
+    .transparency-content h3.limit-heading {
+      color: var(--danger);
+    }
+
+    .transparency-content h3.caveat-heading {
+      color: var(--warning);
+    }
+
+    .transparency-content ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .transparency-content li {
+      padding: 0.3rem 0;
+      font-size: var(--font-sm);
+      line-height: 1.5;
+    }
+
+    .transparency-content .cap-list li {
+      color: var(--text-primary);
+    }
+
+    .transparency-content .cap-list li::before {
+      content: '\2713  ';
+      color: var(--success);
+      font-weight: 700;
+    }
+
+    .transparency-content .limit-list li {
+      color: var(--text-secondary);
+    }
+
+    .transparency-content .limit-list li::before {
+      content: '\2717  ';
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    .transparency-content .caveat-list li {
+      color: var(--text-secondary);
+      padding-left: 1rem;
+      position: relative;
+    }
+
+    .transparency-content .caveat-list li::before {
+      content: '\2022';
+      color: var(--warning);
+      font-weight: 700;
+      position: absolute;
+      left: 0;
+    }
+
+    .about-analysis-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: var(--font-sm);
+      color: var(--text-muted);
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: var(--space-xs) 0;
+      transition: color var(--transition-fast);
+      text-decoration: none;
+    }
+
+    .about-analysis-link:hover {
+      color: var(--accent);
+    }
   </style>
 </head>
 <body>
@@ -2272,6 +2541,12 @@
   <a href="#main-content" class="skip-nav">Skip to main content</a>
 
   <header>
+    <div style="display: flex; justify-content: flex-end; margin-bottom: -0.5rem;">
+      <button id="theme-toggle" class="theme-toggle" aria-label="Toggle light/dark theme" title="Toggle theme">
+        <span class="theme-icon-dark">&#9788;</span>
+        <span class="theme-icon-light">&#9790;</span>
+      </button>
+    </div>
     <h1>Lift Form Analyzer</h1>
     <p>AI-powered form analysis for squat, deadlift &amp; bench &mdash; your video never leaves your device <button class="btn-link" id="reshow-onboarding" aria-label="Show how it works">(How does this work?)</button></p>
     <button id="header-history-link" aria-label="View session history">History (<span id="header-history-count">0</span>)</button>
@@ -2399,6 +2674,32 @@
                   <button type="button" class="weight-unit-btn" data-unit="kg" aria-label="Kilograms">kg</button>
                 </div>
               </div>
+            </div>
+
+            <div class="form-group">
+              <label for="bodyweight-input">Bodyweight <span class="weight-optional-label">(optional)</span></label>
+              <div class="weight-input-row">
+                <input type="number" id="bodyweight-input" min="20" max="300" step="0.1" placeholder="--" aria-label="Your bodyweight">
+                <select id="bodyweight-unit" aria-label="Bodyweight unit" style="width: auto; min-width: 60px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.4rem 0.5rem; font-size: 0.875rem;">
+                  <option value="kg">kg</option>
+                  <option value="lbs">lbs</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="rpe-input">RPE <span class="weight-optional-label">(Rate of Perceived Exertion)</span></label>
+              <select id="rpe-input" aria-label="Rate of perceived exertion">
+                <option value="">Not set</option>
+                <option value="6">RPE 6 - Could do 4+ more reps</option>
+                <option value="6.5">RPE 6.5</option>
+                <option value="7">RPE 7 - Could do 3 more reps</option>
+                <option value="7.5">RPE 7.5</option>
+                <option value="8">RPE 8 - Could do 2 more reps</option>
+                <option value="8.5">RPE 8.5</option>
+                <option value="9">RPE 9 - Could do 1 more rep</option>
+                <option value="9.5">RPE 9.5</option>
+                <option value="10">RPE 10 - Maximum effort</option>
+              </select>
             </div>
 
             <!-- Competition Mode Toggle -->
@@ -2640,6 +2941,51 @@
         </div>
       </section>
 
+      <!-- Transparency: What we can and cannot detect -->
+      <details class="transparency-section" id="transparency-section" aria-label="What we can and cannot detect">
+        <summary>What we can and cannot detect</summary>
+        <div class="transparency-content">
+          <h3 class="cap-heading">What we can detect</h3>
+          <ul class="cap-list">
+            <li>Squat depth (knee angle relative to hip)</li>
+            <li>Knee tracking / valgus (frontal plane projection angle)</li>
+            <li>Trunk angle and forward lean</li>
+            <li>Left/right symmetry (hip and knee angles)</li>
+            <li>Descent and ascent tempo</li>
+            <li>Lockout completeness (hip and knee extension)</li>
+            <li>Butt wink (posterior pelvic tilt at bottom)</li>
+            <li>Good morning squat pattern</li>
+            <li>Heel rise indicators</li>
+            <li>Sticking points and velocity changes</li>
+            <li>Rep-to-rep fatigue patterns</li>
+            <li>Deadlift: back rounding, hip shooting, hitching</li>
+            <li>Bench press: pause at chest, press evenness, lockout</li>
+          </ul>
+
+          <h3 class="limit-heading">What we cannot reliably detect</h3>
+          <ul class="limit-list">
+            <li>Foot pressure distribution (no force plate data)</li>
+            <li>Grip width or hand placement</li>
+            <li>Breathing and bracing patterns</li>
+            <li>Bar position on back (high bar vs low bar must be specified)</li>
+            <li>Internal joint forces or injury risk</li>
+            <li>Muscle activation patterns (would need EMG)</li>
+            <li>Spinal loading or disc compression</li>
+            <li>Exact bar path without markers</li>
+            <li>Weight on the bar (must be entered manually)</li>
+          </ul>
+
+          <h3 class="caveat-heading">Important limitations</h3>
+          <ul class="caveat-list">
+            <li>Camera angle significantly affects accuracy &mdash; side view is best for depth/trunk</li>
+            <li>Loose clothing can obscure joint positions</li>
+            <li>MediaPipe pose estimation has ~2-5&deg; angle error</li>
+            <li>This tool provides form feedback, not medical advice</li>
+            <li>Always consult a qualified coach or physiotherapist for injury concerns</li>
+          </ul>
+        </div>
+      </details>
+
       <!-- Session History -->
       <section id="history-section" class="history-section" aria-label="Your progress" style="display: none;">
         <h2>Your Progress</h2>
@@ -2667,6 +3013,21 @@
         navigator.serviceWorker.register('./sw.js').catch(() => {});
       });
     }
+
+    // Theme toggle
+    document.getElementById('theme-toggle').addEventListener('click', function() {
+      var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (isLight) {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('squat_form_theme', 'dark');
+        if (meta) meta.setAttribute('content', '#0f0f0f');
+      } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+        localStorage.setItem('squat_form_theme', 'light');
+        if (meta) meta.setAttribute('content', '#f5f5f7');
+      }
+    });
   </script>
 </body>
 </html>

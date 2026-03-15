@@ -17,7 +17,7 @@ function csvEscape(value: string | number | undefined | null): string {
 
 /** Generate CSV from session history. */
 export function exportSessionsCSV(sessions: SessionRecord[]): string {
-  const headers = ['Date', 'Squat Type', 'Experience Level', 'Reps', 'Score', 'Grade', 'Top Issue', 'Weight', 'Unit'];
+  const headers = ['Date', 'Squat Type', 'Experience Level', 'Reps', 'Score', 'Grade', 'Top Issue', 'Weight', 'Unit', 'Bodyweight', 'BW Unit', 'RPE'];
   const rows = sessions.map(s => [
     csvEscape(s.date),
     csvEscape(s.squat_type),
@@ -28,6 +28,9 @@ export function exportSessionsCSV(sessions: SessionRecord[]): string {
     csvEscape(s.top_issue),
     csvEscape(s.weight ?? ''),
     csvEscape(s.weight_unit ?? ''),
+    csvEscape(s.bodyweight ?? ''),
+    csvEscape(s.bodyweight_unit ?? ''),
+    csvEscape(s.rpe ?? ''),
   ].join(','));
 
   return [headers.join(','), ...rows].join('\n');
