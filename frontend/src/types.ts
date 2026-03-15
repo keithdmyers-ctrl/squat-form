@@ -334,4 +334,9 @@ export interface SessionRecord {
   bodyweight?: number;
   bodyweight_unit?: string;  // 'kg' | 'lbs'
   rpe?: number;  // 6-10 scale, 0.5 increments
+  snapshots?: Array<{
+    dataUrl: string;
+    phase: string;
+    repIndex: number;
+  }>;
 }

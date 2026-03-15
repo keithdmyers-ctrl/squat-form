@@ -1,10 +1,75 @@
 /**
  * Side-by-side session comparison view.
  * Compares two sessions across overall score and per-dimension averages.
+ * Includes before/after snapshot comparison when available.
  */
 
 import type { SessionRecord } from './types';
 import { escapeHtml, gradeColor, scoreColor, formatShortDate } from './ui-utilities';
+
+/** Phase display labels for snapshot images. */
+const PHASE_LABELS: Record<string, string> = {
+  bottom: 'Bottom Position',
+  lockout: 'Lockout',
+};
+
+/** Build snapshot comparison HTML for two sessions. */
+function buildSnapshotComparison(sessionA: SessionRecord, sessionB: SessionRecord): string {
+  const snapsA = sessionA.snapshots;
+  const snapsB = sessionB.snapshots;
+  const hasA = snapsA && snapsA.length > 0;
+  const hasB = snapsB && snapsB.length > 0;
+
+  if (!hasA && !hasB) return '';
+
+  const dateA = formatShortDate(sessionA.date);
+  const dateB = formatShortDate(sessionB.date);
+
+  const phases = ['bottom', 'lockout'] as const;
+  let rows = '';
+
+  for (const phase of phases) {
+    const snapA = hasA ? snapsA!.find(s => s.phase === phase) : undefined;
+    const snapB = hasB ? snapsB!.find(s => s.phase === phase) : undefined;
+
+    if (!snapA && !snapB) continue;
+
+    const phaseLabel = PHASE_LABELS[phase] ?? phase;
+
+    const imgA = snapA
+      ? `<img src="${snapA.dataUrl}" alt="${escapeHtml(phaseLabel)} - ${escapeHtml(dateA)}" style="width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--border);" loading="lazy" />`
+      : `<div style="width: 100%; aspect-ratio: 16/9; background: var(--bg-input); border-radius: 6px; border: 1px dashed var(--border); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.75rem;">No snapshot</div>`;
+
+    const imgB = snapB
+      ? `<img src="${snapB.dataUrl}" alt="${escapeHtml(phaseLabel)} - ${escapeHtml(dateB)}" style="width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--border);" loading="lazy" />`
+      : `<div style="width: 100%; aspect-ratio: 16/9; background: var(--bg-input); border-radius: 6px; border: 1px dashed var(--border); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.75rem;">No snapshot</div>`;
+
+    rows += `
+      <div style="margin-bottom: 0.75rem;">
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.35rem; font-weight: 600;">${escapeHtml(phaseLabel)}</div>
+        <div class="snapshot-comparison-pair" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+          <div>
+            <div style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 0.2rem; text-align: center;">Before (${escapeHtml(dateA)})</div>
+            ${imgA}
+          </div>
+          <div>
+            <div style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 0.2rem; text-align: center;">After (${escapeHtml(dateB)})</div>
+            ${imgB}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  if (!rows) return '';
+
+  return `
+    <div style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+      <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; font-weight: 600;">Form Snapshots</div>
+      ${rows}
+    </div>
+  `;
+}
 
 /** Render a comparison view between two sessions. */
 export function renderComparisonView(sessionA: SessionRecord, sessionB: SessionRecord): void {
@@ -108,6 +173,9 @@ export function renderComparisonView(sessionA: SessionRecord, sessionB: SessionR
     }
   }
 
+  // Snapshot comparison section
+  const snapshotSection = buildSnapshotComparison(sessionA, sessionB);
+
   // Inject responsive styles once
   if (!document.getElementById('comparison-responsive-styles')) {
     const style = document.createElement('style');
@@ -125,6 +193,9 @@ export function renderComparisonView(sessionA: SessionRecord, sessionB: SessionR
           grid-template-columns: 60px 1fr 30px 1fr 40px !important;
           gap: 0.25rem !important;
           font-size: 0.75rem !important;
+        }
+        .snapshot-comparison-pair {
+          grid-template-columns: 1fr !important;
         }
       }
     `;
@@ -155,6 +226,7 @@ export function renderComparisonView(sessionA: SessionRecord, sessionB: SessionR
     </div>
     ${dimRows ? `<div style="margin-bottom: 0.5rem; max-width: 100%; overflow-x: auto;">${dimRows}</div>` : ''}
     ${repChart}
+    ${snapshotSection}
   `;
 
   section.style.display = 'block';

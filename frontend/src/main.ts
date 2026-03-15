@@ -6,6 +6,7 @@
 
 import { PoseProcessor, prewarmMediaPipe } from './pose';
 import { analyzeSequence } from './analyzer';
+import { computeFrameAngles } from './angles';
 import { analyzeExercise } from './exercises/index';
 import type { ExerciseConfig } from './exercises/index';
 import {
@@ -38,6 +39,7 @@ import { mergeMultiAngleAnalysis } from './multi-angle';
 import type { MultiAngleResult } from './multi-angle';
 import type { TrainingPhase } from './programming';
 import { suggestNextPhase } from './programming';
+import { captureSnapshots, createSnapshotRecord } from './snapshot';
 
 // ─── DOM Elements ───
 const videoInput = document.getElementById('video-input') as HTMLInputElement;
@@ -740,11 +742,60 @@ async function runAnalysis(file: File): Promise<void> {
     const rawRpe = rpeInput ? parseFloat(rpeInput.value) : 0;
     const rpe = isFinite(rawRpe) && rawRpe >= 6 && rawRpe <= 10 ? rawRpe : undefined;
 
+    // Step 6b: Capture video snapshots at key positions (bottom + lockout per rep)
+    let sessionSnapshots: Array<{ dataUrl: string; phase: string; repIndex: number }> | undefined;
+    try {
+      // Build bottom frame and end frame arrays from repFrameMap
+      const repBottomFrames: number[] = [];
+      const repEndFrames: number[] = [];
+      const repFramesByRep = new Map<number, number[]>();
+      for (const [frame, repIdx] of analysis.repFrameMap) {
+        if (repIdx < 0) continue;
+        if (!repFramesByRep.has(repIdx)) repFramesByRep.set(repIdx, []);
+        repFramesByRep.get(repIdx)!.push(frame);
+      }
+      for (let r = 0; r < analysis.repCount; r++) {
+        const frames = repFramesByRep.get(r);
+        if (!frames || frames.length === 0) continue;
+        frames.sort((a, b) => a - b);
+        // Find bottom frame: frame with minimum knee angle in this rep
+        let minAngle = Infinity;
+        let bottomFrame = frames[0];
+        for (const f of frames) {
+          const lm = frameData.get(f);
+          if (!lm) continue;
+          const fa = computeFrameAngles(lm);
+          if (fa.kneeAngle < minAngle) {
+            minAngle = fa.kneeAngle;
+            bottomFrame = f;
+          }
+        }
+        repBottomFrames.push(bottomFrame);
+        repEndFrames.push(frames[frames.length - 1]);
+      }
+
+      const rawSnapshots = await captureSnapshots(
+        resultVideo, repBottomFrames, repEndFrames, fps, 2,
+      );
+      if (rawSnapshots.length > 0) {
+        const compactSnapshots = createSnapshotRecord(rawSnapshots);
+        sessionSnapshots = compactSnapshots.map(s => ({
+          dataUrl: s.dataUrl,
+          phase: s.phase,
+          repIndex: s.repIndex,
+        }));
+      }
+    } catch (err) {
+      // Snapshot capture is optional -- continue without them
+      console.warn('Snapshot capture failed:', err);
+    }
+
     saveSession(
       analysis, squatTypeSelect.value, experienceSelect.value,
       weight, unit, oneRMEstimate?.average,
       exerciseType, variantName,
       bodyweight, bwUnit, rpe,
+      sessionSnapshots,
     );
 
     // Step 7: Determine training phase (user-selected or auto-detected)

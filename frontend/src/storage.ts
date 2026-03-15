@@ -23,6 +23,7 @@ export function saveSession(
   bodyweight?: number,
   bodyweightUnit?: string,
   rpe?: number,
+  snapshots?: Array<{ dataUrl: string; phase: string; repIndex: number }>,
 ): void {
   const sessions = getSessions();
 
@@ -58,6 +59,7 @@ export function saveSession(
     bodyweight: bodyweight && bodyweight > 0 ? bodyweight : undefined,
     bodyweight_unit: bodyweightUnit,
     rpe: rpe && rpe >= 6 && rpe <= 10 ? rpe : undefined,
+    snapshots: snapshots && snapshots.length > 0 ? snapshots : undefined,
   });
   if (sessions.length > MAX_SESSIONS) sessions.length = MAX_SESSIONS;
   try {
