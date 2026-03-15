@@ -161,6 +161,8 @@ export interface WarmUpStep {
   description: string;
   duration: string;
   purpose: string;
+  /** Duration in seconds for the warmup timer. Defaults to 30 if not specified. */
+  durationSeconds?: number;
 }
 
 export interface ExerciseProgression {

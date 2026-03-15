@@ -2750,6 +2750,104 @@
     .about-analysis-link:hover {
       color: var(--accent);
     }
+
+    /* ===== Warmup Timer Overlay ===== */
+    .warmup-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--bg-primary);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-xl);
+    }
+    .warmup-countdown {
+      font-size: 6rem;
+      font-weight: 700;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+    .warmup-step-name {
+      font-size: var(--font-xl);
+      color: var(--text-primary);
+      margin-top: var(--space-md);
+      text-align: center;
+    }
+    .warmup-step-desc {
+      font-size: var(--font-sm);
+      color: var(--text-secondary);
+      margin-top: var(--space-sm);
+      text-align: center;
+      max-width: 500px;
+      line-height: 1.5;
+    }
+    .warmup-step-counter {
+      font-size: var(--font-sm);
+      color: var(--text-muted);
+      margin-top: var(--space-lg);
+    }
+    .warmup-progress {
+      width: 80%;
+      max-width: 400px;
+      height: 6px;
+      background: var(--bg-input);
+      border-radius: 3px;
+      margin-top: var(--space-lg);
+      overflow: hidden;
+    }
+    .warmup-progress-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 1s linear;
+    }
+    .warmup-dots {
+      display: flex;
+      gap: var(--space-sm);
+      margin-top: var(--space-md);
+    }
+    .warmup-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--bg-input);
+      transition: background var(--transition-fast);
+    }
+    .warmup-dot.completed {
+      background: var(--success);
+    }
+    .warmup-dot.active {
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent-glow);
+    }
+    .warmup-controls {
+      display: flex;
+      gap: var(--space-md);
+      margin-top: var(--space-xl);
+    }
+    .warmup-controls button {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: var(--space-sm) var(--space-lg);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-sm);
+      cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast);
+    }
+    .warmup-controls button:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-hover);
+    }
+    .warmup-controls .warmup-stop-btn {
+      color: var(--danger);
+      border-color: var(--danger);
+    }
+    .warmup-controls .warmup-stop-btn:hover {
+      background: rgba(248, 113, 113, 0.1);
+    }
   </style>
 </head>
 <body>

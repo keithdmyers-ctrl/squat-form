@@ -11,6 +11,7 @@ import type {
   BarPathData,
   VelocityMetrics,
   SessionRecord,
+  WarmUpStep,
 } from './types';
 import type { OneRMEstimate } from './one-rm';
 import { WEIGHTS, COMPETITION_WEIGHTS } from './scorer';
@@ -31,6 +32,8 @@ import { encodeAnalysisUrl, generateShareCard } from './share';
 import { exportAnalysisCSV, downloadCSV } from './csv-export';
 import { CUE_DATABASE } from './issues';
 import { loadGoals, saveGoals, checkGoals } from './goals';
+import { WarmupTimer, getStepDuration } from './warmup-timer';
+import type { TimerState } from './warmup-timer';
 
 // ─── Progress Insights (session-history-aware coaching) ───
 
@@ -1505,9 +1508,169 @@ export function renderWarmUpProtocol(analysis: SetAnalysis): void {
     `;
   });
 
-  html += '</div></details>';
+  html += `
+      </div>
+      <button id="start-warmup-btn" style="margin-top: 0.75rem; width: 100%; padding: 0.5rem; background: var(--accent, #00d4ff); color: var(--bg-primary, #0a0a0a); border: none; border-radius: var(--radius-sm, 8px); font-weight: 600; font-size: 0.875rem; cursor: pointer; transition: opacity 0.2s;">
+        Start Guided Warmup
+      </button>
+    </details>
+  `;
   section.innerHTML = html;
   scoresPanel.appendChild(section);
+
+  // Attach warmup timer launcher
+  document.getElementById('start-warmup-btn')?.addEventListener('click', () => {
+    launchWarmupOverlay(protocol);
+  });
+}
+
+// ─── Warmup Timer Overlay ───
+
+/** Format seconds as MM:SS. */
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+/** Announce a step name via Web Speech API, if available. */
+function announceStep(stepName: string): void {
+  if (typeof speechSynthesis === 'undefined') return;
+  try {
+    // Cancel any ongoing speech
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(stepName);
+    utterance.rate = 0.9;
+    utterance.volume = 0.8;
+    speechSynthesis.speak(utterance);
+  } catch {
+    // Speech not available — silently ignore
+  }
+}
+
+/** Trigger a vibration pattern for step transitions. */
+function vibrateStepTransition(): void {
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    try {
+      navigator.vibrate([100, 50, 100]);
+    } catch {
+      // Vibration not available — silently ignore
+    }
+  }
+}
+
+function launchWarmupOverlay(protocol: WarmUpStep[]): void {
+  // Remove existing overlay if any
+  document.getElementById('warmup-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'warmup-overlay';
+  overlay.className = 'warmup-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-label', 'Guided warmup timer');
+
+  // Build dots HTML
+  const dotsHtml = protocol
+    .map((_, i) => `<div class="warmup-dot" data-dot="${i}"></div>`)
+    .join('');
+
+  overlay.innerHTML = `
+    <div class="warmup-countdown" id="warmup-time">0:00</div>
+    <div class="warmup-step-name" id="warmup-step-name"></div>
+    <div class="warmup-step-desc" id="warmup-step-desc"></div>
+    <div class="warmup-step-counter" id="warmup-step-counter"></div>
+    <div class="warmup-progress">
+      <div class="warmup-progress-fill" id="warmup-progress-fill" style="width: 0%"></div>
+    </div>
+    <div class="warmup-dots" id="warmup-dots">${dotsHtml}</div>
+    <div class="warmup-controls">
+      <button id="warmup-pause-btn">Pause</button>
+      <button id="warmup-skip-btn">Skip</button>
+      <button id="warmup-stop-btn" class="warmup-stop-btn">Stop</button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  const timeEl = document.getElementById('warmup-time')!;
+  const nameEl = document.getElementById('warmup-step-name')!;
+  const descEl = document.getElementById('warmup-step-desc')!;
+  const counterEl = document.getElementById('warmup-step-counter')!;
+  const progressFill = document.getElementById('warmup-progress-fill')!;
+  const pauseBtn = document.getElementById('warmup-pause-btn')!;
+  const skipBtn = document.getElementById('warmup-skip-btn')!;
+  const stopBtn = document.getElementById('warmup-stop-btn')!;
+
+  let stepDuration = 0;
+
+  const updateDots = (currentIndex: number) => {
+    const dots = overlay.querySelectorAll('.warmup-dot');
+    dots.forEach((dot, i) => {
+      dot.classList.remove('active', 'completed');
+      if (i < currentIndex) dot.classList.add('completed');
+      else if (i === currentIndex) dot.classList.add('active');
+    });
+  };
+
+  const timer = new WarmupTimer(protocol, {
+    onTick: (state: TimerState) => {
+      timeEl.textContent = formatTime(state.timeRemaining);
+      counterEl.textContent = `Step ${state.currentStepIndex + 1} of ${state.totalSteps}`;
+      // Progress within current step
+      const elapsed = stepDuration - state.timeRemaining;
+      const pct = stepDuration > 0 ? (elapsed / stepDuration) * 100 : 0;
+      progressFill.style.width = `${Math.min(100, pct)}%`;
+      updateDots(state.currentStepIndex);
+    },
+    onStepChange: (step: WarmUpStep, index: number) => {
+      stepDuration = getStepDuration(step);
+      nameEl.textContent = step.name;
+      descEl.textContent = step.description;
+      progressFill.style.width = '0%';
+      announceStep(step.name);
+      if (index > 0) vibrateStepTransition();
+    },
+    onComplete: () => {
+      timeEl.textContent = 'Done!';
+      nameEl.textContent = 'Warmup Complete';
+      descEl.textContent = 'You are ready to lift.';
+      counterEl.textContent = '';
+      progressFill.style.width = '100%';
+      // Mark all dots completed
+      overlay.querySelectorAll('.warmup-dot').forEach(dot => dot.classList.add('completed'));
+      pauseBtn.style.display = 'none';
+      skipBtn.style.display = 'none';
+      stopBtn.textContent = 'Close';
+      stopBtn.classList.remove('warmup-stop-btn');
+      announceStep('Warmup complete');
+      vibrateStepTransition();
+    },
+  });
+
+  pauseBtn.addEventListener('click', () => {
+    const state = timer.getState();
+    if (state.isPaused) {
+      timer.resume();
+      pauseBtn.textContent = 'Pause';
+    } else {
+      timer.pause();
+      pauseBtn.textContent = 'Resume';
+    }
+  });
+
+  skipBtn.addEventListener('click', () => timer.skip());
+
+  stopBtn.addEventListener('click', () => {
+    timer.stop();
+    // Cancel any speech
+    if (typeof speechSynthesis !== 'undefined') {
+      try { speechSynthesis.cancel(); } catch { /* ignore */ }
+    }
+    overlay.remove();
+  });
+
+  // Start the timer
+  timer.start();
 }
 
 // ─── Share / Print Report ───
