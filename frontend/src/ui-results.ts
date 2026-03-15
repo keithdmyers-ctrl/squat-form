@@ -30,6 +30,7 @@ import { hideProgress, hideError, hideSkeletonLoading } from './ui-progress';
 import { encodeAnalysisUrl, generateShareCard } from './share';
 import { exportAnalysisCSV, downloadCSV } from './csv-export';
 import { CUE_DATABASE } from './issues';
+import { loadGoals, saveGoals, checkGoals } from './goals';
 
 // ─── Progress Insights (session-history-aware coaching) ───
 
@@ -286,6 +287,80 @@ export function showResults(analysis: SetAnalysis, frameData: FrameData, session
     return el;
   })();
   liveRegion.textContent = `Analysis complete. Grade: ${escapeHtml(analysis.grade)}. Score: ${analysis.overallScore} out of 100. ${analysis.repCount} reps analyzed.`;
+
+  // --- Goal checking ---
+  checkAndCelebrateGoals(analysis, sessions);
+}
+
+// ─── Goal Celebration ───
+
+/**
+ * Check active goals against the most recently saved session.
+ * If any goals are newly achieved, show a celebration banner with confetti.
+ */
+function checkAndCelebrateGoals(analysis: SetAnalysis, sessions: SessionRecord[]): void {
+  const goals = loadGoals();
+  if (goals.length === 0) return;
+
+  // Build a synthetic session record from the current analysis for checking
+  // Use the most recently saved session from localStorage (which was saved before showResults)
+  const allSessions = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('squat_form_sessions') || '[]') as SessionRecord[];
+    } catch { return []; }
+  })();
+
+  if (allSessions.length === 0) return;
+  const latestSession = allSessions[0]; // most recent is first
+
+  const { updatedGoals, celebrations } = checkGoals(goals, latestSession);
+  saveGoals(updatedGoals);
+
+  if (celebrations.length > 0) {
+    showGoalCelebration(celebrations);
+  }
+}
+
+/** Show a celebration banner with confetti animation for achieved goals. */
+function showGoalCelebration(celebrations: string[]): void {
+  // Remove any existing celebration
+  document.getElementById('goal-celebration-overlay')?.remove();
+  document.getElementById('goal-celebration-confetti')?.remove();
+
+  // Confetti container
+  const confettiDiv = document.createElement('div');
+  confettiDiv.id = 'goal-celebration-confetti';
+  confettiDiv.className = 'goal-celebration-confetti';
+  for (let i = 0; i < 12; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    confettiDiv.appendChild(piece);
+  }
+  document.body.appendChild(confettiDiv);
+
+  // Banner
+  const celebration = document.createElement('div');
+  celebration.id = 'goal-celebration-overlay';
+  celebration.className = 'goal-celebration';
+
+  for (const msg of celebrations) {
+    const banner = document.createElement('div');
+    banner.className = 'goal-celebration-banner';
+    banner.textContent = msg;
+    celebration.appendChild(banner);
+  }
+
+  document.body.appendChild(celebration);
+
+  // Auto-dismiss after 5 seconds
+  setTimeout(() => {
+    celebration.style.transition = 'opacity 0.5s ease';
+    celebration.style.opacity = '0';
+    setTimeout(() => {
+      celebration.remove();
+      confettiDiv.remove();
+    }, 500);
+  }, 5000);
 }
 
 /** Render post-results call-to-action buttons. */

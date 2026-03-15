@@ -1,5 +1,5 @@
 /**
- * Session history display: trend chart and history list.
+ * Session history display: trend chart, history list, and goal setting.
  */
 
 import type { SessionRecord } from './types';
@@ -12,6 +12,19 @@ import {
 } from './ui-utilities';
 import { exportSessionsCSV, downloadCSV } from './csv-export';
 import { renderComparisonView } from './ui-comparison';
+import {
+  loadGoals,
+  saveGoals,
+  createGoal,
+  removeGoal,
+  getActiveGoals,
+  getCurrentAvgForGoal,
+  DIMENSION_LABELS,
+  MAX_ACTIVE_GOALS,
+  CONSECUTIVE_HITS_REQUIRED,
+} from './goals';
+import type { GoalRecord } from './goals';
+import { getDimensionLabels } from './exercise-core';
 
 // ─── Chart Mode State ───
 
@@ -369,6 +382,7 @@ function renderHistoryList(container: HTMLElement, sessions: SessionRecord[]): v
   html += '</div>';
   html += '<div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap;">';
   html += `<button id="compare-btn" class="btn btn-sm" style="font-size: 0.8rem; background: var(--accent); color: var(--bg-primary);${displaySessions.length < 2 ? ' opacity: 0.4; cursor: not-allowed;' : ''}" aria-label="Compare selected sessions" disabled>Compare (0/2)</button>`;
+  html += '<button id="set-goals-btn" class="btn btn-sm" style="font-size: 0.8rem; background: var(--bg-input); border: 1px solid var(--accent); color: var(--accent);" aria-label="Set performance goals">Set Goals</button>';
   html += '<button id="export-csv-btn" class="btn btn-sm" style="font-size: 0.8rem; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary);" aria-label="Export session history as CSV">Export CSV</button>';
   html += '<button id="clear-history-btn" class="btn btn-sm" style="font-size: 0.8rem; background: var(--bg-input, #222); border: 1px solid var(--border-hover, #444); color: var(--text-muted);" aria-label="Clear session history">Clear History</button>';
   html += '</div>';
@@ -451,6 +465,14 @@ function renderHistoryList(container: HTMLElement, sessions: SessionRecord[]): v
       );
     });
   }
+
+  // Wire up Set Goals button
+  const goalsBtn = document.getElementById('set-goals-btn');
+  if (goalsBtn) {
+    goalsBtn.addEventListener('click', () => {
+      showGoalModal(sessions);
+    });
+  }
 }
 
 // ─── Custom Confirm Modal ───
@@ -524,4 +546,195 @@ function showConfirmModal(
 
   // Focus the cancel button (safer default for destructive actions)
   setTimeout(() => cancelBtn.focus(), 50);
+}
+
+// ─── Goal Modal ───
+
+/** Show the goal-setting modal with current goals and an add form. */
+function showGoalModal(sessions: SessionRecord[]): void {
+  // Remove any existing goal modal
+  document.getElementById('goal-modal-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'goal-modal-overlay';
+  overlay.className = 'goal-modal';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Set Performance Goals');
+
+  const card = document.createElement('div');
+  card.className = 'goal-modal-card';
+
+  function renderModalContent(): void {
+    const goals = loadGoals();
+    const activeGoals = getActiveGoals(goals);
+    const achievedGoals = goals.filter(g => g.status === 'achieved');
+
+    let html = '<h3>Performance Goals</h3>';
+
+    // Active goals
+    if (activeGoals.length > 0) {
+      html += '<div style="margin-bottom: var(--space-md);">';
+      for (const goal of activeGoals) {
+        const labels = getDimensionLabels(goal.exerciseType);
+        const dimKey = goal.dimension as keyof typeof labels;
+        const label = (dimKey in labels ? labels[dimKey] : null) ?? DIMENSION_LABELS[goal.dimension] ?? goal.dimension;
+        const currentAvg = getCurrentAvgForGoal(goal, sessions);
+        const progress = currentAvg !== undefined
+          ? Math.min(100, Math.round((currentAvg / goal.targetScore) * 100))
+          : 0;
+        const progressHit = currentAvg !== undefined && currentAvg >= goal.targetScore;
+
+        const exerciseLabel = goal.exerciseType === 'deadlift' ? 'Deadlift'
+          : goal.exerciseType === 'bench_press' ? 'Bench Press'
+          : goal.exerciseType === 'overhead_press' ? 'OHP'
+          : goal.exerciseType === 'barbell_row' ? 'Row'
+          : goal.exerciseType === 'lunge' ? 'Lunge'
+          : 'Squat';
+
+        // Consecutive hits dots
+        let dotsHtml = '<div class="goal-consecutive-dots">';
+        for (let i = 0; i < CONSECUTIVE_HITS_REQUIRED; i++) {
+          dotsHtml += `<div class="dot${i < goal.consecutiveHits ? ' filled' : ''}"></div>`;
+        }
+        dotsHtml += `<span class="dot-label">${goal.consecutiveHits}/${CONSECUTIVE_HITS_REQUIRED} consecutive</span>`;
+        dotsHtml += '</div>';
+
+        html += `
+          <div class="goal-card">
+            <div class="goal-card-header">
+              <span>${escapeHtml(label)}</span>
+              <span class="goal-status-badge active">Active</span>
+            </div>
+            <div class="goal-target">${escapeHtml(exerciseLabel)} &mdash; Target: ${goal.targetScore}${currentAvg !== undefined ? ` &bull; Current avg: ${currentAvg}` : ''}</div>
+            <div class="goal-progress-bar">
+              <div class="goal-progress-bar-fill${progressHit ? ' goal-hit' : ''}" style="width: ${progress}%;"></div>
+            </div>
+            ${dotsHtml}
+            <button class="goal-remove-btn" data-goal-id="${escapeHtml(goal.id)}">Remove</button>
+          </div>
+        `;
+      }
+      html += '</div>';
+    } else if (achievedGoals.length === 0) {
+      html += '<p style="font-size: var(--font-sm); color: var(--text-muted); margin-bottom: var(--space-md);">No goals set yet. Add a goal below to track your progress.</p>';
+    }
+
+    // Recently achieved goals (show last 2)
+    if (achievedGoals.length > 0) {
+      html += '<div style="margin-bottom: var(--space-md);">';
+      html += '<div style="font-size: var(--font-xs); color: var(--text-muted); margin-bottom: var(--space-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Achieved</div>';
+      for (const goal of achievedGoals.slice(0, 2)) {
+        const label = DIMENSION_LABELS[goal.dimension] ?? goal.dimension;
+        html += `
+          <div class="goal-card" style="opacity: 0.7;">
+            <div class="goal-card-header">
+              <span>${escapeHtml(label)}</span>
+              <span class="goal-status-badge achieved">Achieved</span>
+            </div>
+            <div class="goal-target">Target: ${goal.targetScore}</div>
+          </div>
+        `;
+      }
+      html += '</div>';
+    }
+
+    // Add goal form (only if under max)
+    if (activeGoals.length < MAX_ACTIVE_GOALS) {
+      html += `
+        <div class="goal-form" id="goal-add-form">
+          <div style="font-size: var(--font-sm); font-weight: 600; color: var(--text-primary);">Add Goal</div>
+          <label for="goal-dimension">Dimension</label>
+          <select id="goal-dimension">
+            <option value="overall">Overall</option>
+            <option value="depth">Depth</option>
+            <option value="kneeTracking">Knee Tracking</option>
+            <option value="trunk">Torso Position</option>
+            <option value="symmetry">Symmetry</option>
+            <option value="tempo">Tempo</option>
+            <option value="lockout">Lockout</option>
+          </select>
+          <label for="goal-target-score">Target Score (60-100)</label>
+          <input type="number" id="goal-target-score" min="60" max="100" value="80" step="1" />
+          <label for="goal-exercise-type">Exercise</label>
+          <select id="goal-exercise-type">
+            <option value="squat">Squat</option>
+            <option value="deadlift">Deadlift</option>
+            <option value="bench_press">Bench Press</option>
+            <option value="overhead_press">OHP</option>
+            <option value="barbell_row">Row</option>
+            <option value="lunge">Lunge</option>
+          </select>
+          <div class="goal-form-actions">
+            <button id="goal-add-btn" class="btn btn-sm" style="background: var(--accent); color: var(--bg-primary); font-size: 0.8rem;">Add Goal</button>
+          </div>
+        </div>
+      `;
+    } else {
+      html += '<p style="font-size: var(--font-xs); color: var(--text-muted); margin-top: var(--space-sm);">Maximum of 3 active goals reached. Remove a goal to add a new one.</p>';
+    }
+
+    // Close button
+    html += '<div style="text-align: center; margin-top: var(--space-md);"><button id="goal-close-btn" class="btn btn-sm" style="font-size: 0.8rem; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary);">Close</button></div>';
+
+    card.innerHTML = html;
+
+    // Wire up remove buttons
+    card.querySelectorAll<HTMLButtonElement>('.goal-remove-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const goalId = btn.dataset.goalId;
+        if (goalId) {
+          removeGoal(goalId);
+          renderModalContent();
+        }
+      });
+    });
+
+    // Wire up add button
+    const addBtn = card.querySelector<HTMLButtonElement>('#goal-add-btn');
+    if (addBtn) {
+      addBtn.addEventListener('click', () => {
+        const dimSelect = card.querySelector<HTMLSelectElement>('#goal-dimension');
+        const scoreInput = card.querySelector<HTMLInputElement>('#goal-target-score');
+        const exSelect = card.querySelector<HTMLSelectElement>('#goal-exercise-type');
+        if (!dimSelect || !scoreInput || !exSelect) return;
+
+        const target = parseInt(scoreInput.value);
+        if (!isFinite(target)) return;
+
+        const result = createGoal(dimSelect.value, target, exSelect.value);
+        if (result) {
+          renderModalContent();
+        }
+      });
+    }
+
+    // Wire up close button
+    const closeBtn = card.querySelector<HTMLButtonElement>('#goal-close-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', dismiss);
+    }
+  }
+
+  function dismiss(): void {
+    overlay.remove();
+    document.removeEventListener('keydown', keyHandler);
+  }
+
+  function keyHandler(e: KeyboardEvent): void {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      dismiss();
+    }
+  }
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) dismiss();
+  });
+  document.addEventListener('keydown', keyHandler);
+
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+
+  renderModalContent();
 }
