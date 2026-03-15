@@ -84,6 +84,7 @@ export function saveSettings(
   exerciseType?: string, deadliftType?: string, benchType?: string,
   bodyweight?: string, bodyweightUnit?: string, rpe?: string,
   ohpType?: string, rowType?: string, lungeType?: string,
+  trainingPhase?: string,
 ): void {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
@@ -100,6 +101,7 @@ export function saveSettings(
       bodyweight: bodyweight ?? '',
       bodyweight_unit: bodyweightUnit ?? 'lbs',
       rpe: rpe ?? '',
+      training_phase: trainingPhase ?? '',
     }));
   } catch {
     // localStorage full -- silently continue
@@ -111,6 +113,7 @@ export function loadSettings(): {
   exercise_type?: string; deadlift_type?: string; bench_type?: string; ohp_type?: string;
   row_type?: string; lunge_type?: string;
   bodyweight?: string; bodyweight_unit?: string; rpe?: string;
+  training_phase?: string;
 } | null {
   try {
     return JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');

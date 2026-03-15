@@ -29,6 +29,12 @@ import {
 } from './ui-utilities';
 import { hideProgress, hideError, hideSkeletonLoading } from './ui-progress';
 import { encodeAnalysisUrl, generateShareCard } from './share';
+import type { TrainingPhase } from './programming';
+import {
+  getRecommendation,
+  suggestNextPhase,
+  PHASE_DESCRIPTIONS,
+} from './programming';
 import { exportAnalysisCSV, downloadCSV } from './csv-export';
 import { CUE_DATABASE } from './issues';
 import { loadGoals, saveGoals, checkGoals } from './goals';
@@ -126,6 +132,108 @@ function renderProgressInsights(analysis: SetAnalysis, sessions: SessionRecord[]
   }
 }
 
+// ─── Training Recommendations ───
+
+function renderTrainingRecommendations(
+  phase?: TrainingPhase,
+  oneRMEstimate?: OneRMEstimate | null,
+  sessions?: SessionRecord[],
+  exerciseType?: string,
+): void {
+  const existing = document.getElementById('training-recommendations');
+  if (existing) existing.remove();
+
+  const activePhase = phase ?? 'hypertrophy';
+  const rec = getRecommendation(activePhase, oneRMEstimate?.average, exerciseType, oneRMEstimate?.unit);
+
+  const recDiv = document.createElement('div');
+  recDiv.id = 'training-recommendations';
+  recDiv.className = 'card';
+  recDiv.setAttribute('aria-label', 'Training recommendations');
+  recDiv.style.cssText = 'border-left: 3px solid var(--info); padding: 1rem 1.25rem; margin-bottom: 1rem;';
+
+  const phaseColors: Record<string, string> = {
+    hypertrophy: 'var(--accent)',
+    strength: 'var(--warning)',
+    peaking: 'var(--danger)',
+    deload: 'var(--success)',
+  };
+  const phaseColor = phaseColors[activePhase] ?? 'var(--accent)';
+
+  const heading = document.createElement('h4');
+  heading.style.cssText = 'margin: 0 0 0.5rem; font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;';
+  heading.textContent = 'Training Recommendations';
+  recDiv.appendChild(heading);
+
+  const phaseBadge = document.createElement('div');
+  phaseBadge.style.cssText = `display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; color: var(--bg-primary); background: ${phaseColor}; margin-bottom: 0.5rem;`;
+  phaseBadge.textContent = activePhase.charAt(0).toUpperCase() + activePhase.slice(1) + ' Phase';
+  recDiv.appendChild(phaseBadge);
+
+  const desc = document.createElement('p');
+  desc.style.cssText = 'font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0.75rem;';
+  desc.textContent = PHASE_DESCRIPTIONS[activePhase];
+  recDiv.appendChild(desc);
+
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.5rem; margin-bottom: 0.75rem;';
+  for (const item of [
+    { label: 'Sets', value: String(rec.sets) },
+    { label: 'Reps', value: rec.reps },
+    { label: 'Intensity', value: rec.intensity },
+    { label: 'Rest', value: rec.restMinutes + ' min' },
+  ]) {
+    const cell = document.createElement('div');
+    cell.style.cssText = 'background: var(--bg-input); border-radius: 6px; padding: 0.5rem; text-align: center;';
+    cell.innerHTML = `<div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">${escapeHtml(item.label)}</div><div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.15rem;">${escapeHtml(item.value)}</div>`;
+    grid.appendChild(cell);
+  }
+  recDiv.appendChild(grid);
+
+  if (rec.weightRange) {
+    const weightInfo = document.createElement('div');
+    weightInfo.style.cssText = 'background: var(--bg-input); border-radius: 6px; padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; font-size: 0.9rem;';
+    weightInfo.innerHTML = `<span style="color: var(--text-muted);">Target weight:</span> <span style="color: var(--accent); font-weight: 700;">${rec.weightRange[0]}-${rec.weightRange[1]} ${escapeHtml(rec.weightUnit ?? 'lbs')}</span>`;
+    recDiv.appendChild(weightInfo);
+  }
+
+  if (rec.focusAreas.length > 0) {
+    const focusHeading = document.createElement('div');
+    focusHeading.style.cssText = 'font-size: 0.8rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.35rem;';
+    focusHeading.textContent = 'Focus Areas';
+    recDiv.appendChild(focusHeading);
+    const focusList = document.createElement('ul');
+    focusList.style.cssText = 'margin: 0 0 0.75rem; padding-left: 1.25rem; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6;';
+    for (const area of rec.focusAreas) {
+      const li = document.createElement('li');
+      li.textContent = area;
+      focusList.appendChild(li);
+    }
+    recDiv.appendChild(focusList);
+  }
+
+  if (sessions && sessions.length > 0) {
+    const suggestion = suggestNextPhase(sessions.map(s => ({ score: s.overall_score, date: s.date })));
+    const suggestionDiv = document.createElement('div');
+    suggestionDiv.style.cssText = 'background: var(--bg-input); border-radius: 6px; padding: 0.6rem 0.75rem; font-size: 0.85rem; border-left: 2px solid var(--text-muted);';
+    const nextPhaseLabel = suggestion.phase.charAt(0).toUpperCase() + suggestion.phase.slice(1);
+    suggestionDiv.innerHTML = `<div style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.2rem;">Suggested Next Phase</div><div style="color: var(--text-primary); font-weight: 600;">${escapeHtml(nextPhaseLabel)}</div><div style="color: var(--text-secondary); margin-top: 0.2rem;">${escapeHtml(suggestion.reason)}</div>`;
+    recDiv.appendChild(suggestionDiv);
+  }
+
+  const section = document.getElementById('results-section');
+  if (section) {
+    const progressInsights = document.getElementById('progress-insights');
+    const coachingSection = document.getElementById('coaching-section');
+    const insertAfter = progressInsights ?? coachingSection;
+    if (insertAfter?.parentNode) {
+      insertAfter.parentNode.insertBefore(recDiv, insertAfter.nextSibling);
+    } else {
+      section.appendChild(recDiv);
+    }
+  }
+}
+
 // ─── Score count-up animation ───
 
 export function animateScoreCountUp(
@@ -202,7 +310,7 @@ export function wrapInCollapsible(wrapperId: string, title: string, targetId: st
 
 // ─── Results Display ───
 
-export function showResults(analysis: SetAnalysis, frameData: FrameData, sessions: SessionRecord[] = [], oneRMEstimate?: OneRMEstimate | null, fps: number = 0): void {
+export function showResults(analysis: SetAnalysis, frameData: FrameData, sessions: SessionRecord[] = [], oneRMEstimate?: OneRMEstimate | null, fps: number = 0, trainingPhase?: TrainingPhase, exerciseType?: string): void {
   hideProgress();
   hideError();
   hideSkeletonLoading();
@@ -243,6 +351,7 @@ export function showResults(analysis: SetAnalysis, frameData: FrameData, session
   renderFocusSection(analysis, fps);
   if (!isBeginner) renderCoachingCues(analysis, fps);
   renderProgressInsights(analysis, sessions);
+  renderTrainingRecommendations(trainingPhase, oneRMEstimate, sessions, exerciseType);
 
   // --- Tier 3: Details (collapsed by default, hidden for beginners unless expanded) ---
   if (!isBeginner) {

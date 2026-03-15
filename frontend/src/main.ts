@@ -36,6 +36,8 @@ import { estimateOneRM } from './one-rm';
 import { decodeAnalysisUrl } from './share';
 import { mergeMultiAngleAnalysis } from './multi-angle';
 import type { MultiAngleResult } from './multi-angle';
+import type { TrainingPhase } from './programming';
+import { suggestNextPhase } from './programming';
 
 // ─── DOM Elements ───
 const videoInput = document.getElementById('video-input') as HTMLInputElement;
@@ -55,6 +57,7 @@ const liveWeightInput = document.getElementById('live-weight-input') as HTMLInpu
 const bodyweightInput = document.getElementById('bodyweight-input') as HTMLInputElement | null;
 const bodyweightUnitSelect = document.getElementById('bodyweight-unit') as HTMLSelectElement | null;
 const rpeInput = document.getElementById('rpe-input') as HTMLSelectElement | null;
+const trainingPhaseSelect = document.getElementById('training-phase') as HTMLSelectElement | null;
 
 const frontVideoInput = document.getElementById('front-video-input') as HTMLInputElement | null;
 const frontDropLabel = document.getElementById('front-drop-label') as HTMLElement | null;
@@ -103,6 +106,9 @@ if (savedSettings) {
   if (savedSettings.rpe && rpeInput) {
     rpeInput.value = savedSettings.rpe;
   }
+  if (savedSettings.training_phase && trainingPhaseSelect) {
+    trainingPhaseSelect.value = savedSettings.training_phase;
+  }
 }
 
 /** Get the currently selected weight unit from the upload settings panel. */
@@ -128,6 +134,7 @@ function persistSettings(): void {
     exerciseTypeSelect?.value, deadliftTypeSelect?.value, benchTypeSelect?.value,
     bodyweightInput?.value, bodyweightUnitSelect?.value, rpeInput?.value,
     ohpTypeSelect?.value, rowTypeSelect?.value, lungeTypeSelect?.value,
+    trainingPhaseSelect?.value,
   );
 }
 
@@ -196,6 +203,7 @@ weightInput.addEventListener('input', persistSettings);
 if (bodyweightInput) bodyweightInput.addEventListener('input', persistSettings);
 if (bodyweightUnitSelect) bodyweightUnitSelect.addEventListener('change', persistSettings);
 if (rpeInput) rpeInput.addEventListener('change', persistSettings);
+if (trainingPhaseSelect) trainingPhaseSelect.addEventListener('change', persistSettings);
 
 // Update experience hint when selection changes
 const experienceHints: Record<string, string> = {
@@ -739,10 +747,18 @@ async function runAnalysis(file: File): Promise<void> {
       bodyweight, bwUnit, rpe,
     );
 
-    // Step 7: Display results with session context
+    // Step 7: Determine training phase (user-selected or auto-detected)
+    const selectedPhase = trainingPhaseSelect?.value as TrainingPhase | '' | undefined;
+    const trainingPhase: TrainingPhase | undefined = selectedPhase
+      ? selectedPhase as TrainingPhase
+      : suggestNextPhase(
+          previousSessions.map(s => ({ score: s.overall_score, date: s.date })),
+        ).phase;
+
+    // Step 8: Display results with session context and training phase
     showProgress(97, 'Rendering results...');
     hideSkeletonLoading();
-    showResults(analysis, frameData, previousSessions, oneRMEstimate, fps);
+    showResults(analysis, frameData, previousSessions, oneRMEstimate, fps, trainingPhase, exerciseType);
 
     // Show multi-angle alignment quality indicator if applicable
     if (multiAngleResult) {

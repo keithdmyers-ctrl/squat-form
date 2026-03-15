@@ -3150,6 +3150,19 @@
               </div>
             </div>
 
+            <!-- Training Phase Selector -->
+            <div class="form-group">
+              <label for="training-phase">Training Phase</label>
+              <select id="training-phase" aria-label="Select training phase for programming recommendations">
+                <option value="">Auto-detect</option>
+                <option value="hypertrophy">Hypertrophy</option>
+                <option value="strength">Strength</option>
+                <option value="peaking">Peaking / Competition Prep</option>
+                <option value="deload">Deload / Recovery</option>
+              </select>
+              <p class="form-hint" id="training-phase-hint" style="font-size: 0.75rem; color: var(--text-muted); margin: 0.25rem 0 0;">Auto-detect suggests a phase based on your training history.</p>
+            </div>
+
             <!-- Camera Setup Guide with SVG Illustration -->
             <div class="camera-guide" aria-label="Camera positioning guide">
               <svg viewBox="0 0 240 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration showing proper camera positioning: phone at hip height, 2-4 meters away, side view">
