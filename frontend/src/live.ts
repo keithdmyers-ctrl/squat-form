@@ -2,6 +2,9 @@
  * Real-time live webcam analysis engine.
  * Orchestrates per-frame pose processing, phase detection, rep scoring,
  * and audio coaching cues for the live mode.
+ *
+ * Supports multiple exercises via the LiveExerciseStrategy interface.
+ * Each exercise provides its own phase detection, calibration, and scoring.
  */
 
 import { computeFrameAngles, segmentLength, pickSide } from './angles';
@@ -57,11 +60,154 @@ export interface LiveConfig {
   audioEnabled: boolean;
 }
 
+// ─── LiveExerciseStrategy ───
+
+/**
+ * Strategy interface for exercise-specific live analysis behavior.
+ * Each exercise provides its own phase detection, calibration check,
+ * rep scoring, and score dimension labels.
+ */
+export interface LiveExerciseStrategy {
+  /** Exercise type identifier. */
+  exerciseType: string;
+  /** Detect the current movement phase from frame angles. */
+  detectPhase(angles: FrameAngles): SquatPhase;
+  /** Check whether the person is in a calibration-ready position. */
+  isCalibrated(angles: FrameAngles): boolean;
+  /** Get the primary angle used for calibration readiness checking. */
+  calibrationAngle(angles: FrameAngles): number;
+  /** Minimum angle threshold for the starting/standing position. */
+  standingThreshold: number;
+  /** Get the display labels for scoring dimensions. */
+  getScoreDimensions(): string[];
+  /** Get the primary tracking angle for bottom-of-rep detection. */
+  trackingAngle(angles: FrameAngles): number;
+  /** Score a completed rep using exercise-specific scoring logic. */
+  scoreRep(
+    rep: RepData,
+    config: SquatConfig,
+    calibration: CalibrationData | null,
+  ): RepScore;
+  /** Reset any internal state (e.g., phase detector smoothing buffers). */
+  reset(): void;
+  /** Get the no-reps feedback message appropriate for this exercise. */
+  noRepsMessage: string;
+}
+
+// ─── Squat Live Strategy ───
+
+export class SquatLiveStrategy implements LiveExerciseStrategy {
+  exerciseType = 'squat';
+  standingThreshold = 150;
+  noRepsMessage = 'No reps detected. Make sure you complete full squats \u2014 standing, down, and back to standing.';
+  private phaseDetector: PhaseDetector;
+  private squatConfig: SquatConfig;
+
+  constructor(config: SquatConfig) {
+    this.phaseDetector = new PhaseDetector(true);
+    this.squatConfig = config;
+  }
+
+  detectPhase(angles: FrameAngles): SquatPhase {
+    return this.phaseDetector.update(angles.kneeAngle);
+  }
+
+  isCalibrated(angles: FrameAngles): boolean {
+    return angles.kneeAngle >= this.standingThreshold;
+  }
+
+  calibrationAngle(angles: FrameAngles): number {
+    return angles.kneeAngle;
+  }
+
+  trackingAngle(angles: FrameAngles): number {
+    return angles.kneeAngle;
+  }
+
+  getScoreDimensions(): string[] {
+    return ['Depth', 'Knee Tracking', 'Torso Position', 'Symmetry', 'Tempo', 'Lockout'];
+  }
+
+  scoreRep(
+    rep: RepData,
+    config: SquatConfig,
+    calibration: CalibrationData | null,
+  ): RepScore {
+    return scoreSquatRepForLive(rep, config, calibration);
+  }
+
+  reset(): void {
+    this.phaseDetector = new PhaseDetector(true);
+  }
+}
+
+/** Score a squat rep using the original squat scoring pipeline. */
+function scoreSquatRepForLive(
+  rep: RepData,
+  config: SquatConfig,
+  calibration: CalibrationData | null,
+): RepScore {
+  const isCompetition = config.competitionMode;
+  const depth = scoreDepth(rep.minKneeAngle, config);
+  const kneeTracking = scoreKneeTracking(rep, config);
+  const trunk = scoreTrunk(rep.maxTrunkAngle, config, calibration);
+  const symmetry = scoreSymmetry(rep);
+  const tempo = isCompetition ? 100 : scoreTempo(rep.descentDuration, rep.bottomDuration, rep.ascentDuration);
+  const lockout = scoreLockout(rep, calibration);
+  const effectiveLockout = isCompetition ? scoreCompetitionLockout(rep, calibration) : lockout;
+
+  const baseW = isCompetition ? COMPETITION_WEIGHTS : WEIGHTS;
+
+  // If no frontal knee data, redistribute kneeTracking weight
+  const hasFrontalData = rep.frameAngles.some((fa) => fa.kneeWidthRatio !== null);
+  const w = hasFrontalData ? baseW : redistributeWeights(baseW, 'kneeTracking');
+
+  const overall = clamp(
+    Math.round(
+      depth * w.depth +
+        kneeTracking * w.kneeTracking +
+        trunk * w.trunk +
+        symmetry * w.symmetry +
+        tempo * w.tempo +
+        effectiveLockout * w.lockout,
+    ),
+    0,
+    100,
+  );
+
+  const issues = detectRepIssues(rep, config, calibration);
+  const cues = getCuesForIssues(issues);
+  const positiveFeedback = getPositiveFeedback({
+    depth,
+    kneeTracking,
+    trunk,
+    symmetry,
+    tempo,
+    lockout: isCompetition ? effectiveLockout : lockout,
+  });
+
+  return {
+    depthScore: depth,
+    kneeTrackingScore: kneeTracking,
+    trunkScore: trunk,
+    symmetryScore: symmetry,
+    tempoScore: tempo,
+    lockoutScore: isCompetition ? effectiveLockout : lockout,
+    overallScore: overall,
+    grade: scoreToGrade(overall, config.experienceLevel),
+    issues,
+    cues,
+    positiveFeedback,
+    stickingPoints: rep.stickingPoints,
+    velocity: rep.velocity,
+  };
+}
+
 // ─── LiveAnalyzer ───
 
 export class LiveAnalyzer {
   private config: SquatConfig;
-  private phaseDetector: PhaseDetector;
+  private strategy: LiveExerciseStrategy;
   private calibration: CalibrationData | null = null;
   private frameBuffer: FrameAngles[] = [];
   private landmarkBuffer: Landmarks[] = [];
@@ -72,7 +218,7 @@ export class LiveAnalyzer {
   private lastPhase: SquatPhase = SquatPhase.STANDING;
   private repStartIdx = 0;
   private bottomIdx = 0;
-  private minKneeInRep = 180;
+  private minTrackingAngle = 180;
   private frameIndex = 0;
   private calibrationFrames: Landmarks[] = [];
   private calibrationAttempts = 0;
@@ -83,13 +229,13 @@ export class LiveAnalyzer {
   private frameIntervals: number[] = [];
   private readonly FPS_ROLLING_WINDOW = 30;
 
-  constructor(liveConfig: LiveConfig, callbacks: LiveCallbacks) {
+  constructor(liveConfig: LiveConfig, callbacks: LiveCallbacks, strategy?: LiveExerciseStrategy) {
     this.config = {
       squatType: liveConfig.squatType,
       experienceLevel: liveConfig.experienceLevel,
       competitionMode: liveConfig.competitionMode,
     };
-    this.phaseDetector = new PhaseDetector(true);
+    this.strategy = strategy ?? new SquatLiveStrategy(this.config);
     this.callbacks = callbacks;
     this.audioEnabled = liveConfig.audioEnabled;
   }
@@ -116,7 +262,7 @@ export class LiveAnalyzer {
     // Calibration: use first few standing frames
     if (!this.calibration && this.calibrationAttempts < 60) {
       this.calibrationAttempts++;
-      if (angles.kneeAngle >= 150) {
+      if (this.strategy.isCalibrated(angles)) {
         this.calibrationFrames.push(landmarks);
         // Require 5 consecutive standing frames for stable calibration
         if (this.calibrationFrames.length >= 5) {
@@ -129,8 +275,11 @@ export class LiveAnalyzer {
       }
     }
 
-    // Update phase detector
-    const phase = this.phaseDetector.update(angles.kneeAngle);
+    // Update phase detector via strategy
+    const phase = this.strategy.detectPhase(angles);
+
+    // Get the exercise-specific tracking angle for bottom detection
+    const trackingAngle = this.strategy.trackingAngle(angles);
 
     // Track phase changes
     if (phase !== this.lastPhase) {
@@ -140,7 +289,7 @@ export class LiveAnalyzer {
       if (this.lastPhase === SquatPhase.STANDING && phase === SquatPhase.DESCENDING) {
         this.inRep = true;
         this.repStartIdx = this.frameBuffer.length;
-        this.minKneeInRep = angles.kneeAngle;
+        this.minTrackingAngle = trackingAngle;
         this.bottomIdx = this.frameBuffer.length;
       }
 
@@ -155,8 +304,8 @@ export class LiveAnalyzer {
 
     // Track the bottom of the rep
     if (this.inRep && (phase === SquatPhase.DESCENDING || phase === SquatPhase.BOTTOM)) {
-      if (angles.kneeAngle < this.minKneeInRep) {
-        this.minKneeInRep = angles.kneeAngle;
+      if (trackingAngle < this.minTrackingAngle) {
+        this.minTrackingAngle = trackingAngle;
         this.bottomIdx = this.frameBuffer.length;
       }
     }
@@ -186,8 +335,8 @@ export class LiveAnalyzer {
     const repData = this.buildRepData(repFrameAngles, repLandmarks, this.repStartIdx, repEndIdx);
     repData.repNumber = this.repCount;
 
-    // Score the rep
-    const repScore = this.scoreRep(repData);
+    // Score the rep via strategy
+    const repScore = this.strategy.scoreRep(repData, this.config, this.calibration);
     this.repScores.push(repScore);
 
     this.callbacks.onRepComplete(repScore, this.repCount);
@@ -356,63 +505,6 @@ export class LiveAnalyzer {
     };
   }
 
-  private scoreRep(rep: RepData): RepScore {
-    const isCompetition = this.config.competitionMode;
-    const depth = scoreDepth(rep.minKneeAngle, this.config);
-    const kneeTracking = scoreKneeTracking(rep, this.config);
-    const trunk = scoreTrunk(rep.maxTrunkAngle, this.config, this.calibration);
-    const symmetry = scoreSymmetry(rep);
-    const tempo = isCompetition ? 100 : scoreTempo(rep.descentDuration, rep.bottomDuration, rep.ascentDuration);
-    const lockout = scoreLockout(rep, this.calibration);
-    const effectiveLockout = isCompetition ? scoreCompetitionLockout(rep, this.calibration) : lockout;
-
-    const baseW = isCompetition ? COMPETITION_WEIGHTS : WEIGHTS;
-
-    // If no frontal knee data, redistribute kneeTracking weight
-    const hasFrontalData = rep.frameAngles.some((fa) => fa.kneeWidthRatio !== null);
-    const w = hasFrontalData ? baseW : redistributeWeights(baseW, 'kneeTracking');
-
-    const overall = clamp(
-      Math.round(
-        depth * w.depth +
-          kneeTracking * w.kneeTracking +
-          trunk * w.trunk +
-          symmetry * w.symmetry +
-          tempo * w.tempo +
-          effectiveLockout * w.lockout,
-      ),
-      0,
-      100,
-    );
-
-    const issues = detectRepIssues(rep, this.config, this.calibration);
-    const cues = getCuesForIssues(issues);
-    const positiveFeedback = getPositiveFeedback({
-      depth,
-      kneeTracking,
-      trunk,
-      symmetry,
-      tempo,
-      lockout: isCompetition ? effectiveLockout : lockout,
-    });
-
-    return {
-      depthScore: depth,
-      kneeTrackingScore: kneeTracking,
-      trunkScore: trunk,
-      symmetryScore: symmetry,
-      tempoScore: tempo,
-      lockoutScore: isCompetition ? effectiveLockout : lockout,
-      overallScore: overall,
-      grade: scoreToGrade(overall, this.config.experienceLevel),
-      issues,
-      cues,
-      positiveFeedback,
-      stickingPoints: rep.stickingPoints,
-      velocity: rep.velocity,
-    };
-  }
-
   /** Get accumulated results for the full session. */
   getResults(): SetAnalysis {
     if (this.repScores.length === 0) {
@@ -558,9 +650,14 @@ export class LiveAnalyzer {
     };
   }
 
+  /** Get the current strategy for exercise-specific UI behavior. */
+  getStrategy(): LiveExerciseStrategy {
+    return this.strategy;
+  }
+
   /** Reset for a new session. */
   reset(): void {
-    this.phaseDetector = new PhaseDetector(true);
+    this.strategy.reset();
     this.calibration = null;
     this.frameBuffer = [];
     this.landmarkBuffer = [];
@@ -569,7 +666,7 @@ export class LiveAnalyzer {
     this.lastPhase = SquatPhase.STANDING;
     this.repStartIdx = 0;
     this.bottomIdx = 0;
-    this.minKneeInRep = 180;
+    this.minTrackingAngle = 180;
     this.frameIndex = 0;
     this.calibrationFrames = [];
     this.calibrationAttempts = 0;

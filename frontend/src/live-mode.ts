@@ -1,13 +1,17 @@
 /**
  * Live webcam mode: camera access, real-time pose overlay,
  * rep counting, and session result display.
+ *
+ * Supports squat, deadlift, and bench press via exercise strategy selection.
  */
 
 import { PoseProcessor } from './pose';
-import { LiveAnalyzer } from './live';
-import type { LiveConfig, LiveCallbacks } from './live';
+import { LiveAnalyzer, SquatLiveStrategy } from './live';
+import type { LiveConfig, LiveCallbacks, LiveExerciseStrategy } from './live';
+import { DeadliftLiveStrategy } from './live-deadlift';
+import { BenchLiveStrategy } from './live-bench';
 import { SquatPhase } from './types';
-import type { SquatType, ExperienceLevel, Landmarks, FrameAngles } from './types';
+import type { SquatType, ExperienceLevel, Landmarks, FrameAngles, DeadliftType, BenchType } from './types';
 import {
   hideError,
   showResults,
@@ -17,13 +21,30 @@ import {
 import { showErrorCard } from './ui-progress';
 import { getSessions, saveSession, saveSettings } from './storage';
 
-/** Phase labels for the overlay */
-const PHASE_LABELS: Record<string, string> = {
-  standing: 'Standing',
-  descending: 'Going Down',
-  bottom: 'Bottom',
-  ascending: 'Coming Up',
+/** Phase labels for the overlay — shared across exercises */
+const PHASE_LABELS: Record<string, Record<string, string>> = {
+  squat: {
+    standing: 'Standing',
+    descending: 'Going Down',
+    bottom: 'Bottom',
+    ascending: 'Coming Up',
+  },
+  deadlift: {
+    standing: 'Standing',
+    descending: 'Hinging Down',
+    bottom: 'Bottom',
+    ascending: 'Pulling Up',
+  },
+  bench_press: {
+    standing: 'Lockout',
+    descending: 'Lowering',
+    bottom: 'On Chest',
+    ascending: 'Pressing',
+  },
 };
+
+/** Default phase labels (squat) */
+const DEFAULT_PHASE_LABELS: Record<string, string> = PHASE_LABELS.squat;
 
 const PHASE_CSS_CLASS: Record<string, string> = {
   standing: 'phase-standing',
@@ -32,12 +53,18 @@ const PHASE_CSS_CLASS: Record<string, string> = {
   ascending: 'phase-ascending',
 };
 
+function getPhaseLabel(exerciseType: string, phase: string): string {
+  const labels = PHASE_LABELS[exerciseType] ?? DEFAULT_PHASE_LABELS;
+  return labels[phase] ?? phase;
+}
+
 function drawLiveOverlay(
   ctx: CanvasRenderingContext2D,
   landmarks: Landmarks,
   phase: string,
   width: number,
   height: number,
+  exerciseType: string = 'squat',
 ): void {
   ctx.clearRect(0, 0, width, height);
 
@@ -45,7 +72,7 @@ function drawLiveOverlay(
   drawSkeleton(ctx, landmarks, [], width, height);
 
   // Draw phase text overlay in bottom center
-  const phaseLabel = PHASE_LABELS[phase] ?? phase;
+  const phaseLabel = getPhaseLabel(exerciseType, phase);
   ctx.font = 'bold 16px sans-serif';
   ctx.textAlign = 'center';
   const metrics = ctx.measureText(phaseLabel);
@@ -98,6 +125,10 @@ export function initLiveMode(deps: LiveModeDeps): void {
   const liveFeedbackText = document.getElementById('live-feedback-text');
   const liveSquatTypeSelect = document.getElementById('live-squat-type') as HTMLSelectElement | null;
   const liveExperienceSelect = document.getElementById('live-experience-level') as HTMLSelectElement | null;
+  const liveExerciseTypeSelect = document.getElementById('live-exercise-type') as HTMLSelectElement | null;
+  const liveDeadliftTypeSelect = document.getElementById('live-deadlift-type') as HTMLSelectElement | null;
+  const liveBenchTypeSelect = document.getElementById('live-bench-type') as HTMLSelectElement | null;
+  const liveBenchWarning = document.getElementById('live-bench-warning');
 
   let livePoseProcessor: PoseProcessor | null = null;
   let liveAnalyzer: LiveAnalyzer | null = null;
@@ -111,6 +142,7 @@ export function initLiveMode(deps: LiveModeDeps): void {
   let observedOverlayWidth = 0;
   let observedOverlayHeight = 0;
   let wakeLockSentinel: any = null;
+  let currentExerciseType: string = 'squat';
 
   // Target ~20 fps for pose processing (50ms interval) — feasible with lite model
   const LIVE_FRAME_INTERVAL_MS = 50;
@@ -121,6 +153,27 @@ export function initLiveMode(deps: LiveModeDeps): void {
   audioEnabledCheckbox?.addEventListener('change', () => {
     liveAnalyzer?.setAudioEnabled(audioEnabledCheckbox.checked);
   });
+
+  // ─── Exercise Type Selection ───
+
+  /** Show/hide variant selectors based on current exercise type. */
+  function updateVariantVisibility(): void {
+    const exerciseType = liveExerciseTypeSelect?.value ?? 'squat';
+    currentExerciseType = exerciseType;
+
+    const squatGroup = document.getElementById('live-squat-type-group');
+    const deadliftGroup = document.getElementById('live-deadlift-type-group');
+    const benchGroup = document.getElementById('live-bench-type-group');
+
+    if (squatGroup) squatGroup.style.display = exerciseType === 'squat' ? '' : 'none';
+    if (deadliftGroup) deadliftGroup.style.display = exerciseType === 'deadlift' ? '' : 'none';
+    if (benchGroup) benchGroup.style.display = exerciseType === 'bench_press' ? '' : 'none';
+    if (liveBenchWarning) liveBenchWarning.style.display = exerciseType === 'bench_press' ? '' : 'none';
+  }
+
+  liveExerciseTypeSelect?.addEventListener('change', updateVariantVisibility);
+  // Initialize visibility
+  updateVariantVisibility();
 
   // ─── Sync Live Settings with Upload Settings ───
 
@@ -149,6 +202,31 @@ export function initLiveMode(deps: LiveModeDeps): void {
     deps.experienceSelect.value = liveExperienceSelect.value;
     saveSettings(deps.squatTypeSelect.value, deps.experienceSelect.value);
   });
+
+  /** Build the appropriate strategy for the current exercise selection. */
+  function buildStrategy(experienceLevel: ExperienceLevel, competitionMode: boolean): LiveExerciseStrategy {
+    const exerciseType = liveExerciseTypeSelect?.value ?? 'squat';
+
+    switch (exerciseType) {
+      case 'deadlift': {
+        const dlType = (liveDeadliftTypeSelect?.value ?? 'conventional') as DeadliftType;
+        return new DeadliftLiveStrategy(dlType, experienceLevel, competitionMode);
+      }
+      case 'bench_press': {
+        const benchType = (liveBenchTypeSelect?.value ?? 'flat') as BenchType;
+        return new BenchLiveStrategy(benchType, experienceLevel, competitionMode);
+      }
+      case 'squat':
+      default: {
+        const squatType = (liveSquatTypeSelect?.value ?? deps.squatTypeSelect.value) as SquatType;
+        return new SquatLiveStrategy({
+          squatType,
+          experienceLevel,
+          competitionMode,
+        });
+      }
+    }
+  }
 
   /** Switch camera between front and rear. */
   async function switchCamera(): Promise<void> {
@@ -197,6 +275,26 @@ export function initLiveMode(deps: LiveModeDeps): void {
     switchCamera();
   });
 
+  /** Get the calibration instruction appropriate for the exercise. */
+  function getCalibrationMessage(): string {
+    switch (currentExerciseType) {
+      case 'deadlift':
+        return 'Stand Still to Calibrate (stand upright near the bar)';
+      case 'bench_press':
+        return 'Hold Arms Extended to Calibrate (lock out the bar)';
+      default:
+        return 'Stand Still to Calibrate';
+    }
+  }
+
+  /** Get the no-reps message from the current strategy or a default. */
+  function getNoRepsMessage(): string {
+    if (liveAnalyzer) {
+      return liveAnalyzer.getStrategy().noRepsMessage;
+    }
+    return 'No reps detected. Make sure you complete full reps.';
+  }
+
   async function startLiveSession(): Promise<void> {
     if (!liveVideo || !liveOverlay) return;
 
@@ -219,6 +317,9 @@ export function initLiveMode(deps: LiveModeDeps): void {
     if (liveScoreDisplay) liveScoreDisplay.style.display = 'none';
     if (liveFeedback) liveFeedback.style.display = 'none';
 
+    // Capture current exercise type for this session
+    currentExerciseType = liveExerciseTypeSelect?.value ?? 'squat';
+
     // Disable settings during active session
     if (liveSquatTypeSelect) {
       liveSquatTypeSelect.disabled = true;
@@ -227,6 +328,18 @@ export function initLiveMode(deps: LiveModeDeps): void {
     if (liveExperienceSelect) {
       liveExperienceSelect.disabled = true;
       liveExperienceSelect.title = 'Settings locked during session';
+    }
+    if (liveExerciseTypeSelect) {
+      liveExerciseTypeSelect.disabled = true;
+      liveExerciseTypeSelect.title = 'Settings locked during session';
+    }
+    if (liveDeadliftTypeSelect) {
+      liveDeadliftTypeSelect.disabled = true;
+      liveDeadliftTypeSelect.title = 'Settings locked during session';
+    }
+    if (liveBenchTypeSelect) {
+      liveBenchTypeSelect.disabled = true;
+      liveBenchTypeSelect.title = 'Settings locked during session';
     }
 
     try {
@@ -260,12 +373,18 @@ export function initLiveMode(deps: LiveModeDeps): void {
       livePoseProcessor = new PoseProcessor();
 
       const compToggle = document.getElementById('competition-mode') as HTMLInputElement | null;
+      const experienceLevel = (liveExperienceSelect?.value ?? deps.experienceSelect.value) as ExperienceLevel;
+      const competitionMode = compToggle?.checked ?? false;
+
       const liveConfig: LiveConfig = {
         squatType: (liveSquatTypeSelect?.value ?? deps.squatTypeSelect.value) as SquatType,
-        experienceLevel: (liveExperienceSelect?.value ?? deps.experienceSelect.value) as ExperienceLevel,
-        competitionMode: compToggle?.checked ?? false,
+        experienceLevel,
+        competitionMode,
         audioEnabled: audioEnabledCheckbox?.checked ?? true,
       };
+
+      // Build exercise-specific strategy
+      const strategy = buildStrategy(experienceLevel, competitionMode);
 
       const callbacks: LiveCallbacks = {
         onFrameProcessed: (_landmarks: Landmarks, _angles: FrameAngles, _phase: SquatPhase) => {
@@ -326,14 +445,14 @@ export function initLiveMode(deps: LiveModeDeps): void {
             calibrationTimeoutId = null;
           }
           if (livePhaseBadge) {
-            livePhaseBadge.textContent = 'Calibrated -- Go!';
+            livePhaseBadge.textContent = 'Calibrated \u2014 Go!';
             livePhaseBadge.className = 'phase-badge phase-calibrated';
           }
         },
         onPhaseChange: (phase: SquatPhase) => {
           currentPhaseKey = phase;
           if (livePhaseBadge) {
-            livePhaseBadge.textContent = PHASE_LABELS[phase] ?? phase;
+            livePhaseBadge.textContent = getPhaseLabel(currentExerciseType, phase);
             livePhaseBadge.className = `phase-badge ${PHASE_CSS_CLASS[phase] ?? ''}`;
           }
         },
@@ -347,7 +466,7 @@ export function initLiveMode(deps: LiveModeDeps): void {
         },
       };
 
-      liveAnalyzer = new LiveAnalyzer(liveConfig, callbacks);
+      liveAnalyzer = new LiveAnalyzer(liveConfig, callbacks, strategy);
 
       // Store latest landmarks for drawing
       let latestLandmarks: Landmarks | null = null;
@@ -360,14 +479,18 @@ export function initLiveMode(deps: LiveModeDeps): void {
       });
 
       if (livePhaseBadge) {
-        livePhaseBadge.textContent = 'Stand Still to Calibrate';
+        livePhaseBadge.textContent = getCalibrationMessage();
         livePhaseBadge.className = 'phase-badge';
       }
 
       // Calibration timeout: show help message after 30 seconds
       calibrationTimeoutId = setTimeout(() => {
         if (liveAnalyzer && !liveAnalyzer.isCalibrated() && livePhaseBadge) {
-          livePhaseBadge.textContent = 'Having trouble? Make sure your full body is visible and you\'re standing upright.';
+          if (currentExerciseType === 'bench_press') {
+            livePhaseBadge.textContent = 'Having trouble? Make sure the camera can see your arms clearly from the side with elbows locked out.';
+          } else {
+            livePhaseBadge.textContent = 'Having trouble? Make sure your full body is visible and you\'re standing upright.';
+          }
           livePhaseBadge.className = 'phase-badge';
         }
         calibrationTimeoutId = null;
@@ -393,7 +516,7 @@ export function initLiveMode(deps: LiveModeDeps): void {
             liveOverlay.width = observedOverlayWidth;
             liveOverlay.height = observedOverlayHeight;
           }
-          drawLiveOverlay(ctx, latestLandmarks, currentPhaseKey, liveOverlay.width, liveOverlay.height);
+          drawLiveOverlay(ctx, latestLandmarks, currentPhaseKey, liveOverlay.width, liveOverlay.height, currentExerciseType);
         }
 
         if (currentPhaseKey === 'standing') {
@@ -519,6 +642,18 @@ export function initLiveMode(deps: LiveModeDeps): void {
       liveExperienceSelect.disabled = false;
       liveExperienceSelect.title = '';
     }
+    if (liveExerciseTypeSelect) {
+      liveExerciseTypeSelect.disabled = false;
+      liveExerciseTypeSelect.title = '';
+    }
+    if (liveDeadliftTypeSelect) {
+      liveDeadliftTypeSelect.disabled = false;
+      liveDeadliftTypeSelect.title = '';
+    }
+    if (liveBenchTypeSelect) {
+      liveBenchTypeSelect.disabled = false;
+      liveBenchTypeSelect.title = '';
+    }
 
     // If we have results, show them (skip when called as cleanup before restart)
     if (showResultsOnStop) {
@@ -530,7 +665,7 @@ export function initLiveMode(deps: LiveModeDeps): void {
         deps.initHistorySection();
       } else if (liveAnalyzer && liveAnalyzer.getRepCount() === 0) {
         showErrorCard(
-          'No reps detected. Make sure you complete full squats \u2014 standing, down, and back to standing.',
+          getNoRepsMessage(),
           'no_reps',
           () => { startLiveSession(); },
           null,
@@ -545,7 +680,7 @@ export function initLiveMode(deps: LiveModeDeps): void {
     startLiveSession().catch((err) => {
       console.error('Live session start failed:', err);
       if (livePhaseBadge) {
-        livePhaseBadge.textContent = 'Failed to start -- please try again';
+        livePhaseBadge.textContent = 'Failed to start \u2014 please try again';
         livePhaseBadge.className = 'phase-badge';
       }
       stopLiveSession();

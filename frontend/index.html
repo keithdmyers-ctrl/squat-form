@@ -1852,6 +1852,28 @@
       margin-bottom: var(--space-sm);
     }
 
+    .live-bench-warning {
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      border-radius: var(--radius);
+      padding: var(--space-xs) var(--space-sm);
+      text-align: left;
+    }
+
+    .experimental-badge {
+      display: inline-block;
+      background: #fbbf24;
+      color: #000;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
     /* ===== Progress ETA ===== */
     .progress-eta {
       text-align: center;
@@ -2783,10 +2805,17 @@
       <!-- Live Mode Panel -->
       <div id="live-panel" role="tabpanel" aria-labelledby="mode-live" tabindex="0" style="display: none;">
         <div class="live-container">
-          <p class="live-panel-note">Live mode currently supports squats. Use Upload Video for deadlift and bench press.</p>
           <!-- Live Settings -->
           <div class="live-settings">
             <div class="form-group">
+              <label for="live-exercise-type">Exercise</label>
+              <select id="live-exercise-type" aria-label="Select exercise type for live session">
+                <option value="squat">Squat</option>
+                <option value="deadlift">Deadlift</option>
+                <option value="bench_press">Bench Press</option>
+              </select>
+            </div>
+            <div class="form-group" id="live-squat-type-group">
               <label for="live-squat-type">Squat Type</label>
               <select id="live-squat-type" aria-label="Select squat type for live session">
                 <option value="bodyweight">Bodyweight (no weight)</option>
@@ -2797,6 +2826,26 @@
                 <option value="overhead">Overhead (bar held overhead — advanced)</option>
               </select>
             </div>
+            <div class="form-group" id="live-deadlift-type-group" style="display: none;">
+              <label for="live-deadlift-type">Deadlift Type</label>
+              <select id="live-deadlift-type" aria-label="Select deadlift type for live session">
+                <option value="conventional">Conventional</option>
+                <option value="sumo">Sumo</option>
+                <option value="romanian">Romanian (RDL)</option>
+              </select>
+            </div>
+            <div class="form-group" id="live-bench-type-group" style="display: none;">
+              <label for="live-bench-type">Bench Type</label>
+              <select id="live-bench-type" aria-label="Select bench type for live session">
+                <option value="flat">Flat Bench</option>
+                <option value="close_grip">Close Grip</option>
+                <option value="wide_grip">Wide Grip</option>
+              </select>
+            </div>
+            <p class="live-panel-note live-bench-warning" id="live-bench-warning" style="display: none;">
+              <span class="experimental-badge">Experimental</span>
+              Live bench press analysis works best with a side-view camera. Pose detection accuracy may be reduced while lying down.
+            </p>
             <div class="form-group">
               <label for="live-experience-level">Experience Level</label>
               <select id="live-experience-level" aria-label="Select experience level for live session">
