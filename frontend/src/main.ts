@@ -34,6 +34,8 @@ import {
 import { initLiveMode } from './live-mode';
 import { estimateOneRM } from './one-rm';
 import { decodeAnalysisUrl } from './share';
+import { mergeMultiAngleAnalysis } from './multi-angle';
+import type { MultiAngleResult } from './multi-angle';
 
 // ─── DOM Elements ───
 const videoInput = document.getElementById('video-input') as HTMLInputElement;
@@ -54,7 +56,11 @@ const bodyweightInput = document.getElementById('bodyweight-input') as HTMLInput
 const bodyweightUnitSelect = document.getElementById('bodyweight-unit') as HTMLSelectElement | null;
 const rpeInput = document.getElementById('rpe-input') as HTMLSelectElement | null;
 
+const frontVideoInput = document.getElementById('front-video-input') as HTMLInputElement | null;
+const frontDropLabel = document.getElementById('front-drop-label') as HTMLElement | null;
+
 let selectedFile: File | null = null;
+let selectedFrontFile: File | null = null;
 let quickStartPending = false;
 let analysisCancelled = false;
 
@@ -476,6 +482,29 @@ videoInput.addEventListener('change', () => {
   }
 });
 
+// ─── Front Video Input (multi-angle) ───
+
+if (frontVideoInput) {
+  frontVideoInput.addEventListener('change', () => {
+    const files = frontVideoInput.files;
+    if (files && files.length > 0) {
+      selectedFrontFile = files[0];
+      if (frontDropLabel) {
+        frontDropLabel.textContent = selectedFrontFile.name;
+        frontDropLabel.style.color = 'var(--accent)';
+        frontDropLabel.style.fontWeight = '600';
+      }
+    } else {
+      selectedFrontFile = null;
+      if (frontDropLabel) {
+        frontDropLabel.textContent = 'Add a front view for better knee/symmetry analysis';
+        frontDropLabel.style.color = '';
+        frontDropLabel.style.fontWeight = '';
+      }
+    }
+  });
+}
+
 analyzeBtn.addEventListener('click', async () => {
   if (!selectedFile) return;
   await runAnalysis(selectedFile);
@@ -615,7 +644,7 @@ async function runAnalysis(file: File): Promise<void> {
     };
 
     const fps = poseProcessor.getProcessingFps();
-    const analysis = analyzeExercise(frameData, fps, exerciseConfig);
+    let analysis = analyzeExercise(frameData, fps, exerciseConfig);
 
     // Attach multi-person warning from pose processor if detected
     const multiPersonWarning = poseProcessor.getMultiPersonWarning();
@@ -628,6 +657,59 @@ async function runAnalysis(file: File): Promise<void> {
         'no_reps',
         "Your video needs to show at least one complete squat — from standing, down, and back to standing. Make sure your full body is visible and you complete at least one full rep.",
       );
+    }
+
+    // Step 4b: Multi-angle merge (if front video provided)
+    let multiAngleResult: MultiAngleResult | null = null;
+    if (selectedFrontFile) {
+      try {
+        showProgress(93, 'Processing front-view video...');
+
+        // Load front video into a temporary video element
+        const frontVideo = document.createElement('video');
+        frontVideo.muted = true;
+        frontVideo.playsInline = true;
+        const frontUrl = URL.createObjectURL(selectedFrontFile);
+        try {
+          await loadVideo(frontVideo, frontUrl);
+
+          // Process front video with a fresh pose processor
+          const frontPoseProcessor = new PoseProcessor();
+          await frontPoseProcessor.init();
+          try {
+            showProgress(94, 'Extracting front-view poses...');
+            const frontFrameData: FrameData = await frontPoseProcessor.processVideo(
+              frontVideo,
+              (percent, _status) => {
+                if (analysisCancelled) {
+                  throw new Error('Analysis cancelled');
+                }
+                const scaledPercent = 94 + Math.round(percent * 0.04);
+                showProgress(scaledPercent, 'Processing front view...');
+              },
+            );
+
+            if (frontFrameData.size > 0) {
+              showProgress(98, 'Merging multi-angle results...');
+              const frontFps = frontPoseProcessor.getProcessingFps();
+              const frontAnalysis = analyzeExercise(frontFrameData, frontFps, exerciseConfig);
+
+              if (frontAnalysis.repCount > 0) {
+                multiAngleResult = mergeMultiAngleAnalysis(analysis, frontAnalysis);
+                analysis = multiAngleResult.merged;
+              }
+            }
+          } finally {
+            frontPoseProcessor.close();
+          }
+        } finally {
+          URL.revokeObjectURL(frontUrl);
+        }
+      } catch (err) {
+        // Front video processing failed -- continue with side-only analysis
+        console.warn('Front video processing failed, using side view only:', err);
+        analysis.sideViewWarning = 'Front view video could not be processed -- using side view only.';
+      }
     }
 
     // Step 5: 1RM estimation (if weight provided and valid rep count)
@@ -661,6 +743,46 @@ async function runAnalysis(file: File): Promise<void> {
     showProgress(97, 'Rendering results...');
     hideSkeletonLoading();
     showResults(analysis, frameData, previousSessions, oneRMEstimate, fps);
+
+    // Show multi-angle alignment quality indicator if applicable
+    if (multiAngleResult) {
+      const alignIndicator = document.getElementById('multi-angle-indicator');
+      if (alignIndicator) {
+        alignIndicator.remove();
+      }
+      const resultsSection = document.getElementById('results-section');
+      if (resultsSection) {
+        const indicator = document.createElement('div');
+        indicator.id = 'multi-angle-indicator';
+        const qualityColors: Record<string, string> = {
+          good: 'var(--success, #4ade80)',
+          fair: 'var(--warning, #fbbf24)',
+          poor: 'var(--danger, #f87171)',
+          failed: 'var(--danger, #f87171)',
+        };
+        const qualityLabels: Record<string, string> = {
+          good: 'Good -- reps aligned perfectly',
+          fair: 'Fair -- reps aligned with minor offset',
+          poor: 'Poor -- partial alignment only',
+          failed: 'Failed -- using side view only',
+        };
+        const q = multiAngleResult.alignmentQuality;
+        indicator.style.cssText = `
+          display: flex; align-items: center; gap: 0.5rem;
+          padding: 0.5rem 0.75rem; margin-bottom: 0.75rem;
+          border-radius: var(--radius-sm, 6px);
+          background: var(--bg-card, #121212);
+          border: 1px solid ${qualityColors[q]};
+          font-size: 0.8rem; color: var(--text-secondary, #b0b0b0);
+        `;
+        indicator.innerHTML = `
+          <span style="color: ${qualityColors[q]}; font-weight: 600;">Multi-Angle</span>
+          <span>${qualityLabels[q]}</span>
+        `;
+        // Insert at top of results section
+        resultsSection.insertBefore(indicator, resultsSection.firstChild);
+      }
+    }
 
     // Step 8: Setup annotated playback
     resultVideo.currentTime = 0;

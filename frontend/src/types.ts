@@ -268,6 +268,10 @@ export interface SetAnalysis {
   detectedCameraView?: 'side' | 'front' | 'unknown';
   /** Warning if multiple people were detected in the video. */
   multiPersonWarning?: string;
+  /** Whether multi-angle analysis was used (side + front cameras). */
+  multiAngleUsed?: boolean;
+  /** Quality of multi-angle rep alignment ('good', 'fair', 'poor', 'failed'). */
+  multiAngleAlignmentQuality?: 'good' | 'fair' | 'poor' | 'failed';
   positiveHighlights: string[];
   mobilityFindings: MobilityFinding[];
   warmupProtocol: WarmUpStep[];
