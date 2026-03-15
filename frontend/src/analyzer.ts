@@ -333,6 +333,8 @@ function scoreRep(
     descentDuration: rep.descentDuration,
     ascentDuration: rep.ascentDuration,
     bottomDuration: rep.bottomDuration,
+    dimensions: { depth, kneeTracking, trunk, symmetry, tempo, lockout: config.competitionMode ? effectiveLockout : lockout },
+    exerciseType: 'squat',
   };
 
   // Aggregate landmark confidence across all frames in this rep

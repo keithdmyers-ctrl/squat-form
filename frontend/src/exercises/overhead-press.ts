@@ -582,6 +582,8 @@ function scoreOHPRep(
     descentDuration: rep.descentDuration,
     ascentDuration: rep.ascentDuration,
     bottomDuration: rep.bottomDuration,
+    dimensions: { overheadStability, lockout, pressPath, symmetry, tempo, rom },
+    exerciseType: 'overhead_press',
   };
 }
 

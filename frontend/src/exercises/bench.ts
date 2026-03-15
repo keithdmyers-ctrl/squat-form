@@ -580,6 +580,8 @@ function scoreBenchRep(
     descentDuration: rep.descentDuration,
     ascentDuration: rep.ascentDuration,
     bottomDuration: rep.bottomDuration,
+    dimensions: { rom, lockout, control, symmetry, tempo, pause },
+    exerciseType: 'bench_press',
   };
 }
 

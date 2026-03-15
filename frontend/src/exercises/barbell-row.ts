@@ -603,6 +603,8 @@ export function scoreRowRep(
     descentDuration: rep.descentDuration,
     ascentDuration: rep.ascentDuration,
     bottomDuration: rep.bottomDuration,
+    dimensions: { backPosition, rowRom, control, symmetry, tempo, torsoStability },
+    exerciseType: 'barbell_row',
   };
 }
 

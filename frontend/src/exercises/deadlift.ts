@@ -634,6 +634,8 @@ function scoreDeadliftRep(
     descentDuration: rep.descentDuration,
     ascentDuration: rep.ascentDuration,
     bottomDuration: rep.bottomDuration,
+    dimensions: { backPosition, hipHinge, lockout, symmetry, tempo, control },
+    exerciseType: 'deadlift',
   };
 }
 

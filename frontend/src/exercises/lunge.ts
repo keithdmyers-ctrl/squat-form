@@ -550,6 +550,8 @@ function scoreLungeRep(
     descentDuration: rep.descentDuration,
     ascentDuration: rep.ascentDuration,
     bottomDuration: rep.bottomDuration,
+    dimensions: { depth, kneeTracking, trunk, balance, tempo, lockout },
+    exerciseType: 'lunge',
   };
 }
 
