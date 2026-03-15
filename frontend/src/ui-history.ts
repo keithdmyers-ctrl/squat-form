@@ -434,16 +434,17 @@ function renderHistoryList(container: HTMLElement, sessions: SessionRecord[], sh
         <span class="history-score">${s.overall_score}</span>
         <span class="history-reps">${s.rep_count} reps${metricHtml ? ' ' : ''}${metricHtml}</span>
         <span class="history-issue">${escapeHtml(topIssue)}</span>
+        <button class="history-delete-btn" data-delete-idx="${idx}" aria-label="Delete session from ${dateStr}" title="Delete this session">&times;</button>
       </div>
     `;
   }
 
   html += '</div>';
   html += '<div class="history-actions">';
-  html += `<button id="compare-btn" class="btn btn-sm" style="font-size: 0.8rem; background: var(--accent); color: var(--bg-primary);${displaySessions.length < 2 ? ' opacity: 0.4; cursor: not-allowed;' : ''}" aria-label="Compare selected sessions" disabled>Compare (0/2)</button>`;
-  html += '<button id="set-goals-btn" class="btn btn-sm" style="font-size: 0.8rem; background: var(--bg-input); border: 1px solid var(--accent); color: var(--accent);" aria-label="Set performance goals">Set Goals</button>';
-  html += '<button id="export-csv-btn" class="btn btn-sm" style="font-size: 0.8rem; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary);" aria-label="Export session history as CSV">Export CSV</button>';
-  html += '<button id="clear-history-btn" class="btn btn-sm" style="font-size: 0.8rem; background: var(--bg-input, #222); border: 1px solid var(--border-hover, #444); color: var(--text-muted);" aria-label="Clear session history">Clear History</button>';
+  html += `<button id="compare-btn" class="btn btn-sm" style="font-size: var(--font-xs); background: var(--accent); color: var(--bg-primary);${displaySessions.length < 2 ? ' opacity: 0.4; cursor: not-allowed;' : ''}" aria-label="Compare selected sessions" disabled>Compare (0/2)</button>`;
+  html += '<button id="set-goals-btn" class="btn btn-sm" style="font-size: var(--font-xs); background: var(--bg-input); border: 1px solid var(--accent); color: var(--accent);" aria-label="Set performance goals">Set Goals</button>';
+  html += '<button id="export-csv-btn" class="btn btn-sm" style="font-size: var(--font-xs); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary);" aria-label="Export session history as CSV">Export CSV</button>';
+  html += '<button id="clear-history-btn" class="btn btn-sm" style="font-size: var(--font-xs); background: var(--bg-input, #222); border: 1px solid var(--border-hover, #444); color: var(--text-muted);" aria-label="Clear session history">Clear History</button>';
   html += '</div>';
 
   container.innerHTML = html;
@@ -498,6 +499,38 @@ function renderHistoryList(container: HTMLElement, sessions: SessionRecord[], sh
       }
     });
   }
+
+  // Wire up per-session delete buttons
+  container.querySelectorAll<HTMLButtonElement>('.history-delete-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation(); // prevent triggering compare selection
+      const deleteIdx = parseInt(btn.dataset.deleteIdx ?? '0');
+      const session = displaySessions[deleteIdx];
+      if (!session) return;
+      const dateStr = formatShortDate(session.date);
+      showConfirmModal(
+        'Delete Session',
+        `Delete this session from ${dateStr}?`,
+        'Delete',
+        () => {
+          try {
+            const stored = JSON.parse(localStorage.getItem('squat_form_sessions') || '[]') as SessionRecord[];
+            // Find and remove the matching session by date + score
+            const removeIdx = stored.findIndex(
+              s => s.date === session.date && s.overall_score === session.overall_score && s.rep_count === session.rep_count
+            );
+            if (removeIdx !== -1) {
+              stored.splice(removeIdx, 1);
+              localStorage.setItem('squat_form_sessions', JSON.stringify(stored));
+            }
+            renderHistorySection(stored);
+          } catch {
+            // Ignore storage errors
+          }
+        },
+      );
+    });
+  });
 
   // Wire up export button
   const exportBtn = document.getElementById('export-csv-btn');
@@ -727,7 +760,7 @@ function showGoalModal(sessions: SessionRecord[]): void {
             <option value="lunge">Lunge</option>
           </select>
           <div class="goal-form-actions">
-            <button id="goal-add-btn" class="btn btn-sm" style="background: var(--accent); color: var(--bg-primary); font-size: 0.8rem;">Add Goal</button>
+            <button id="goal-add-btn" class="btn btn-sm" style="background: var(--accent); color: var(--bg-primary); font-size: var(--font-xs);">Add Goal</button>
           </div>
         </div>
       `;
@@ -736,7 +769,7 @@ function showGoalModal(sessions: SessionRecord[]): void {
     }
 
     // Close button
-    html += '<div style="text-align: center; margin-top: var(--space-md);"><button id="goal-close-btn" class="btn btn-sm" style="font-size: 0.8rem; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary);">Close</button></div>';
+    html += '<div style="text-align: center; margin-top: var(--space-md);"><button id="goal-close-btn" class="btn btn-sm" style="font-size: var(--font-xs); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary);">Close</button></div>';
 
     card.innerHTML = html;
 

@@ -233,6 +233,15 @@ function updateAdvancedSettingsVisibility(): void {
   if (compToggle) {
     compToggle.style.display = '';
   }
+  // Progressive disclosure: collapse "More options" for beginners, open for intermediate/advanced
+  const moreSettings = document.getElementById('more-settings') as HTMLDetailsElement | null;
+  if (moreSettings) {
+    if (isBeginner) {
+      moreSettings.removeAttribute('open');
+    } else {
+      moreSettings.setAttribute('open', '');
+    }
+  }
 }
 
 experienceSelect.addEventListener('change', () => {

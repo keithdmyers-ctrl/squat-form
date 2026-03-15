@@ -143,7 +143,7 @@ function renderProgressInsights(analysis: SetAnalysis, sessions: SessionRecord[]
 
   const insightsDiv = document.createElement('div');
   insightsDiv.id = 'progress-insights';
-  insightsDiv.className = 'card progress-insights-card';
+  insightsDiv.className = 'card card--static progress-insights-card';
 
   const heading = document.createElement('h4');
   heading.className = 'section-heading-sm';
@@ -182,7 +182,7 @@ function renderTrainingRecommendations(
 
   const recDiv = document.createElement('div');
   recDiv.id = 'training-recommendations';
-  recDiv.className = 'card training-rec-card';
+  recDiv.className = 'card card--static training-rec-card';
   recDiv.setAttribute('aria-label', 'Training recommendations');
 
   const phaseColors: Record<string, string> = {
@@ -205,7 +205,7 @@ function renderTrainingRecommendations(
   recDiv.appendChild(phaseBadge);
 
   const desc = document.createElement('p');
-  desc.style.cssText = 'font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0.75rem;';
+  desc.style.cssText = 'font-size: var(--font-sm); color: var(--text-secondary); margin: 0.25rem 0 0.75rem;';
   desc.textContent = PHASE_DESCRIPTIONS[activePhase];
   recDiv.appendChild(desc);
 
@@ -314,7 +314,7 @@ export function wrapInCollapsible(wrapperId: string, title: string, targetId: st
 
   const wrapper = document.createElement('div');
   wrapper.id = wrapperId;
-  wrapper.className = 'card collapsible-section';
+  wrapper.className = 'card card--static collapsible-section';
 
   const details = document.createElement('details');
   details.setAttribute('aria-label', title);
@@ -674,7 +674,7 @@ export function renderScoreBreakdown(analysis: SetAnalysis): void {
     const level = score >= 90 ? 'Excellent' : score >= 80 ? 'Good' : score >= 70 ? 'Fair' : score >= 60 ? 'Needs Work' : 'Focus Here';
     const noteText = confidenceNotes[label] ?? '';
     const noteHtml = noteText
-      ? `<div class="confidence-note" style="font-size: 0.7rem; color: var(--text-muted); font-style: italic; margin-top: 0.15rem;">${escapeHtml(noteText)}</div>`
+      ? `<div class="confidence-note" style="font-size: var(--font-caption); color: var(--text-muted); font-style: italic; margin-top: 0.15rem;">${escapeHtml(noteText)}</div>`
       : '';
     const displayLabel = isBegExp ? (BEGINNER_DIMENSION_LABELS[label] ?? label) : label;
     html += `
@@ -684,7 +684,7 @@ export function renderScoreBreakdown(analysis: SetAnalysis): void {
           <div class="score-bar-fill" style="width: ${score}%; background: ${color}"></div>
         </div>
         <span class="score-bar-value" style="color: ${color}">${score}</span>
-        <span class="score-bar-level" style="color: ${color}; font-size: 0.7rem; min-width: 5.5em; text-align: left;">${level}</span>
+        <span class="score-bar-level" style="color: ${color}; font-size: var(--font-caption); min-width: 5.5em; text-align: left;">${level}</span>
       </div>
       ${noteHtml}
     `;
@@ -721,15 +721,15 @@ export function renderOneRMEstimate(estimate: OneRMEstimate): void {
 
   const section = document.createElement('div');
   section.id = 'one-rm-section';
-  section.className = 'card';
+  section.className = 'card card--static';
   section.setAttribute('aria-label', `Estimated one rep max: ${estimate.average} ${escapeHtml(estimate.unit)}`);
 
   const tableRows = estimate.percentageTable
     .filter(row => row.percent <= 95 && row.percent >= 60)
     .map(row => `
-      <div style="display: flex; justify-content: space-between; padding: 0.25rem 0; font-size: 0.85rem;">
-        <span style="color: var(--text-muted);">${row.percent}%</span>
-        <span style="color: var(--text-primary); font-weight: 600;">${row.weight} ${escapeHtml(estimate.unit)}</span>
+      <div class="one-rm-row">
+        <span class="one-rm-row-label">${row.percent}%</span>
+        <span class="one-rm-row-value">${row.weight} ${escapeHtml(estimate.unit)}</span>
       </div>
     `).join('');
 
@@ -750,13 +750,13 @@ export function renderOneRMEstimate(estimate: OneRMEstimate): void {
       const level = dotsResult.score >= 500 ? 'Elite' : dotsResult.score >= 400 ? 'Advanced' : dotsResult.score >= 300 ? 'Intermediate' : 'Novice';
       const levelColor = dotsResult.score >= 500 ? 'var(--danger)' : dotsResult.score >= 400 ? 'var(--warning)' : dotsResult.score >= 300 ? 'var(--accent)' : 'var(--text-muted)';
       dotsHtml = `
-        <div style="background: var(--bg-input); border-radius: var(--radius-sm); padding: 0.75rem; margin-top: 0.75rem;">
-          <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem; font-weight: 600;">DOTS Score</div>
-          <div style="display: flex; align-items: baseline; gap: 0.5rem;">
-            <span style="font-size: 1.5rem; font-weight: 800; color: var(--accent);">${dotsResult.score.toFixed(1)}</span>
-            <span style="font-size: 0.85rem; font-weight: 600; color: ${levelColor};">${level}</span>
+        <div class="dots-panel">
+          <div class="dots-heading">DOTS Score</div>
+          <div class="dots-score-row">
+            <span class="dots-score-value">${dotsResult.score.toFixed(1)}</span>
+            <span class="dots-level" style="color: ${levelColor};">${level}</span>
           </div>
-          <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.15rem;">Relative strength at ${rawBw} ${escapeHtml(bwUnit)} (${isMale ? 'male' : 'female'})</div>
+          <div class="dots-subtitle">Relative strength at ${rawBw} ${escapeHtml(bwUnit)} (${isMale ? 'male' : 'female'})</div>
         </div>
       `;
     }
@@ -768,19 +768,19 @@ export function renderOneRMEstimate(estimate: OneRMEstimate): void {
   if (compModeCheckbox?.checked && estimate.average > 0) {
     const plan = generateAttemptPlan(estimate.average, estimate.unit);
     attemptHtml = `
-      <div style="background: var(--bg-input); border-radius: var(--radius-sm); padding: 0.75rem; margin-top: 0.75rem;">
-        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; font-weight: 600;">Meet Attempt Plan</div>
-        <div style="display: flex; justify-content: space-between; padding: 0.25rem 0; font-size: 0.85rem;">
-          <span style="color: var(--text-secondary);">Opener (~88%)</span>
-          <span style="color: var(--success); font-weight: 700;">${plan.opener} ${escapeHtml(estimate.unit)}</span>
+      <div class="one-rm-panel">
+        <div class="one-rm-panel-heading">Meet Attempt Plan</div>
+        <div class="one-rm-row">
+          <span class="attempt-row-label">Opener (~88%)</span>
+          <span class="attempt-opener">${plan.opener} ${escapeHtml(estimate.unit)}</span>
         </div>
-        <div style="display: flex; justify-content: space-between; padding: 0.25rem 0; font-size: 0.85rem;">
-          <span style="color: var(--text-secondary);">2nd Attempt (~94%)</span>
-          <span style="color: var(--warning); font-weight: 700;">${plan.second} ${escapeHtml(estimate.unit)}</span>
+        <div class="one-rm-row">
+          <span class="attempt-row-label">2nd Attempt (~94%)</span>
+          <span class="attempt-second">${plan.second} ${escapeHtml(estimate.unit)}</span>
         </div>
-        <div style="display: flex; justify-content: space-between; padding: 0.25rem 0; font-size: 0.85rem;">
-          <span style="color: var(--text-secondary);">3rd Attempt (~100%)</span>
-          <span style="color: var(--danger); font-weight: 700;">${plan.third} ${escapeHtml(estimate.unit)}</span>
+        <div class="one-rm-row">
+          <span class="attempt-row-label">3rd Attempt (~100%)</span>
+          <span class="attempt-third">${plan.third} ${escapeHtml(estimate.unit)}</span>
         </div>
       </div>
     `;
@@ -788,20 +788,20 @@ export function renderOneRMEstimate(estimate: OneRMEstimate): void {
 
   section.innerHTML = `
     <details>
-      <summary style="cursor: pointer; font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; list-style: none; display: flex; align-items: center; gap: 0.35rem; user-select: none;">
-        <span style="font-size: 0.6rem; transition: transform 0.2s; display: inline-block;" class="collapse-chevron">&#9654;</span>
+      <summary class="one-rm-summary">
+        <span class="collapse-chevron" style="font-size: var(--font-2xs); transition: transform 0.2s; display: inline-block;">&#9654;</span>
         Estimated 1RM
       </summary>
-      <div style="margin-top: 0.75rem;">
-        <div style="text-align: center; margin-bottom: 1rem;">
-          <div style="font-size: 2rem; font-weight: 800; color: var(--accent);">${estimate.average} ${escapeHtml(estimate.unit)}</div>
-          <div style="font-size: 0.8rem; color: var(--text-muted);">Based on ${estimate.reps} reps at ${estimate.weight} ${escapeHtml(estimate.unit)}</div>
-          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Epley: ${estimate.epley} | Brzycki: ${estimate.brzycki}</div>
+      <div class="one-rm-content">
+        <div class="one-rm-hero">
+          <div class="one-rm-hero-value">${estimate.average} ${escapeHtml(estimate.unit)}</div>
+          <div class="one-rm-subtitle">Based on ${estimate.reps} reps at ${estimate.weight} ${escapeHtml(estimate.unit)}</div>
+          <div class="one-rm-methods">Epley: ${estimate.epley} | Brzycki: ${estimate.brzycki}</div>
         </div>
         ${dotsHtml}
         ${attemptHtml}
-        <div style="background: var(--bg-input); border-radius: var(--radius-sm); padding: 0.75rem; margin-top: 0.75rem;">
-          <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; font-weight: 600;">Training Percentages</div>
+        <div class="one-rm-panel">
+          <div class="one-rm-panel-heading">Training Percentages</div>
           ${tableRows}
         </div>
       </div>
@@ -958,7 +958,7 @@ export function renderFocusSection(analysis: SetAnalysis, fps: number = 0): void
     const focusFrame = findIssueFrame(analysis, topCue.issue);
     if (focusFrame !== null && fps > 0) {
       const timestampP = document.createElement('p');
-      timestampP.style.cssText = 'font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;';
+      timestampP.style.cssText = 'font-size: var(--font-sm); color: var(--text-muted); margin-top: 0.5rem;';
       timestampP.textContent = 'See this at ';
       timestampP.appendChild(createTimestampLink(focusFrame, fps));
       const focusWhy = focusDiv.querySelector('.focus-why');
@@ -1083,7 +1083,7 @@ export function renderPositiveFeedback(analysis: SetAnalysis): void {
     const overallScoreCard = $('overall-score-card');
     positiveSection = document.createElement('div');
     positiveSection.id = 'positive-feedback-section';
-    positiveSection.className = 'card positive-section';
+    positiveSection.className = 'card card--static positive-section';
     positiveSection.setAttribute('aria-label', 'What you did well');
     overallScoreCard.parentNode?.insertBefore(positiveSection, overallScoreCard.nextSibling);
   }
@@ -1126,7 +1126,7 @@ export function renderBeginnerSummary(analysis: SetAnalysis): void {
   const overallScoreCard = $('overall-score-card');
   const summaryDiv = document.createElement('div');
   summaryDiv.id = 'beginner-summary-section';
-  summaryDiv.className = 'card beginner-summary';
+  summaryDiv.className = 'card card--static beginner-summary';
   summaryDiv.setAttribute('aria-label', 'Session summary for beginners');
 
   // Positives: top 2-3 highlights
@@ -1305,7 +1305,7 @@ function renderRepCards(analysis: SetAnalysis): void {
       const shortName = formatShortIssueName(issue.name);
       const displayName = ISSUE_DISPLAY_NAMES[issue.name] ?? formatIssueName(issue.name);
       const severityLabel = issue.severity === 'high' ? 'H' : issue.severity === 'moderate' ? 'M' : 'L';
-      issueLabelsHtml += `<span class="issue-indicator" style="display: inline-flex; align-items: center; gap: 2px; font-size: 0.7rem; color: ${sColor};" title="${escapeHtml(displayName)} (${severityLabel})"><span class="issue-dot" style="background: ${sColor}" aria-hidden="true"></span>${escapeHtml(shortName)}<span style="font-size: 0.65rem; opacity: 0.8;">(${severityLabel})</span></span>`;
+      issueLabelsHtml += `<span class="issue-indicator" style="font-size: var(--font-caption); color: ${sColor};" title="${escapeHtml(displayName)} (${severityLabel})"><span class="issue-dot" style="background: ${sColor}" aria-hidden="true"></span>${escapeHtml(shortName)}<span style="font-size: var(--font-2xs); opacity: 0.8;">(${severityLabel})</span></span>`;
     }
 
     // Competition depth judgment
@@ -1469,7 +1469,7 @@ export function renderStickingPointIndicator(sp: StickingPoint): string {
         <div style="width: 4px; height: 30px; background: var(--bg-input, #222); border-radius: 2px; position: relative;">
           <div style="position: absolute; left: -2px; width: 8px; height: 3px; background: var(--danger, #f87171); border-radius: 1px; bottom: ${pct}%;" aria-hidden="true"></div>
         </div>
-        <span style="font-size: 0.7rem; color: var(--text-muted, #888);">Stick ${pct}%</span>
+        <span style="font-size: var(--font-caption); color: var(--text-muted);">Stick ${pct}%</span>
       </div>
     </div>
   `;
@@ -1511,7 +1511,7 @@ export function renderBarPathMini(barPath: BarPathData): string {
         <line x1="${midX}" y1="${padding}" x2="${midX}" y2="${height - padding}" stroke="var(--border, #333)" stroke-width="0.5" stroke-dasharray="2,2" />
         <polyline points="${points.join(' ')}" fill="none" stroke="${driftColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
-      <div style="font-size: 0.7rem; color: var(--text-muted, #888);">${(barPath.lateralDrift * 100).toFixed(0)}% drift</div>
+      <div style="font-size: var(--font-caption); color: var(--text-muted);">${(barPath.lateralDrift * 100).toFixed(0)}% drift</div>
     </div>
   `;
 }
@@ -1526,11 +1526,11 @@ export function renderVelocityMini(vel: VelocityMetrics, competitionMode: boolea
 
   let grindWarning = '';
   if (competitionMode && ratio < 0.5) {
-    grindWarning = `<span style="font-size: 0.7rem; color: var(--danger, #f87171);">Grinding</span>`;
+    grindWarning = `<span style="font-size: var(--font-caption); color: var(--danger);">Grinding</span>`;
   }
 
   return `
-    <div style="margin-top: 0.25rem; font-size: 0.7rem; color: var(--text-muted, #888);">
+    <div style="margin-top: 0.25rem; font-size: var(--font-caption); color: var(--text-muted);">
       <span title="Descent angular tempo">&darr;${vel.meanDescentVelocity}&deg;/s</span>
       <span title="Ascent angular tempo">&uarr;${vel.meanAscentVelocity}&deg;/s</span>
       <span style="color: ${ratioColor};" title="Tempo ratio">${ratio.toFixed(1)}x</span>
@@ -1552,7 +1552,7 @@ export function renderVelocityChart(analysis: SetAnalysis): void {
 
   const container = document.createElement('div');
   container.id = 'velocity-chart-section';
-  container.className = 'card velocity-chart-card';
+  container.className = 'card card--static velocity-chart-card';
 
   const velocities = analysis.reps.map(r => r.velocity?.meanAscentVelocity ?? 0);
   const maxVel = Math.max(...velocities, 1);
@@ -1602,20 +1602,20 @@ export function renderVelocityChart(analysis: SetAnalysis): void {
         return `<circle cx="${x}" cy="${y}" r="3" fill="${color}" />`;
       }).join('')}
     </svg>
-    <div style="display: grid; grid-template-columns: repeat(${velocities.length}, 1fr); font-size: 0.65rem; text-align: center; margin-top: 0.35rem; gap: 2px;">
+    <div class="velocity-data-grid" style="grid-template-columns: repeat(${velocities.length}, 1fr);">
       ${analysis.reps.map((r, i) => {
         const v = r.velocity;
         const rpe = rpeLabels[i] || '';
         const velColor = i === 0 ? 'var(--success)' : i === velocities.length - 1 ? (velocityLoss > 30 ? 'var(--danger)' : 'var(--accent)') : 'var(--text-secondary)';
         return `<div>
-          <div style="font-weight: 700; color: var(--text-muted);">R${i + 1}</div>
+          <div class="velocity-rep-label">R${i + 1}</div>
           <div style="color: ${velColor};" title="Mean ascent angular velocity">${v?.meanAscentVelocity ?? '-'}</div>
-          <div style="color: var(--text-muted);" title="Ascent/descent ratio">${v ? v.ascentDescentRatio.toFixed(1) + 'x' : '-'}</div>
-          ${rpe ? `<div style="color: var(--accent); font-size: 0.6rem;">${rpe}</div>` : ''}
+          <div class="velocity-rep-ratio" title="Ascent/descent ratio">${v ? v.ascentDescentRatio.toFixed(1) + 'x' : '-'}</div>
+          ${rpe ? `<div class="velocity-rpe-est">${rpe}</div>` : ''}
         </div>`;
       }).join('')}
     </div>
-    <div style="font-size: 0.6rem; color: var(--text-muted); text-align: right; margin-top: 0.15rem;">deg/s | ratio | est. RPE</div>
+    <div class="velocity-footer">deg/s | ratio | est. RPE</div>
     ${velocityLoss > 20 ? `<div class="velocity-advice">
       ${velocityLoss > 30
         ? 'Significant velocity drop — consider stopping 1-2 reps earlier next set for better quality reps.'
@@ -1649,14 +1649,14 @@ export function renderVelocityChart(analysis: SetAnalysis): void {
     }
 
     const rpeCompDiv = document.createElement('div');
-    rpeCompDiv.style.cssText = 'margin-top: 0.5rem; padding: 0.4rem 0.6rem; background: var(--bg-input); border-radius: var(--radius-sm, 6px); font-size: 0.8rem; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;';
+    rpeCompDiv.className = 'velocity-rpe-compare';
     rpeCompDiv.innerHTML = `
       <div>
-        <span style="color: var(--text-muted);">Your RPE:</span> <span style="color: var(--accent); font-weight: 700;">${userRpe}</span>
-        <span style="color: var(--text-muted); margin: 0 0.25rem;">|</span>
-        <span style="color: var(--text-muted);">Estimated:</span> <span style="color: var(--accent); font-weight: 700;">${estRpe}</span>
+        <span class="velocity-rpe-label">Your RPE:</span> <span class="velocity-rpe-value">${userRpe}</span>
+        <span class="velocity-rpe-label" style="margin: 0 0.25rem;">|</span>
+        <span class="velocity-rpe-label">Estimated:</span> <span class="velocity-rpe-value">${estRpe}</span>
       </div>
-      <div style="font-size: 0.7rem; color: ${diffAbs <= 0.5 ? 'var(--success)' : 'var(--warning)'};">${calibrationNote}</div>
+      <div class="velocity-calibration" style="color: ${diffAbs <= 0.5 ? 'var(--success)' : 'var(--warning)'};">${calibrationNote}</div>
     `;
     container.appendChild(rpeCompDiv);
   }
@@ -1694,16 +1694,16 @@ export function renderCoachingCues(analysis: SetAnalysis, fps: number = 0): void
     let progressionHtml = '';
     if (progressions.length > 0) {
       progressionHtml = `
-        <details style="margin-top: 0.5rem;">
-          <summary style="cursor: pointer; font-size: 0.75rem; color: var(--accent, #00d4ff); font-weight: 500;">Progression Path</summary>
-          <div class="progression-path" style="margin-top: 0.5rem; padding-left: 0.5rem; border-left: 2px solid var(--border, #333333);">
+        <details class="progression-details">
+          <summary>Progression Path</summary>
+          <div class="progression-path">
             ${progressions.map((p, idx) => `
-              <div style="display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.5rem; position: relative;">
-                <div style="width: 22px; height: 22px; border-radius: 50%; background: ${idx === 0 ? 'var(--accent, #00d4ff)' : idx === progressions.length - 1 ? 'var(--success, #4ade80)' : 'var(--warning, #fbbf24)'}; color: var(--bg-primary, #0a0a0a); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.65rem; flex-shrink: 0;">${idx + 1}</div>
+              <div class="progression-step">
+                <div class="progression-step-num" style="background: ${idx === 0 ? 'var(--accent)' : idx === progressions.length - 1 ? 'var(--success)' : 'var(--warning)'};">${idx + 1}</div>
                 <div>
-                  <div style="font-size: 0.75rem; color: var(--text-muted, #888); font-weight: 600;">${escapeHtml(p.level)}</div>
-                  <div style="font-size: 0.8rem; color: var(--text, #e0e0e0); font-weight: 600;">${escapeHtml(p.exercise)}</div>
-                  <div style="font-size: 0.7rem; color: var(--text-muted, #888);">${escapeHtml(p.criteria)}</div>
+                  <div class="progression-level">${escapeHtml(p.level)}</div>
+                  <div class="progression-exercise">${escapeHtml(p.exercise)}</div>
+                  <div class="progression-criteria">${escapeHtml(p.criteria)}</div>
                 </div>
               </div>
             `).join('')}
@@ -1719,7 +1719,7 @@ export function renderCoachingCues(analysis: SetAnalysis, fps: number = 0): void
       if (dbEntry?.alternateCues && dbEntry.alternateCues.length > 0) {
         const altText = dbEntry.alternateCues.map((alt) => `"${escapeHtml(alt)}"`).join(' or ');
         alternatesHtml = `
-          <div class="cue-alternates" style="font-size: 0.8rem; color: var(--text-muted, #888); margin-top: 0.25rem;">
+          <div class="cue-alternates">
             Also try: ${altText}
           </div>
         `;
@@ -1734,9 +1734,9 @@ export function renderCoachingCues(analysis: SetAnalysis, fps: number = 0): void
       <div class="cue-text">${escapeHtml(cue.cue)}</div>
       ${alternatesHtml}
       <div class="cue-explanation">${escapeHtml(cue.explanation)}</div>
-      <div class="cue-issue" style="display: flex; align-items: center; gap: 0.5rem;">
-        <span style="display: inline-flex; align-items: center; gap: 4px;">
-          <span style="width: 8px; height: 8px; border-radius: 50%; background: ${severitySColor}; display: inline-block;" aria-hidden="true"></span>
+      <div class="cue-issue">
+        <span class="issue-indicator">
+          <span class="issue-dot" style="background: ${severitySColor}" aria-hidden="true"></span>
           <span class="cue-priority" style="font-weight: 700; color: ${severitySColor};">${severityText}</span>
         </span>
         Issue: ${escapeHtml(displayName)}
@@ -1779,7 +1779,6 @@ export function renderCompetitionBadge(analysis: SetAnalysis): void {
   badge.id = 'competition-badge';
   badge.className = 'competition-badge';
   badge.setAttribute('aria-label', 'Competition mode active: IPF/USAPL judging standards applied');
-  badge.style.cssText = 'background: linear-gradient(135deg, #e11d48, #be123c); color: white; font-size: 0.85rem; font-weight: 700; padding: 0.65rem 1rem; border-radius: var(--radius-sm, 6px); text-transform: uppercase; letter-spacing: 1px; text-align: center; margin-bottom: 0.75rem; box-shadow: 0 2px 8px rgba(225, 29, 72, 0.3);';
   badge.innerHTML = 'Competition Mode &mdash; IPF/USAPL Standards';
 
   // Insert at the very top of the scores panel
@@ -1793,12 +1792,12 @@ export function renderCompetitionDepthJudgment(rep: RepScore, repIdx: number): s
   const depthPassed = rep.competitionDepthPass !== undefined ? rep.competitionDepthPass : rep.depthScore >= 80;
 
   if (depthPassed) {
-    return `<div class="competition-judgment good-lift" style="background: rgba(74, 222, 128, 0.1); border: 1px solid var(--success, #4ade80); border-radius: var(--radius-sm, 6px); padding: 0.5rem; text-align: center; margin-top: 0.5rem;" aria-label="Good lift">
-      <span style="color: var(--success, #4ade80); font-weight: 700; font-size: 1rem;">GOOD LIFT</span>
+    return `<div class="competition-judgment good-lift" aria-label="Good lift">
+      <span class="judgment-text" style="color: var(--success);">GOOD LIFT</span>
     </div>`;
   } else {
-    return `<div class="competition-judgment depth-call" style="background: rgba(248, 113, 113, 0.1); border: 1px solid var(--danger, #f87171); border-radius: var(--radius-sm, 6px); padding: 0.5rem; text-align: center; margin-top: 0.5rem;" aria-label="Depth call">
-      <span style="color: var(--danger, #f87171); font-weight: 700; font-size: 1rem;">DEPTH</span>
+    return `<div class="competition-judgment depth-call" aria-label="Depth call">
+      <span class="judgment-text" style="color: var(--danger);">DEPTH</span>
     </div>`;
   }
 }
@@ -1818,29 +1817,29 @@ export function renderMobilityAssessment(analysis: SetAnalysis): void {
 
   const section = document.createElement('div');
   section.id = 'mobility-section';
-  section.className = 'card mobility-section';
+  section.className = 'card card--static mobility-section';
   section.setAttribute('aria-label', 'Mobility assessment');
 
   let html = `
-    <h3 style="font-size: 0.9rem; color: var(--text-muted, #888); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem;">Mobility Assessment</h3>
-    <p style="font-size: 0.8rem; color: var(--text-muted, #888); margin-bottom: 1rem;">Based on your form, here are areas to work on</p>
+    <h3 class="mobility-heading">Mobility Assessment</h3>
+    <p class="mobility-subheading">Based on your form, here are areas to work on</p>
   `;
 
   for (const f of findings) {
     html += `
       <div class="mobility-finding mobility-card" style="padding: 0.85rem;">
-        <div style="font-weight: 700; color: var(--accent, #00d4ff); font-size: 0.95rem; margin-bottom: 0.25rem;">${escapeHtml(f.area)}</div>
-        <p style="font-size: 0.85rem; color: var(--text, #e0e0e0); margin-bottom: 0.5rem;">${escapeHtml(f.limitation)}</p>
+        <div class="mobility-area-title">${escapeHtml(f.area)}</div>
+        <p class="mobility-limitation">${escapeHtml(f.limitation)}</p>
         <details style="margin-bottom: 0.5rem;">
-          <summary style="cursor: pointer; font-size: 0.8rem; color: var(--accent, #00d4ff); font-weight: 500;">Self-test: Can you pass this?</summary>
-          <p style="font-size: 0.8rem; color: var(--text-muted, #888); margin-top: 0.35rem; padding: 0.5rem; background: var(--bg-input, #1e1e1e); border-radius: 6px;">${escapeHtml(f.test)}</p>
+          <summary class="mobility-test-summary">Self-test: Can you pass this?</summary>
+          <p class="mobility-test-content">${escapeHtml(f.test)}</p>
         </details>
         <div>
-          <strong style="font-size: 0.8rem; color: var(--text-muted, #888);">Recommended:</strong>
-          <ul style="margin: 0.25rem 0 0 1.25rem; font-size: 0.8rem; color: var(--text, #e0e0e0);">
-            ${f.stretches.map(s => `<li style="margin-bottom: 0.15rem;">${escapeHtml(s)}</li>`).join('')}
+          <strong class="mobility-rec-heading">Recommended:</strong>
+          <ul class="mobility-stretch-list">
+            ${f.stretches.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
           </ul>
-          <p style="font-size: 0.75rem; color: var(--accent, #00d4ff); margin-top: 0.35rem; font-weight: 500;">${escapeHtml(f.frequency)}</p>
+          <p class="mobility-frequency">${escapeHtml(f.frequency)}</p>
         </div>
       </div>
     `;
@@ -1870,25 +1869,25 @@ export function renderWarmUpProtocol(analysis: SetAnalysis): void {
 
   const section = document.createElement('div');
   section.id = 'warmup-section';
-  section.className = 'card';
+  section.className = 'card card--static';
   section.setAttribute('aria-label', 'Recommended warm-up');
 
   let html = `
     <details>
-      <summary style="cursor: pointer; font-size: 0.9rem; color: var(--text-muted, #888); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; list-style: none; display: flex; align-items: center; gap: 0.35rem;">
-        <span style="font-size: 0.6rem; transition: transform 0.2s;">&#9654;</span>
+      <summary class="warmup-summary">
+        <span class="collapse-chevron" style="font-size: var(--font-2xs); transition: transform 0.2s;">&#9654;</span>
         Recommended Warm-Up (~${totalMinutes} min)
       </summary>
-      <div style="margin-top: 0.75rem;">
+      <div class="warmup-content">
   `;
 
   protocol.forEach((step, i) => {
     html += `
-      <div class="warmup-step" style="margin-bottom: 0.65rem; padding: 0.5rem 0.65rem; background: var(--bg-input, #1e1e1e); border-radius: var(--radius-sm, 8px);">
-        <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--accent, #00d4ff); color: var(--bg-primary, #0a0a0a); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; flex-shrink: 0;">${i + 1}</div>
+      <div class="warmup-step warmup-step-card">
+        <div class="warmup-step-number">${i + 1}</div>
         <div style="flex: 1;">
-          <div style="font-weight: 600; font-size: 0.875rem; color: var(--text, #e0e0e0);">${escapeHtml(step.name)} <span style="color: var(--accent, #00d4ff); font-size: 0.75rem; font-weight: 500;">${escapeHtml(step.duration)}</span></div>
-          <p style="font-size: 0.8rem; color: var(--text-muted, #888); margin-top: 0.1rem;">${escapeHtml(step.description)}</p>
+          <div class="warmup-step-name-text">${escapeHtml(step.name)} <span class="warmup-step-duration">${escapeHtml(step.duration)}</span></div>
+          <p class="warmup-step-desc-text">${escapeHtml(step.description)}</p>
         </div>
       </div>
     `;
@@ -1896,7 +1895,7 @@ export function renderWarmUpProtocol(analysis: SetAnalysis): void {
 
   html += `
       </div>
-      <button id="start-warmup-btn" style="margin-top: 0.75rem; width: 100%; padding: 0.5rem; background: var(--accent, #00d4ff); color: var(--bg-primary, #0a0a0a); border: none; border-radius: var(--radius-sm, 8px); font-weight: 600; font-size: 0.875rem; cursor: pointer; transition: opacity 0.2s;">
+      <button id="start-warmup-btn" class="warmup-start-btn">
         Start Guided Warmup
       </button>
     </details>
@@ -2073,7 +2072,7 @@ export function renderShareButtons(analysis: SetAnalysis): void {
   section.id = 'share-section';
   section.style.cssText = 'display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;';
 
-  const btnStyle = 'background: var(--bg-input, #1e1e1e); border: 1px solid var(--border, #333333); color: var(--text, #e0e0e0); font-size: 0.8rem; cursor: pointer;';
+  const btnStyle = 'background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); font-size: var(--font-xs); cursor: pointer;';
 
   section.innerHTML = `
     <button class="btn btn-sm" id="share-link-btn" aria-label="Copy shareable link" style="${btnStyle}">Share Link</button>
@@ -2253,7 +2252,7 @@ function renderBeginnerFullReportToggle(analysis: SetAnalysis, fps: number, sess
   const btn = document.createElement('button');
   btn.className = 'btn btn-secondary';
   btn.textContent = 'Show Full Detailed Report';
-  btn.style.cssText = 'font-size: 0.85rem;';
+  btn.style.cssText = 'font-size: var(--font-sm);';
 
   btn.addEventListener('click', () => {
     // Render the hidden sections
@@ -2362,7 +2361,7 @@ function renderGamification(score: number, sessions: SessionRecord[]): void {
   container.style.cssText = 'background: rgba(74, 222, 128, 0.06); border: 1px solid rgba(74, 222, 128, 0.2); border-radius: var(--radius-md, 10px); padding: 0.75rem 1rem; margin: 0.5rem 0; text-align: center;';
 
   container.innerHTML = badges.map(b =>
-    `<div style="color: var(--success, #4ade80); font-size: 0.85rem; font-weight: 600; margin: 0.15rem 0;">&#127942; ${escapeHtml(b)}</div>`
+    `<div style="color: var(--success); font-size: var(--font-sm); font-weight: 600; margin: 0.15rem 0;">&#127942; ${escapeHtml(b)}</div>`
   ).join('');
 
   // Insert after overall score
