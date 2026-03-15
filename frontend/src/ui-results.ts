@@ -205,7 +205,7 @@ function renderTrainingRecommendations(
   recDiv.appendChild(phaseBadge);
 
   const desc = document.createElement('p');
-  desc.style.cssText = 'font-size: var(--font-sm); color: var(--text-secondary); margin: 0.25rem 0 0.75rem;';
+  desc.className = 'training-rec-desc';
   desc.textContent = PHASE_DESCRIPTIONS[activePhase];
   recDiv.appendChild(desc);
 
@@ -227,7 +227,7 @@ function renderTrainingRecommendations(
   if (rec.weightRange) {
     const weightInfo = document.createElement('div');
     weightInfo.className = 'training-rec-weight';
-    weightInfo.innerHTML = `<span style="color: var(--text-muted);">Target weight:</span> <span style="color: var(--accent); font-weight: 700;">${rec.weightRange[0]}-${rec.weightRange[1]} ${escapeHtml(rec.weightUnit ?? 'lbs')}</span>`;
+    weightInfo.innerHTML = `<span class="training-rec-weight-label">Target weight:</span> <span class="training-rec-weight-value">${rec.weightRange[0]}-${rec.weightRange[1]} ${escapeHtml(rec.weightUnit ?? 'lbs')}</span>`;
     recDiv.appendChild(weightInfo);
   }
 
@@ -251,7 +251,7 @@ function renderTrainingRecommendations(
     const suggestionDiv = document.createElement('div');
     suggestionDiv.className = 'training-rec-suggestion';
     const nextPhaseLabel = suggestion.phase.charAt(0).toUpperCase() + suggestion.phase.slice(1);
-    suggestionDiv.innerHTML = `<div class="training-rec-suggestion-label">Suggested Next Phase</div><div style="color: var(--text-primary); font-weight: 600;">${escapeHtml(nextPhaseLabel)}</div><div style="color: var(--text-secondary); margin-top: 0.2rem;">${escapeHtml(suggestion.reason)}</div>`;
+    suggestionDiv.innerHTML = `<div class="training-rec-suggestion-label">Suggested Next Phase</div><div class="training-rec-phase-label">${escapeHtml(nextPhaseLabel)}</div><div class="training-rec-reason">${escapeHtml(suggestion.reason)}</div>`;
     recDiv.appendChild(suggestionDiv);
   }
 
@@ -332,7 +332,7 @@ export function wrapInCollapsible(wrapperId: string, title: string, targetId: st
   });
 
   const content = document.createElement('div');
-  content.style.marginTop = '0.75rem';
+  content.className = 'collapsible-content';
 
   // Move the target element into the collapsible content
   target.parentNode?.insertBefore(wrapper, target);
@@ -674,7 +674,7 @@ export function renderScoreBreakdown(analysis: SetAnalysis): void {
     const level = score >= 90 ? 'Excellent' : score >= 80 ? 'Good' : score >= 70 ? 'Fair' : score >= 60 ? 'Needs Work' : 'Focus Here';
     const noteText = confidenceNotes[label] ?? '';
     const noteHtml = noteText
-      ? `<div class="confidence-note" style="font-size: var(--font-caption); color: var(--text-muted); font-style: italic; margin-top: 0.15rem;">${escapeHtml(noteText)}</div>`
+      ? `<div class="confidence-note">${escapeHtml(noteText)}</div>`
       : '';
     const displayLabel = isBegExp ? (BEGINNER_DIMENSION_LABELS[label] ?? label) : label;
     html += `
@@ -684,7 +684,7 @@ export function renderScoreBreakdown(analysis: SetAnalysis): void {
           <div class="score-bar-fill" style="width: ${score}%; background: ${color}"></div>
         </div>
         <span class="score-bar-value" style="color: ${color}">${score}</span>
-        <span class="score-bar-level" style="color: ${color}; font-size: var(--font-caption); min-width: 5.5em; text-align: left;">${level}</span>
+        <span class="score-bar-level" style="color: ${color}">${level}</span>
       </div>
       ${noteHtml}
     `;
@@ -789,7 +789,7 @@ export function renderOneRMEstimate(estimate: OneRMEstimate): void {
   section.innerHTML = `
     <details>
       <summary class="one-rm-summary">
-        <span class="collapse-chevron" style="font-size: var(--font-2xs); transition: transform 0.2s; display: inline-block;">&#9654;</span>
+        <span class="collapse-chevron">&#9654;</span>
         Estimated 1RM
       </summary>
       <div class="one-rm-content">
@@ -935,8 +935,8 @@ export function renderFocusSection(analysis: SetAnalysis, fps: number = 0): void
         <div class="focus-exercises">
           <h4>Try These Exercises</h4>
           ${exercises.map((ex: CorrectiveExercise) => `
-            <div class="exercise-card" style="display: flex; gap: 0.5rem; align-items: flex-start;">
-              ${ex.svg ? `<div style="flex-shrink: 0;">${ex.svg}</div>` : ''}
+            <div class="exercise-card corrective-exercise-card">
+              ${ex.svg ? `<div class="corrective-exercise-svg">${ex.svg}</div>` : ''}
               <div>
                 <strong>${escapeHtml(ex.name)}</strong> <span class="exercise-sets">${escapeHtml(ex.sets)}</span>${ex.videoUrl ? ` <a href="${escapeHtml(ex.videoUrl)}" target="_blank" rel="noopener" class="video-link" title="Watch demo video">&#9654; Watch</a>` : ''}
                 <p>${escapeHtml(ex.description)}</p>
@@ -958,7 +958,7 @@ export function renderFocusSection(analysis: SetAnalysis, fps: number = 0): void
     const focusFrame = findIssueFrame(analysis, topCue.issue);
     if (focusFrame !== null && fps > 0) {
       const timestampP = document.createElement('p');
-      timestampP.style.cssText = 'font-size: var(--font-sm); color: var(--text-muted); margin-top: 0.5rem;';
+      timestampP.className = 'focus-timestamp';
       timestampP.textContent = 'See this at ';
       timestampP.appendChild(createTimestampLink(focusFrame, fps));
       const focusWhy = focusDiv.querySelector('.focus-why');
@@ -1091,7 +1091,7 @@ export function renderPositiveFeedback(analysis: SetAnalysis): void {
   const highlights = analysis.positiveHighlights;
   positiveSection.style.display = 'block';
 
-  let html = '<h3 class="section-heading-sm" style="margin-bottom: 0.75rem;">What You Did Well</h3>';
+  let html = '<h3 class="section-heading-sm">What You Did Well</h3>';
 
   if (highlights.length === 0) {
     html += `
@@ -1133,7 +1133,7 @@ export function renderBeginnerSummary(analysis: SetAnalysis): void {
   const highlights = analysis.positiveHighlights.slice(0, 3);
   let positivesHtml = '';
   if (highlights.length > 0) {
-    positivesHtml = '<div style="margin-bottom: 0.75rem;"><h4 class="section-heading-sm" style="margin-bottom: 0.5rem;">What you did well</h4>';
+    positivesHtml = '<div class="beginner-positives-group"><h4 class="section-heading-sm">What you did well</h4>';
     for (const item of highlights) {
       positivesHtml += `<div class="positive-item"><span class="positive-item-icon" aria-hidden="true">&#10003;</span><span class="positive-item-text">${escapeHtml(item)}</span></div>`;
     }
@@ -1144,7 +1144,7 @@ export function renderBeginnerSummary(analysis: SetAnalysis): void {
   let focusHtml = '';
   if (analysis.topCues.length > 0) {
     const topCue = analysis.topCues[0];
-    focusHtml = `<div class="beginner-focus"><h4 class="section-heading-sm" style="margin-bottom: 0.5rem;">One thing to focus on</h4><div class="focus-cue">${escapeHtml(topCue.cue)}</div></div>`;
+    focusHtml = `<div class="beginner-focus"><h4 class="section-heading-sm">One thing to focus on</h4><div class="focus-cue">${escapeHtml(topCue.cue)}</div></div>`;
   }
 
   summaryDiv.innerHTML = positivesHtml + focusHtml;
@@ -1305,7 +1305,7 @@ function renderRepCards(analysis: SetAnalysis): void {
       const shortName = formatShortIssueName(issue.name);
       const displayName = ISSUE_DISPLAY_NAMES[issue.name] ?? formatIssueName(issue.name);
       const severityLabel = issue.severity === 'high' ? 'H' : issue.severity === 'moderate' ? 'M' : 'L';
-      issueLabelsHtml += `<span class="issue-indicator" style="font-size: var(--font-caption); color: ${sColor};" title="${escapeHtml(displayName)} (${severityLabel})"><span class="issue-dot" style="background: ${sColor}" aria-hidden="true"></span>${escapeHtml(shortName)}<span style="font-size: var(--font-2xs); opacity: 0.8;">(${severityLabel})</span></span>`;
+      issueLabelsHtml += `<span class="issue-indicator" style="color: ${sColor};" title="${escapeHtml(displayName)} (${severityLabel})"><span class="issue-dot" style="background: ${sColor}" aria-hidden="true"></span>${escapeHtml(shortName)}<span class="issue-severity-text">(${severityLabel})</span></span>`;
     }
 
     // Competition depth judgment
@@ -1464,12 +1464,12 @@ async function handleRepExport(
 export function renderStickingPointIndicator(sp: StickingPoint): string {
   const pct = Math.max(0, Math.min(100, sp.depthPercentage));
   return `
-    <div class="sticking-point-indicator" style="margin-top: 0.35rem; position: relative;" title="${escapeHtml(sp.description)}">
-      <div style="display: flex; align-items: center; gap: 0.25rem;">
-        <div style="width: 4px; height: 30px; background: var(--bg-input, #222); border-radius: 2px; position: relative;">
-          <div style="position: absolute; left: -2px; width: 8px; height: 3px; background: var(--danger, #f87171); border-radius: 1px; bottom: ${pct}%;" aria-hidden="true"></div>
+    <div class="sticking-point-indicator sticking-indicator" title="${escapeHtml(sp.description)}">
+      <div class="sticking-bar-container">
+        <div class="sticking-bar">
+          <div class="sticking-marker" style="bottom: ${pct}%;" aria-hidden="true"></div>
         </div>
-        <span style="font-size: var(--font-caption); color: var(--text-muted);">Stick ${pct}%</span>
+        <span class="sticking-label">Stick ${pct}%</span>
       </div>
     </div>
   `;
@@ -1506,12 +1506,12 @@ export function renderBarPathMini(barPath: BarPathData): string {
   const driftColor = barPath.lateralDrift < 0.02 ? 'var(--success)' : barPath.lateralDrift < 0.04 ? 'var(--warning)' : 'var(--danger)';
 
   return `
-    <div style="margin-top: 0.35rem; text-align: center;" title="Bar path: ${barPath.pathEfficiency}% efficient, ${(barPath.lateralDrift * 100).toFixed(1)}cm drift">
+    <div class="bar-path-display" title="Bar path: ${barPath.pathEfficiency}% efficient, ${(barPath.lateralDrift * 100).toFixed(1)}cm drift">
       <svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bar path visualization">
         <line x1="${midX}" y1="${padding}" x2="${midX}" y2="${height - padding}" stroke="var(--border, #333)" stroke-width="0.5" stroke-dasharray="2,2" />
         <polyline points="${points.join(' ')}" fill="none" stroke="${driftColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
-      <div style="font-size: var(--font-caption); color: var(--text-muted);">${(barPath.lateralDrift * 100).toFixed(0)}% drift</div>
+      <div class="bar-path-drift-label">${(barPath.lateralDrift * 100).toFixed(0)}% drift</div>
     </div>
   `;
 }
@@ -1526,11 +1526,11 @@ export function renderVelocityMini(vel: VelocityMetrics, competitionMode: boolea
 
   let grindWarning = '';
   if (competitionMode && ratio < 0.5) {
-    grindWarning = `<span style="font-size: var(--font-caption); color: var(--danger);">Grinding</span>`;
+    grindWarning = `<span class="grind-warning">Grinding</span>`;
   }
 
   return `
-    <div style="margin-top: 0.25rem; font-size: var(--font-caption); color: var(--text-muted);">
+    <div class="rep-tempo-info">
       <span title="Descent angular tempo">&darr;${vel.meanDescentVelocity}&deg;/s</span>
       <span title="Ascent angular tempo">&uarr;${vel.meanAscentVelocity}&deg;/s</span>
       <span style="color: ${ratioColor};" title="Tempo ratio">${ratio.toFixed(1)}x</span>
@@ -1653,7 +1653,7 @@ export function renderVelocityChart(analysis: SetAnalysis): void {
     rpeCompDiv.innerHTML = `
       <div>
         <span class="velocity-rpe-label">Your RPE:</span> <span class="velocity-rpe-value">${userRpe}</span>
-        <span class="velocity-rpe-label" style="margin: 0 0.25rem;">|</span>
+        <span class="velocity-rpe-label velocity-rpe-separator">|</span>
         <span class="velocity-rpe-label">Estimated:</span> <span class="velocity-rpe-value">${estRpe}</span>
       </div>
       <div class="velocity-calibration" style="color: ${diffAbs <= 0.5 ? 'var(--success)' : 'var(--warning)'};">${calibrationNote}</div>
@@ -1737,7 +1737,7 @@ export function renderCoachingCues(analysis: SetAnalysis, fps: number = 0): void
       <div class="cue-issue">
         <span class="issue-indicator">
           <span class="issue-dot" style="background: ${severitySColor}" aria-hidden="true"></span>
-          <span class="cue-priority" style="font-weight: 700; color: ${severitySColor};">${severityText}</span>
+          <span class="cue-priority" style="color: ${severitySColor};">${severityText}</span>
         </span>
         Issue: ${escapeHtml(displayName)}
       </div>
@@ -1793,11 +1793,11 @@ export function renderCompetitionDepthJudgment(rep: RepScore, repIdx: number): s
 
   if (depthPassed) {
     return `<div class="competition-judgment good-lift" aria-label="Good lift">
-      <span class="judgment-text" style="color: var(--success);">GOOD LIFT</span>
+      <span class="judgment-text">GOOD LIFT</span>
     </div>`;
   } else {
     return `<div class="competition-judgment depth-call" aria-label="Depth call">
-      <span class="judgment-text" style="color: var(--danger);">DEPTH</span>
+      <span class="judgment-text">DEPTH</span>
     </div>`;
   }
 }
@@ -1827,10 +1827,10 @@ export function renderMobilityAssessment(analysis: SetAnalysis): void {
 
   for (const f of findings) {
     html += `
-      <div class="mobility-finding mobility-card" style="padding: 0.85rem;">
+      <div class="mobility-finding mobility-card mobility-finding-card">
         <div class="mobility-area-title">${escapeHtml(f.area)}</div>
         <p class="mobility-limitation">${escapeHtml(f.limitation)}</p>
-        <details style="margin-bottom: 0.5rem;">
+        <details class="mobility-test-details">
           <summary class="mobility-test-summary">Self-test: Can you pass this?</summary>
           <p class="mobility-test-content">${escapeHtml(f.test)}</p>
         </details>
@@ -1875,7 +1875,7 @@ export function renderWarmUpProtocol(analysis: SetAnalysis): void {
   let html = `
     <details>
       <summary class="warmup-summary">
-        <span class="collapse-chevron" style="font-size: var(--font-2xs); transition: transform 0.2s;">&#9654;</span>
+        <span class="collapse-chevron">&#9654;</span>
         Recommended Warm-Up (~${totalMinutes} min)
       </summary>
       <div class="warmup-content">
@@ -1885,7 +1885,7 @@ export function renderWarmUpProtocol(analysis: SetAnalysis): void {
     html += `
       <div class="warmup-step warmup-step-card">
         <div class="warmup-step-number">${i + 1}</div>
-        <div style="flex: 1;">
+        <div class="warmup-step-flex">
           <div class="warmup-step-name-text">${escapeHtml(step.name)} <span class="warmup-step-duration">${escapeHtml(step.duration)}</span></div>
           <p class="warmup-step-desc-text">${escapeHtml(step.description)}</p>
         </div>
@@ -2070,16 +2070,14 @@ export function renderShareButtons(analysis: SetAnalysis): void {
 
   const section = document.createElement('div');
   section.id = 'share-section';
-  section.style.cssText = 'display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;';
-
-  const btnStyle = 'background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); font-size: var(--font-xs); cursor: pointer;';
+  section.className = 'share-buttons-row';
 
   section.innerHTML = `
-    <button class="btn btn-sm" id="share-link-btn" aria-label="Copy shareable link" style="${btnStyle}">Share Link</button>
-    <button class="btn btn-sm" id="save-image-btn" aria-label="Save result as image" style="${btnStyle}">Save Image</button>
-    <button class="btn btn-sm" id="export-analysis-csv-btn" aria-label="Export this analysis as CSV" style="${btnStyle}">Export CSV</button>
-    <button class="btn btn-sm" id="copy-report-btn" aria-label="Copy text report to clipboard" style="${btnStyle}">Copy Report</button>
-    <button class="btn btn-sm" id="print-report-btn" aria-label="Print or save report as PDF" style="${btnStyle}">Print Report</button>
+    <button class="btn btn-sm share-btn" id="share-link-btn" aria-label="Copy shareable link">Share Link</button>
+    <button class="btn btn-sm share-btn" id="save-image-btn" aria-label="Save result as image">Save Image</button>
+    <button class="btn btn-sm share-btn" id="export-analysis-csv-btn" aria-label="Export this analysis as CSV">Export CSV</button>
+    <button class="btn btn-sm share-btn" id="copy-report-btn" aria-label="Copy text report to clipboard">Copy Report</button>
+    <button class="btn btn-sm share-btn" id="print-report-btn" aria-label="Print or save report as PDF">Print Report</button>
   `;
 
   scoresPanel.appendChild(section);
@@ -2247,12 +2245,11 @@ function renderBeginnerFullReportToggle(analysis: SetAnalysis, fps: number, sess
 
   const container = document.createElement('div');
   container.id = 'beginner-full-report';
-  container.style.cssText = 'text-align: center; margin: 1rem 0;';
+  container.className = 'beginner-full-report-toggle';
 
   const btn = document.createElement('button');
   btn.className = 'btn btn-secondary';
   btn.textContent = 'Show Full Detailed Report';
-  btn.style.cssText = 'font-size: var(--font-sm);';
 
   btn.addEventListener('click', () => {
     // Render the hidden sections
@@ -2357,11 +2354,10 @@ function renderGamification(score: number, sessions: SessionRecord[]): void {
 
   const container = document.createElement('div');
   container.id = 'gamification-section';
-  container.className = 'milestone-banner';
-  container.style.cssText = 'background: rgba(74, 222, 128, 0.06); border: 1px solid rgba(74, 222, 128, 0.2); border-radius: var(--radius-md, 10px); padding: 0.75rem 1rem; margin: 0.5rem 0; text-align: center;';
+  container.className = 'milestone-banner gamification-section';
 
   container.innerHTML = badges.map(b =>
-    `<div style="color: var(--success); font-size: var(--font-sm); font-weight: 600; margin: 0.15rem 0;">&#127942; ${escapeHtml(b)}</div>`
+    `<div class="gamification-badge-item">&#127942; ${escapeHtml(b)}</div>`
   ).join('');
 
   // Insert after overall score
