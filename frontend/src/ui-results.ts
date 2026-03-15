@@ -40,6 +40,12 @@ import { CUE_DATABASE } from './issues';
 import { loadGoals, saveGoals, checkGoals } from './goals';
 import { WarmupTimer, getStepDuration } from './warmup-timer';
 import type { TimerState } from './warmup-timer';
+import { exportRepClip, downloadClip, shareClip } from './gif-export';
+import type { ClipExportOptions } from './gif-export';
+
+// Module-level state for clip export (set by showResults)
+let _clipExportFps = 0;
+let _clipExportAnalysis: SetAnalysis | null = null;
 
 // ─── Progress Insights (session-history-aware coaching) ───
 
@@ -314,6 +320,10 @@ export function showResults(analysis: SetAnalysis, frameData: FrameData, session
   hideProgress();
   hideError();
   hideSkeletonLoading();
+
+  // Store for clip export handlers
+  _clipExportFps = fps;
+  _clipExportAnalysis = analysis;
 
   const section = $('results-section');
   section.style.display = 'block';
@@ -1220,7 +1230,17 @@ function renderRepCards(analysis: SetAnalysis): void {
       ${stickingHtml}
       ${barPathHtml}
       ${velocityHtml}
+      <button class="btn btn-sm rep-export-btn" data-rep-index="${i}" title="Export video clip for this rep">Export Clip</button>
     `;
+
+    // Wire up clip export button (stop propagation so card click/seek doesn't fire)
+    const exportBtn = card.querySelector('.rep-export-btn') as HTMLButtonElement;
+    if (exportBtn) {
+      exportBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handleRepExport(exportBtn, i, analysis);
+      });
+    }
 
     // Support keyboard activation
     card.addEventListener('keydown', (e) => {
@@ -1232,6 +1252,83 @@ function renderRepCards(analysis: SetAnalysis): void {
 
     grid.appendChild(card);
   });
+}
+
+// ─── Rep Clip Export Handler ───
+
+async function handleRepExport(
+  btn: HTMLButtonElement,
+  repIndex: number,
+  analysis: SetAnalysis,
+): Promise<void> {
+  const fps = _clipExportFps;
+  if (fps <= 0) return;
+
+  const video = document.getElementById('result-video') as HTMLVideoElement | null;
+  const canvas = document.getElementById('overlay-canvas') as HTMLCanvasElement | null;
+  if (!video || !canvas) return;
+
+  // Calculate time range from repStartFrames
+  const frameInterval = 1 / fps;
+  const startFrame = analysis.repStartFrames[repIndex];
+  if (startFrame === undefined) return;
+
+  // End frame: either the start of the next rep, or infer from repFrameMap
+  let endFrame: number;
+  if (repIndex < analysis.repStartFrames.length - 1) {
+    endFrame = analysis.repStartFrames[repIndex + 1];
+  } else {
+    // Last rep: find the max frame in repFrameMap that belongs to this rep
+    let maxFrame = startFrame;
+    for (const [frame, idx] of analysis.repFrameMap) {
+      if (idx === repIndex && frame > maxFrame) {
+        maxFrame = frame;
+      }
+    }
+    endFrame = maxFrame + 1; // include the last frame
+  }
+
+  const startTime = startFrame * frameInterval;
+  const endTime = endFrame * frameInterval;
+
+  if (startTime >= endTime) return;
+
+  // Show loading state
+  const originalText = btn.textContent;
+  btn.textContent = 'Exporting...';
+  btn.classList.add('exporting');
+
+  // Save current video time to restore after export
+  const savedTime = video.currentTime;
+  const wasPaused = video.paused;
+
+  try {
+    const clip = await exportRepClip(
+      { video, canvas, startTime, endTime, fps },
+      repIndex,
+    );
+
+    // Use share on mobile, download on desktop
+    const filename = `rep-${repIndex + 1}.webm`;
+    await shareClip(clip, `rep-${repIndex + 1}`);
+
+    btn.textContent = 'Exported!';
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.classList.remove('exporting');
+    }, 2000);
+  } catch (err) {
+    console.error('Clip export failed:', err);
+    btn.textContent = 'Failed';
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.classList.remove('exporting');
+    }, 2000);
+  } finally {
+    // Restore video position
+    video.currentTime = savedTime;
+    if (!wasPaused) video.play();
+  }
 }
 
 // ─── Sticking Point Indicator ───

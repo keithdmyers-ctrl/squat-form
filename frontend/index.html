@@ -1398,6 +1398,26 @@
       gap: 2px;
     }
 
+    .rep-export-btn {
+      font-size: 0.7rem;
+      padding: 0.2rem 0.5rem;
+      background: var(--bg-input);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      margin-top: 0.25rem;
+      transition: var(--transition-fast);
+    }
+    .rep-export-btn:hover {
+      background: var(--accent);
+      color: var(--bg-primary);
+    }
+    .rep-export-btn.exporting {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
     /* -- Coaching Cues -- */
     .coaching-section h3 {
       font-size: 0.9rem;
