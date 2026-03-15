@@ -12,6 +12,11 @@ cd frontend && npx vite build        # Production build
 cd frontend && npx tsc --noEmit      # Type check
 cd frontend && npx vitest run        # Run tests (865+)
 
+# iOS (Capacitor)
+cd frontend && npm run ios:build    # Build web + sync to iOS
+cd frontend && npm run ios:open     # Open Xcode project
+cd frontend && npm run ios:run      # Build + sync + run on device/sim
+
 # Backend (Python)
 cd tests && python -m pytest -v      # Run all tests (260+)
 cd tests && python -m pytest -k "test_name" -v  # Single test

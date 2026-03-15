@@ -53,6 +53,7 @@ import {
   setSelectedFile,
   setQuickStartPending,
 } from './upload-mode';
+import { initNativePlatform, hapticNotification } from './native';
 
 // ─── DOM Elements ───
 const videoInput = document.getElementById('video-input') as HTMLInputElement;
@@ -80,6 +81,10 @@ let currentObjectUrl: string | null = null;
 /** Cached frame data and fps for re-analysis without re-running pose detection. */
 let cachedFrameData: FrameData | null = null;
 let cachedFps: number = 0;
+
+// ─── Initialize Native Platform ───
+
+initNativePlatform();
 
 // ─── Initialize Settings ───
 

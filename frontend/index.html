@@ -4330,6 +4330,38 @@
       z-index: 5;
       pointer-events: none;
     }
+    /* ===== Native App (Capacitor) Overrides ===== */
+    .native-app {
+      /* Extra top padding for iOS status bar */
+      padding-top: env(safe-area-inset-top, 0);
+      /* Disable text selection for native feel */
+      -webkit-user-select: none;
+      user-select: none;
+      /* Disable pull-to-refresh */
+      overscroll-behavior: none;
+    }
+    .native-app input,
+    .native-app textarea,
+    .native-app select {
+      -webkit-user-select: text;
+      user-select: text;
+    }
+    .ios-app {
+      /* iOS-specific font smoothing */
+      -webkit-font-smoothing: antialiased;
+    }
+    /* Hide web-only elements in native app */
+    .native-app .pwa-install-prompt,
+    .native-app .offline-status {
+      display: none;
+    }
+    /* Native app gets slightly larger touch targets */
+    .native-app .btn {
+      min-height: 48px;
+    }
+    .native-app .btn-sm {
+      min-height: 40px;
+    }
   </style>
 </head>
 <body>
