@@ -1,7 +1,8 @@
 /**
  * Deadlift live mode strategy.
- * Uses hip angle for phase detection, matching the DeadliftPhaseDetector
- * pattern from exercises/deadlift.ts.
+ * Uses hip angle for phase detection with live-specific re-descending logic.
+ * Delegates scoring, issue detection, and cue generation to exercises/deadlift.ts
+ * to avoid duplicating that logic.
  */
 
 import { SquatPhase } from './types';
@@ -12,14 +13,25 @@ import type {
   RepData,
   RepScore,
   ExperienceLevel,
-  FormIssue,
-  CoachingCue,
+  DeadliftType,
 } from './types';
 import type { LiveExerciseStrategy } from './live';
 import { clamp, scoreToGrade, scoreTempo } from './scorer';
-import { computeVelocityMetrics } from './competition';
+import type { DeadliftConfig } from './exercises/deadlift';
+import {
+  scoreBackPosition,
+  scoreHipHinge,
+  scoreDeadliftLockout,
+  scoreDeadliftSymmetry,
+  scoreDeadliftControl,
+  detectDeadliftIssues,
+  getDeadliftCues,
+  getDeadliftPositiveFeedback,
+  DEADLIFT_WEIGHTS,
+  DEADLIFT_COMPETITION_WEIGHTS,
+} from './exercises/deadlift';
 
-// ─── Hip-angle driven phase detector (mirrors exercises/deadlift.ts) ───
+// ─── Hip-angle driven phase detector (live-specific with re-descending) ───
 
 const STANDING_HIP_ANGLE = 160;
 const DESCENDING_THRESHOLD = 2.0;
@@ -107,253 +119,6 @@ class LiveDeadliftPhaseDetector {
   }
 }
 
-// ─── Deadlift Scoring (replicates exercises/deadlift.ts scoring logic) ───
-
-type DeadliftType = 'conventional' | 'sumo' | 'romanian';
-
-const DEADLIFT_TRUNK_RANGES: Record<DeadliftType, [number, number]> = {
-  conventional: [35, 65],
-  sumo: [25, 50],
-  romanian: [30, 55],
-};
-
-const DEADLIFT_WEIGHTS = {
-  backPosition: 0.25,
-  hipHinge: 0.20,
-  lockout: 0.20,
-  symmetry: 0.10,
-  tempo: 0.10,
-  control: 0.15,
-};
-
-const DEADLIFT_COMPETITION_WEIGHTS = {
-  backPosition: 0.25,
-  hipHinge: 0.20,
-  lockout: 0.30,
-  symmetry: 0.10,
-  tempo: 0.00,
-  control: 0.15,
-};
-
-const HIP_HINGE_THRESHOLDS: Record<ExperienceLevel, number> = {
-  beginner: 100,
-  intermediate: 85,
-  advanced: 75,
-};
-
-function scoreBackPosition(maxTrunkAngle: number, dlType: DeadliftType, experienceLevel: ExperienceLevel): number {
-  const [minExpected, maxExpected] = DEADLIFT_TRUNK_RANGES[dlType];
-  const tolerance = experienceLevel === 'advanced' ? 10 : experienceLevel === 'intermediate' ? 15 : 20;
-  if (maxTrunkAngle >= minExpected && maxTrunkAngle <= maxExpected) return 100;
-  let deviation: number;
-  if (maxTrunkAngle < minExpected) deviation = minExpected - maxTrunkAngle;
-  else deviation = maxTrunkAngle - maxExpected;
-  if (deviation <= tolerance) return clamp(100 - (deviation / tolerance) * 15, 0, 100);
-  return clamp(85 - (deviation - tolerance) * 1.5, 0, 100);
-}
-
-function scoreHipHinge(minHipAngle: number, experienceLevel: ExperienceLevel): number {
-  const threshold = HIP_HINGE_THRESHOLDS[experienceLevel];
-  if (minHipAngle <= threshold - 20) return 100;
-  if (minHipAngle <= threshold) {
-    const frac = (minHipAngle - (threshold - 20)) / 20;
-    return clamp(100 - frac * 20, 0, 100);
-  }
-  const over = minHipAngle - threshold;
-  return clamp(80 - over * 2, 0, 100);
-}
-
-function scoreDeadliftLockout(rep: RepData, calibration: CalibrationData | null): number {
-  const lastAngles = rep.frameAngles.slice(-5);
-  if (lastAngles.length === 0) return 50;
-  const finalHipAngle = Math.max(...lastAngles.map(fa => fa.hipAngle));
-  const standingHip = calibration?.standingHipAngle ?? 175;
-  const diff = Math.abs(finalHipAngle - standingHip);
-  if (diff <= 10) return 100;
-  if (diff <= 20) return clamp(100 - ((diff - 10) / 10) * 25, 0, 100);
-  return clamp(75 - (diff - 20) * 1.5, 0, 100);
-}
-
-function scoreDeadliftSymmetry(rep: RepData): number {
-  const symmetryValues = rep.frameAngles.map(fa => fa.hipSymmetry).filter((v): v is number => v !== null);
-  if (symmetryValues.length === 0) return 90;
-  const maxAsymmetry = Math.max(...symmetryValues);
-  if (maxAsymmetry < 0.05) return 100;
-  if (maxAsymmetry < 0.10) return clamp(100 - ((maxAsymmetry - 0.05) / 0.05) * 15, 0, 100);
-  if (maxAsymmetry < 0.20) return clamp(85 - ((maxAsymmetry - 0.10) / 0.10) * 25, 0, 100);
-  return clamp(60 - (maxAsymmetry - 0.20) * 100, 0, 100);
-}
-
-function scoreDeadliftControl(rep: RepData): number {
-  const bottomRelIdx = rep.frameAngles.length > 0
-    ? rep.frameAngles.reduce((minI, fa, i, arr) => fa.hipAngle < arr[minI].hipAngle ? i : minI, 0)
-    : 0;
-  const ascentAngles = rep.frameAngles.slice(bottomRelIdx).map(fa => fa.hipAngle);
-  let reversals = 0;
-  for (let i = 2; i < ascentAngles.length; i++) {
-    const prev = ascentAngles[i - 1] - ascentAngles[i - 2];
-    const curr = ascentAngles[i] - ascentAngles[i - 1];
-    if (prev > 1 && curr < -2) reversals++;
-  }
-  if (reversals === 0) return 100;
-  if (reversals === 1) return 80;
-  return clamp(60 - (reversals - 1) * 15, 0, 100);
-}
-
-// ─── Issue Detection ───
-
-function detectDeadliftIssues(
-  rep: RepData,
-  dlType: DeadliftType,
-  experienceLevel: ExperienceLevel,
-  competitionMode: boolean,
-): FormIssue[] {
-  const issues: FormIssue[] = [];
-  const [, maxExpected] = DEADLIFT_TRUNK_RANGES[dlType];
-  const tolerance = experienceLevel === 'advanced' ? 10 : 15;
-
-  if (rep.maxTrunkAngle > maxExpected + tolerance) {
-    issues.push({
-      name: 'rounded_back',
-      severity: rep.maxTrunkAngle > maxExpected + tolerance * 2 ? 'high' : 'moderate',
-      description: 'Your back rounded excessively during the lift',
-      value: rep.maxTrunkAngle,
-      threshold: maxExpected + tolerance,
-      phase: SquatPhase.ASCENDING,
-      frame: rep.bottomFrame,
-    });
-  }
-
-  const bottomRelIdx = rep.frameAngles.reduce((minI, fa, i, arr) =>
-    fa.hipAngle < arr[minI].hipAngle ? i : minI, 0);
-  const ascentTrunkAngles = rep.frameAngles.slice(bottomRelIdx).map(fa => fa.trunkAngle);
-  if (ascentTrunkAngles.length >= 3) {
-    const trunkAtStart = ascentTrunkAngles[0] ?? 0;
-    const earlyTrunk = ascentTrunkAngles.slice(0, Math.ceil(ascentTrunkAngles.length * 0.4));
-    const maxEarlyTrunk = earlyTrunk.length > 0 ? Math.max(...earlyTrunk) : trunkAtStart;
-    const trunkIncrease = maxEarlyTrunk - trunkAtStart;
-    if (trunkIncrease > 10) {
-      issues.push({
-        name: 'hip_shoot',
-        severity: trunkIncrease > 20 ? 'high' : 'moderate',
-        description: 'Your hips shot up before your shoulders during the pull',
-        value: trunkIncrease,
-        threshold: 10,
-        phase: SquatPhase.ASCENDING,
-        frame: rep.bottomFrame,
-      });
-    }
-  }
-
-  const ascentHipAngles = rep.frameAngles.slice(bottomRelIdx).map(fa => fa.hipAngle);
-  let hitchCount = 0;
-  for (let i = 2; i < ascentHipAngles.length; i++) {
-    const prev = ascentHipAngles[i - 1] - ascentHipAngles[i - 2];
-    const curr = ascentHipAngles[i] - ascentHipAngles[i - 1];
-    if (prev > 1 && curr < -2) hitchCount++;
-  }
-  if (hitchCount > 0) {
-    issues.push({
-      name: 'hitching',
-      severity: hitchCount > 1 ? 'high' : 'moderate',
-      description: 'The bar stopped or reversed direction during the pull',
-      value: hitchCount,
-      threshold: 0,
-      phase: SquatPhase.ASCENDING,
-      frame: rep.bottomFrame,
-    });
-  }
-
-  const lastAngles = rep.frameAngles.slice(-5);
-  const finalHipAngle = lastAngles.length > 0 ? Math.max(...lastAngles.map(fa => fa.hipAngle)) : 0;
-  if (finalHipAngle < 160) {
-    issues.push({
-      name: 'incomplete_lockout',
-      severity: finalHipAngle < 145 ? 'moderate' : 'low',
-      description: 'Didn\'t fully lock out at the top \u2014 hips should be fully extended',
-      value: finalHipAngle,
-      threshold: 160,
-      phase: SquatPhase.STANDING,
-      frame: rep.endFrame,
-    });
-  }
-
-  const hingeThreshold = HIP_HINGE_THRESHOLDS[experienceLevel];
-  if (rep.minHipAngle > hingeThreshold) {
-    issues.push({
-      name: 'insufficient_rom',
-      severity: rep.minHipAngle > hingeThreshold + 15 ? 'moderate' : 'low',
-      description: dlType === 'romanian'
-        ? 'Didn\'t hinge deep enough \u2014 lower the bar until you feel a hamstring stretch'
-        : 'Didn\'t hinge down far enough to the bar',
-      value: rep.minHipAngle,
-      threshold: hingeThreshold,
-      phase: SquatPhase.BOTTOM,
-      frame: rep.bottomFrame,
-    });
-  }
-
-  return issues;
-}
-
-// ─── Coaching Cues ───
-
-const DEADLIFT_CUE_DATABASE: Record<string, { cue: string; priority: number; explanation: string }> = {
-  rounded_back: {
-    cue: 'Pack your lats \u2014 pull the bar into your body',
-    priority: 1,
-    explanation: 'Your back is rounding during the pull.',
-  },
-  hip_shoot: {
-    cue: 'Push the floor away \u2014 don\'t lift the bar, push your feet through the floor',
-    priority: 2,
-    explanation: 'Your hips rose faster than your shoulders.',
-  },
-  hitching: {
-    cue: 'Drive your hips through in one smooth motion',
-    priority: 1,
-    explanation: 'The bar stopped or reversed during the pull.',
-  },
-  incomplete_lockout: {
-    cue: 'Squeeze your glutes and stand tall at the top',
-    priority: 3,
-    explanation: 'You didn\'t fully extend your hips at the top.',
-  },
-  insufficient_rom: {
-    cue: 'Hinge deeper \u2014 push your hips back further',
-    priority: 4,
-    explanation: 'You\'re not hinging deep enough.',
-  },
-};
-
-function getDeadliftCues(issues: FormIssue[]): CoachingCue[] {
-  const cueMap = new Map<string, CoachingCue>();
-  for (const issue of issues) {
-    const entry = DEADLIFT_CUE_DATABASE[issue.name];
-    if (!entry || cueMap.has(issue.name)) continue;
-    cueMap.set(issue.name, { issue: issue.name, cue: entry.cue, priority: entry.priority, explanation: entry.explanation });
-  }
-  return Array.from(cueMap.values()).sort((a, b) => a.priority - b.priority);
-}
-
-function getDeadliftPositiveFeedback(scores: {
-  backPosition: number;
-  hipHinge: number;
-  lockout: number;
-  symmetry: number;
-  tempo: number;
-  control: number;
-}): string[] {
-  const feedback: string[] = [];
-  if (scores.backPosition >= 90) feedback.push('Great back position \u2014 stayed neutral throughout');
-  if (scores.hipHinge >= 90) feedback.push('Good hip hinge depth');
-  if (scores.lockout >= 90) feedback.push('Strong lockout at the top');
-  if (scores.symmetry >= 90) feedback.push('Even pull \u2014 nice and balanced');
-  if (scores.control >= 90) feedback.push('Smooth, controlled pull \u2014 no hitching');
-  if (scores.tempo >= 90) feedback.push('Good tempo and control');
-  return feedback;
-}
-
 // ─── Strategy Implementation ───
 
 export class DeadliftLiveStrategy implements LiveExerciseStrategy {
@@ -370,6 +135,15 @@ export class DeadliftLiveStrategy implements LiveExerciseStrategy {
     this.dlType = dlType;
     this.experienceLevel = experienceLevel;
     this.competitionMode = competitionMode;
+  }
+
+  /** Build a DeadliftConfig from the strategy's parameters for use with exercise scoring functions. */
+  private getConfig(): DeadliftConfig {
+    return {
+      deadliftType: this.dlType,
+      experienceLevel: this.experienceLevel,
+      competitionMode: this.competitionMode,
+    };
   }
 
   detectPhase(angles: FrameAngles): SquatPhase {
@@ -397,9 +171,11 @@ export class DeadliftLiveStrategy implements LiveExerciseStrategy {
     config: SquatConfig,
     calibration: CalibrationData | null,
   ): RepScore {
+    const dlConfig = this.getConfig();
     const isCompetition = this.competitionMode;
-    const backPosition = scoreBackPosition(rep.maxTrunkAngle, this.dlType, this.experienceLevel);
-    const hipHinge = scoreHipHinge(rep.minHipAngle, this.experienceLevel);
+
+    const backPosition = scoreBackPosition(rep.maxTrunkAngle, dlConfig, calibration);
+    const hipHinge = scoreHipHinge(rep.minHipAngle, dlConfig);
     const lockout = scoreDeadliftLockout(rep, calibration);
     const symmetry = scoreDeadliftSymmetry(rep);
     const tempo = isCompetition ? 100 : scoreTempo(rep.descentDuration, rep.bottomDuration, rep.ascentDuration);
@@ -419,8 +195,8 @@ export class DeadliftLiveStrategy implements LiveExerciseStrategy {
       0, 100,
     );
 
-    const issues = detectDeadliftIssues(rep, this.dlType, this.experienceLevel, isCompetition);
-    const cues = getDeadliftCues(issues);
+    const issues = detectDeadliftIssues(rep, dlConfig, calibration);
+    const cues = getDeadliftCues(issues, this.experienceLevel);
     const positiveFeedback = getDeadliftPositiveFeedback({
       backPosition, hipHinge, lockout, symmetry, tempo, control,
     });

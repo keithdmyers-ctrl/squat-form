@@ -242,6 +242,10 @@ export interface RepScore {
   competitionDepthMargin?: number;
   /** Average landmark confidence across all frames in this rep (0-1). */
   avgConfidence?: number;
+  /** Exercise-specific score dimensions with semantic names. */
+  dimensions?: Record<string, number>;
+  /** The exercise type this rep was analyzed for. */
+  exerciseType?: string;
   /** Raw angle summaries for data export. */
   minKneeAngle?: number;
   maxTrunkAngle?: number;

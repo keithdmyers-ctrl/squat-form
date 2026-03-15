@@ -29,7 +29,8 @@ import {
 import { detectRepIssues, getCuesForIssues } from './issues';
 import { detectStickingPoints, computeVelocityMetrics } from './competition';
 import { assessMobility, generateWarmupProtocol } from './mobility';
-import { SquatPhase, severityRank } from './types';
+import { detectFatigue, aggregateTopIssues, aggregatePositiveFeedback } from './exercise-core';
+import { SquatPhase } from './types';
 import type {
   Landmarks,
   FrameAngles,
@@ -40,7 +41,6 @@ import type {
   RepData,
   RepScore,
   SetAnalysis,
-  FormIssue,
 } from './types';
 
 // ─── Public Interfaces ───
@@ -530,50 +530,11 @@ export class LiveAnalyzer {
     const avgScore = this.repScores.reduce((s, r) => s + r.overallScore, 0) / this.repScores.length;
     const overallScore = clamp(Math.round(avgScore), 0, 100);
 
-    // Fatigue detection
-    let fatigueDetected = false;
-    if (this.repScores.length >= 4) {
-      const first2Avg = (this.repScores[0].overallScore + this.repScores[1].overallScore) / 2;
-      const last2Avg = (
-        this.repScores[this.repScores.length - 2].overallScore +
-        this.repScores[this.repScores.length - 1].overallScore
-      ) / 2;
-      fatigueDetected = first2Avg - last2Avg > 15;
-    }
-
-    // Collect top issues
-    const allIssues = this.repScores.flatMap((r) => r.issues);
-    const issueCountMap = new Map<string, { issue: FormIssue; count: number }>();
-    for (const issue of allIssues) {
-      const existing = issueCountMap.get(issue.name);
-      if (existing) {
-        existing.count++;
-        if (severityRank(issue.severity) > severityRank(existing.issue.severity)) {
-          existing.issue = issue;
-        }
-      } else {
-        issueCountMap.set(issue.name, { issue, count: 1 });
-      }
-    }
-
-    const topIssues = Array.from(issueCountMap.values())
-      .sort((a, b) => {
-        const sevDiff = severityRank(b.issue.severity) - severityRank(a.issue.severity);
-        if (sevDiff !== 0) return sevDiff;
-        return b.count - a.count;
-      })
-      .slice(0, 3)
-      .map((e) => e.issue);
-
+    // Use shared utilities from exercise-core.ts
+    const fatigueDetected = detectFatigue(this.repScores);
+    const topIssues = aggregateTopIssues(this.repScores);
     const topCues = getCuesForIssues(topIssues);
-
-    // Collect positive highlights
-    const positiveSet = new Set<string>();
-    for (const rep of this.repScores) {
-      for (const fb of rep.positiveFeedback) {
-        positiveSet.add(fb);
-      }
-    }
+    const positiveHighlights = aggregatePositiveFeedback(this.repScores);
 
     const mobilityFindings = assessMobility(topIssues, this.config.experienceLevel);
     const warmupProtocol = generateWarmupProtocol(topIssues, this.config.experienceLevel);
@@ -590,7 +551,7 @@ export class LiveAnalyzer {
       config: this.config,
       repFrameMap: new Map(),
       repStartFrames: [],
-      positiveHighlights: Array.from(positiveSet),
+      positiveHighlights,
       mobilityFindings,
       warmupProtocol,
       competitionMode: this.config.competitionMode,

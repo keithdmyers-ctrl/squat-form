@@ -162,7 +162,7 @@ function detectBenchReps(elbowAngles: number[]): RepRange[] {
 
 // ─── Bench Scoring ───
 
-const BENCH_WEIGHTS = {
+export const BENCH_WEIGHTS = {
   rom: 0.25,
   lockout: 0.20,
   control: 0.20,
@@ -171,7 +171,7 @@ const BENCH_WEIGHTS = {
   pause: 0.10,
 };
 
-const BENCH_COMPETITION_WEIGHTS = {
+export const BENCH_COMPETITION_WEIGHTS = {
   rom: 0.25,
   lockout: 0.25,
   control: 0.15,
@@ -181,13 +181,13 @@ const BENCH_COMPETITION_WEIGHTS = {
 };
 
 /** Minimum elbow angle thresholds (lower = deeper ROM). */
-const BENCH_ROM_THRESHOLDS: Record<ExperienceLevel, number> = {
+export const BENCH_ROM_THRESHOLDS: Record<ExperienceLevel, number> = {
   beginner: 100,       // Partial range OK
   intermediate: 85,    // Near chest
   advanced: 75,        // Touch chest / full ROM
 };
 
-function scoreBenchROM(minElbowAngle: number, config: BenchConfig): number {
+export function scoreBenchROM(minElbowAngle: number, config: BenchConfig): number {
   const threshold = BENCH_ROM_THRESHOLDS[config.experienceLevel];
   if (minElbowAngle <= threshold - 15) return 100;
   if (minElbowAngle <= threshold) {
@@ -198,7 +198,7 @@ function scoreBenchROM(minElbowAngle: number, config: BenchConfig): number {
   return clamp(80 - over * 2, 0, 100);
 }
 
-function scoreBenchLockout(rep: RepData): number {
+export function scoreBenchLockout(rep: RepData): number {
   const lastAngles = rep.frameAngles.slice(-5);
   if (lastAngles.length === 0) return 50;
 
@@ -209,7 +209,7 @@ function scoreBenchLockout(rep: RepData): number {
 }
 
 /** Control score: smooth press without jerking. */
-function scoreBenchControl(rep: RepData): number {
+export function scoreBenchControl(rep: RepData): number {
   const elbowAngles = rep.frameAngles.map(fa => fa.elbowAngle ?? 180);
   const bottomRelIdx = elbowAngles.reduce((minI, a, i, arr) => a < arr[minI] ? i : minI, 0);
   const ascentAngles = elbowAngles.slice(bottomRelIdx);
@@ -227,7 +227,7 @@ function scoreBenchControl(rep: RepData): number {
 }
 
 /** Symmetry: left vs right shoulder/elbow evenness (uses hip symmetry as proxy). */
-function scoreBenchSymmetry(rep: RepData): number {
+export function scoreBenchSymmetry(rep: RepData): number {
   const symmetryValues = rep.frameAngles.map(fa => fa.hipSymmetry).filter((v): v is number => v !== null);
   if (symmetryValues.length === 0) return 90;
   const maxAsymmetry = Math.max(...symmetryValues);
@@ -238,7 +238,7 @@ function scoreBenchSymmetry(rep: RepData): number {
 }
 
 /** Tempo score for bench press. */
-function scoreBenchTempo(descentDuration: number, ascentDuration: number): number {
+export function scoreBenchTempo(descentDuration: number, ascentDuration: number): number {
   let score = 100;
   // Descent: ideal 1.0-3.0s
   if (descentDuration < 0.8) score -= Math.min(20, (0.8 - descentDuration) * 25);
@@ -249,7 +249,7 @@ function scoreBenchTempo(descentDuration: number, ascentDuration: number): numbe
 }
 
 /** Pause at bottom score (competition: must have a clear pause). */
-function scoreBenchPause(bottomDuration: number, config: BenchConfig): number {
+export function scoreBenchPause(bottomDuration: number, config: BenchConfig): number {
   if (config.competitionMode) {
     // Competition requires a clear pause
     if (bottomDuration >= 0.5) return 100;
@@ -264,7 +264,7 @@ function scoreBenchPause(bottomDuration: number, config: BenchConfig): number {
 
 // ─── Bench Issue Detection ───
 
-function detectBenchIssues(
+export function detectBenchIssues(
   rep: RepData,
   config: BenchConfig,
 ): FormIssue[] {
@@ -427,7 +427,7 @@ const BENCH_CUE_DATABASE: Record<string, { cue: string; priority: number; explan
   },
 };
 
-function getBenchCues(issues: FormIssue[], experienceLevel?: string): CoachingCue[] {
+export function getBenchCues(issues: FormIssue[], experienceLevel?: string): CoachingCue[] {
   const cueMap = new Map<string, CoachingCue>();
   for (const issue of issues) {
     const entry = BENCH_CUE_DATABASE[issue.name];
@@ -441,7 +441,7 @@ function getBenchCues(issues: FormIssue[], experienceLevel?: string): CoachingCu
 
 // ─── Positive Feedback ───
 
-function getBenchPositiveFeedback(scores: {
+export function getBenchPositiveFeedback(scores: {
   rom: number;
   lockout: number;
   control: number;

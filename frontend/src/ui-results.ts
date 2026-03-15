@@ -1,6 +1,6 @@
 /**
- * Results display: overall score, score breakdown, coaching cues,
- * rep cards, milestones, mobility, warm-up, share buttons.
+ * Results display: overall score, score breakdown, rep cards, milestones,
+ * gamification, share buttons. Orchestrator for all results sub-modules.
  */
 
 import type {
@@ -11,12 +11,9 @@ import type {
   BarPathData,
   VelocityMetrics,
   SessionRecord,
-  WarmUpStep,
 } from './types';
 import type { OneRMEstimate } from './one-rm';
 import { WEIGHTS, COMPETITION_WEIGHTS } from './scorer';
-import { getCorrectiveExercises, getExerciseProgressions } from './cues';
-import type { CorrectiveExercise } from './cues';
 import {
   escapeHtml,
   $,
@@ -30,52 +27,29 @@ import {
 import { hideProgress, hideError, hideSkeletonLoading } from './ui-progress';
 import { encodeAnalysisUrl, generateShareCard } from './share';
 import type { TrainingPhase } from './programming';
-import {
-  getRecommendation,
-  suggestNextPhase,
-  PHASE_DESCRIPTIONS,
-} from './programming';
 import { exportAnalysisCSV, downloadCSV } from './csv-export';
-import { CUE_DATABASE } from './issues';
 import { loadGoals, saveGoals, checkGoals } from './goals';
-import { WarmupTimer, getStepDuration } from './warmup-timer';
-import type { TimerState } from './warmup-timer';
 import { exportRepClip, downloadClip, shareClip } from './gif-export';
 import type { ClipExportOptions } from './gif-export';
-import { computeDOTS } from './one-rm';
-import { generateAttemptPlan } from './competition';
 
-// ─── Beginner-Friendly Labels ───
+// ─── Imports from sub-modules ───
 
-const BEGINNER_DIMENSION_LABELS: Record<string, string> = {
-  'Depth': 'How Deep You Went',
-  'Knee Tracking': 'Knee Position',
-  'Trunk Position': 'Upper Body Position',
-  'Trunk': 'Upper Body Position',
-  'Torso Position': 'Upper Body Position',
-  'Symmetry': 'Balance (Left vs Right)',
-  'Tempo': 'Speed Control',
-  'Lockout': 'Standing Up Fully',
-  'ROM': 'Range of Motion',
-  'Back Position': 'Back Position',
-  'Row ROM': 'Pull Range',
-  'Control': 'Movement Control',
-  'Torso Stability': 'Core Stability',
-  'Overhead Stability': 'Overhead Control',
-  'Press Path': 'Bar Path',
-  'Balance': 'Balance',
-};
+import {
+  renderCoachingCues,
+  renderPositiveFeedback,
+  renderBeginnerSummary,
+  renderFocusSection,
+  BEGINNER_DIMENSION_LABELS,
+  beginnerSeverity,
+} from './ui-coaching';
+import { renderTrainingRecommendations, renderOneRMEstimate } from './ui-training';
+import { renderMobilityAssessment, renderWarmUpProtocol } from './ui-warmup-mobility';
 
-/** Convert technical severity labels to beginner-friendly ones. */
-function beginnerSeverity(priority: number): string {
-  if (priority <= 1) return 'Fix First';
-  if (priority <= 3) return 'Work On';
-  return 'Minor';
-}
+// ─── Re-exports from sub-modules ───
 
-// Module-level state for clip export (set by showResults)
-let _clipExportFps = 0;
-let _clipExportAnalysis: SetAnalysis | null = null;
+export { renderCoachingCues, renderPositiveFeedback, renderBeginnerSummary, renderFocusSection, BEGINNER_DIMENSION_LABELS, beginnerSeverity } from './ui-coaching';
+export { renderTrainingRecommendations, renderOneRMEstimate } from './ui-training';
+export { renderMobilityAssessment, renderWarmUpProtocol } from './ui-warmup-mobility';
 
 // ─── Progress Insights (session-history-aware coaching) ───
 
@@ -166,108 +140,6 @@ function renderProgressInsights(analysis: SetAnalysis, sessions: SessionRecord[]
   }
 }
 
-// ─── Training Recommendations ───
-
-function renderTrainingRecommendations(
-  phase?: TrainingPhase,
-  oneRMEstimate?: OneRMEstimate | null,
-  sessions?: SessionRecord[],
-  exerciseType?: string,
-): void {
-  const existing = document.getElementById('training-recommendations');
-  if (existing) existing.remove();
-
-  const activePhase = phase ?? 'hypertrophy';
-  const rec = getRecommendation(activePhase, oneRMEstimate?.average, exerciseType, oneRMEstimate?.unit);
-
-  const recDiv = document.createElement('div');
-  recDiv.id = 'training-recommendations';
-  recDiv.className = 'card card--static training-rec-card';
-  recDiv.setAttribute('aria-label', 'Training recommendations');
-
-  const phaseColors: Record<string, string> = {
-    hypertrophy: 'var(--accent)',
-    strength: 'var(--warning)',
-    peaking: 'var(--danger)',
-    deload: 'var(--success)',
-  };
-  const phaseColor = phaseColors[activePhase] ?? 'var(--accent)';
-
-  const heading = document.createElement('h4');
-  heading.className = 'section-heading-sm';
-  heading.textContent = 'Training Recommendations';
-  recDiv.appendChild(heading);
-
-  const phaseBadge = document.createElement('div');
-  phaseBadge.className = 'phase-badge-inline';
-  phaseBadge.style.background = phaseColor;
-  phaseBadge.textContent = activePhase.charAt(0).toUpperCase() + activePhase.slice(1) + ' Phase';
-  recDiv.appendChild(phaseBadge);
-
-  const desc = document.createElement('p');
-  desc.className = 'training-rec-desc';
-  desc.textContent = PHASE_DESCRIPTIONS[activePhase];
-  recDiv.appendChild(desc);
-
-  const grid = document.createElement('div');
-  grid.className = 'training-rec-grid';
-  for (const item of [
-    { label: 'Sets', value: String(rec.sets) },
-    { label: 'Reps', value: rec.reps },
-    { label: 'Intensity', value: rec.intensity },
-    { label: 'Rest', value: rec.restMinutes + ' min' },
-  ]) {
-    const cell = document.createElement('div');
-    cell.className = 'training-rec-cell';
-    cell.innerHTML = `<div class="training-rec-cell-label">${escapeHtml(item.label)}</div><div class="training-rec-cell-value">${escapeHtml(item.value)}</div>`;
-    grid.appendChild(cell);
-  }
-  recDiv.appendChild(grid);
-
-  if (rec.weightRange) {
-    const weightInfo = document.createElement('div');
-    weightInfo.className = 'training-rec-weight';
-    weightInfo.innerHTML = `<span class="training-rec-weight-label">Target weight:</span> <span class="training-rec-weight-value">${rec.weightRange[0]}-${rec.weightRange[1]} ${escapeHtml(rec.weightUnit ?? 'lbs')}</span>`;
-    recDiv.appendChild(weightInfo);
-  }
-
-  if (rec.focusAreas.length > 0) {
-    const focusHeading = document.createElement('div');
-    focusHeading.className = 'section-heading-xs';
-    focusHeading.textContent = 'Focus Areas';
-    recDiv.appendChild(focusHeading);
-    const focusList = document.createElement('ul');
-    focusList.className = 'training-rec-focus-list';
-    for (const area of rec.focusAreas) {
-      const li = document.createElement('li');
-      li.textContent = area;
-      focusList.appendChild(li);
-    }
-    recDiv.appendChild(focusList);
-  }
-
-  if (sessions && sessions.length > 0) {
-    const suggestion = suggestNextPhase(sessions.map(s => ({ score: s.overall_score, date: s.date })));
-    const suggestionDiv = document.createElement('div');
-    suggestionDiv.className = 'training-rec-suggestion';
-    const nextPhaseLabel = suggestion.phase.charAt(0).toUpperCase() + suggestion.phase.slice(1);
-    suggestionDiv.innerHTML = `<div class="training-rec-suggestion-label">Suggested Next Phase</div><div class="training-rec-phase-label">${escapeHtml(nextPhaseLabel)}</div><div class="training-rec-reason">${escapeHtml(suggestion.reason)}</div>`;
-    recDiv.appendChild(suggestionDiv);
-  }
-
-  const section = document.getElementById('results-section');
-  if (section) {
-    const progressInsights = document.getElementById('progress-insights');
-    const coachingSection = document.getElementById('coaching-section');
-    const insertAfter = progressInsights ?? coachingSection;
-    if (insertAfter?.parentNode) {
-      insertAfter.parentNode.insertBefore(recDiv, insertAfter.nextSibling);
-    } else {
-      section.appendChild(recDiv);
-    }
-  }
-}
-
 // ─── Score count-up animation ───
 
 export function animateScoreCountUp(
@@ -341,6 +213,10 @@ export function wrapInCollapsible(wrapperId: string, title: string, targetId: st
   details.appendChild(content);
   wrapper.appendChild(details);
 }
+
+// Module-level state for clip export (set by showResults)
+let _clipExportFps = 0;
+let _clipExportAnalysis: SetAnalysis | null = null;
 
 // ─── Results Display ───
 
@@ -628,27 +504,50 @@ function renderSetConfidence(analysis: SetAnalysis): void {
   container.appendChild(el);
 }
 
+/** Map a camelCase dimension key to a human-readable label. */
+function dimensionKeyToLabel(key: string): string {
+  const DIMENSION_KEY_LABELS: Record<string, string> = {
+    depth: 'Depth', kneeTracking: 'Knee Tracking', trunk: 'Torso Position',
+    symmetry: 'Symmetry', tempo: 'Tempo', lockout: 'Lockout',
+    backPosition: 'Back Position', hipHinge: 'Hip Hinge', control: 'Control',
+    rom: 'Range of Motion', pause: 'Pause', overheadStability: 'Overhead Stability',
+    pressPath: 'Press Path', rowRom: 'Row ROM', torsoStability: 'Torso Stability',
+    balance: 'Balance',
+  };
+  return DIMENSION_KEY_LABELS[key] ?? key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+}
+
 export function renderScoreBreakdown(analysis: SetAnalysis): void {
   const container = $('score-breakdown');
 
-  // Calculate average dimension scores across all reps
-  // In competition mode, skip tempo display
-  type ScoreKey = 'depthScore' | 'kneeTrackingScore' | 'trunkScore' | 'symmetryScore' | 'tempoScore' | 'lockoutScore';
-  const dims: { label: string; key: ScoreKey }[] = [
-    { label: 'Depth', key: 'depthScore' },
-    { label: 'Knee Tracking', key: 'kneeTrackingScore' },
-    { label: 'Torso Position', key: 'trunkScore' },
-    { label: 'Balance', key: 'symmetryScore' },
-    ...(analysis.competitionMode ? [] : [{ label: 'Control', key: 'tempoScore' as ScoreKey }]),
-    { label: 'Lockout', key: 'lockoutScore' },
-  ];
+  // Use semantic dimensions if available, otherwise legacy fields
+  const hasDimensions = analysis.reps.length > 0 && analysis.reps[0].dimensions != null;
+  let avgScores: { label: string; score: number }[];
 
-  const avgScores = dims.map((d) => {
-    if (analysis.reps.length === 0) return { ...d, score: 0 };
-    const avg =
-      analysis.reps.reduce((s, r) => s + (r[d.key] as number), 0) / analysis.reps.length;
-    return { ...d, score: Math.round(avg) };
-  });
+  if (hasDimensions) {
+    const dimKeys = Object.keys(analysis.reps[0].dimensions!);
+    avgScores = dimKeys
+      .filter(k => !(analysis.competitionMode && k === 'tempo'))
+      .map(k => {
+        const avg = analysis.reps.reduce((s, r) => s + (r.dimensions?.[k] ?? 0), 0) / analysis.reps.length;
+        return { label: dimensionKeyToLabel(k), score: Math.round(avg) };
+      });
+  } else {
+    type ScoreKey = 'depthScore' | 'kneeTrackingScore' | 'trunkScore' | 'symmetryScore' | 'tempoScore' | 'lockoutScore';
+    const dims: { label: string; key: ScoreKey }[] = [
+      { label: 'Depth', key: 'depthScore' },
+      { label: 'Knee Tracking', key: 'kneeTrackingScore' },
+      { label: 'Torso Position', key: 'trunkScore' },
+      { label: 'Balance', key: 'symmetryScore' },
+      ...(analysis.competitionMode ? [] : [{ label: 'Control', key: 'tempoScore' as ScoreKey }]),
+      { label: 'Lockout', key: 'lockoutScore' },
+    ];
+    avgScores = dims.map((d) => {
+      if (analysis.reps.length === 0) return { label: d.label, score: 0 };
+      const avg = analysis.reps.reduce((s, r) => s + (r[d.key] as number), 0) / analysis.reps.length;
+      return { label: d.label, score: Math.round(avg) };
+    });
+  }
 
   // Keep the title
   let html = '<h3>Score Breakdown</h3>';
@@ -709,125 +608,6 @@ export function renderScoreBreakdown(analysis: SetAnalysis): void {
   container.innerHTML = html;
 }
 
-// ─── 1RM Estimation Card ───
-
-export function renderOneRMEstimate(estimate: OneRMEstimate): void {
-  const scoresPanel = document.querySelector('.scores-panel');
-  if (!scoresPanel) return;
-
-  // Remove existing
-  const existing = document.getElementById('one-rm-section');
-  if (existing) existing.remove();
-
-  const section = document.createElement('div');
-  section.id = 'one-rm-section';
-  section.className = 'card card--static';
-  section.setAttribute('aria-label', `Estimated one rep max: ${estimate.average} ${escapeHtml(estimate.unit)}`);
-
-  const tableRows = estimate.percentageTable
-    .filter(row => row.percent <= 95 && row.percent >= 60)
-    .map(row => `
-      <div class="one-rm-row">
-        <span class="one-rm-row-label">${row.percent}%</span>
-        <span class="one-rm-row-value">${row.weight} ${escapeHtml(estimate.unit)}</span>
-      </div>
-    `).join('');
-
-  // DOTS score: read bodyweight and sex from DOM
-  let dotsHtml = '';
-  const bwInput = document.getElementById('bodyweight-input') as HTMLInputElement | null;
-  const bwUnitSelect = document.getElementById('bodyweight-unit') as HTMLSelectElement | null;
-  const rawBw = bwInput ? parseFloat(bwInput.value) : 0;
-  const bwUnit = bwUnitSelect?.value ?? 'kg';
-  if (rawBw > 0 && estimate.average > 0) {
-    const isMaleBtn = document.querySelector('.sex-toggle-btn.active') as HTMLElement | null;
-    const isMale = isMaleBtn?.dataset.sex !== 'female';
-    // Convert to kg if needed for DOTS computation
-    const bwKg = bwUnit === 'lbs' ? rawBw * 0.453592 : rawBw;
-    const totalKg = estimate.unit === 'lbs' ? estimate.average * 0.453592 : estimate.average;
-    const dotsResult = computeDOTS(totalKg, bwKg, isMale);
-    if (dotsResult) {
-      const level = dotsResult.score >= 500 ? 'Elite' : dotsResult.score >= 400 ? 'Advanced' : dotsResult.score >= 300 ? 'Intermediate' : 'Novice';
-      const levelColor = dotsResult.score >= 500 ? 'var(--danger)' : dotsResult.score >= 400 ? 'var(--warning)' : dotsResult.score >= 300 ? 'var(--accent)' : 'var(--text-muted)';
-      dotsHtml = `
-        <div class="dots-panel">
-          <div class="dots-heading">DOTS Score</div>
-          <div class="dots-score-row">
-            <span class="dots-score-value">${dotsResult.score.toFixed(1)}</span>
-            <span class="dots-level" style="color: ${levelColor};">${level}</span>
-          </div>
-          <div class="dots-subtitle">Relative strength at ${rawBw} ${escapeHtml(bwUnit)} (${isMale ? 'male' : 'female'})</div>
-        </div>
-      `;
-    }
-  }
-
-  // Competition attempt plan
-  let attemptHtml = '';
-  const compModeCheckbox = document.getElementById('competition-mode') as HTMLInputElement | null;
-  if (compModeCheckbox?.checked && estimate.average > 0) {
-    const plan = generateAttemptPlan(estimate.average, estimate.unit);
-    attemptHtml = `
-      <div class="one-rm-panel">
-        <div class="one-rm-panel-heading">Meet Attempt Plan</div>
-        <div class="one-rm-row">
-          <span class="attempt-row-label">Opener (~88%)</span>
-          <span class="attempt-opener">${plan.opener} ${escapeHtml(estimate.unit)}</span>
-        </div>
-        <div class="one-rm-row">
-          <span class="attempt-row-label">2nd Attempt (~94%)</span>
-          <span class="attempt-second">${plan.second} ${escapeHtml(estimate.unit)}</span>
-        </div>
-        <div class="one-rm-row">
-          <span class="attempt-row-label">3rd Attempt (~100%)</span>
-          <span class="attempt-third">${plan.third} ${escapeHtml(estimate.unit)}</span>
-        </div>
-      </div>
-    `;
-  }
-
-  section.innerHTML = `
-    <details>
-      <summary class="one-rm-summary">
-        <span class="collapse-chevron">&#9654;</span>
-        Estimated 1RM
-      </summary>
-      <div class="one-rm-content">
-        <div class="one-rm-hero">
-          <div class="one-rm-hero-value">${estimate.average} ${escapeHtml(estimate.unit)}</div>
-          <div class="one-rm-subtitle">Based on ${estimate.reps} reps at ${estimate.weight} ${escapeHtml(estimate.unit)}</div>
-          <div class="one-rm-methods">Epley: ${estimate.epley} | Brzycki: ${estimate.brzycki}</div>
-        </div>
-        ${dotsHtml}
-        ${attemptHtml}
-        <div class="one-rm-panel">
-          <div class="one-rm-panel-heading">Training Percentages</div>
-          ${tableRows}
-        </div>
-      </div>
-    </details>
-  `;
-
-  // Toggle chevron
-  const details = section.querySelector('details');
-  if (details) {
-    details.addEventListener('toggle', () => {
-      const chevron = section.querySelector('.collapse-chevron') as HTMLElement | null;
-      if (chevron) {
-        chevron.style.transform = details.open ? 'rotate(90deg)' : 'rotate(0deg)';
-      }
-    });
-  }
-
-  // Insert after breakdown collapse
-  const breakdownCollapse = document.getElementById('breakdown-collapse');
-  if (breakdownCollapse) {
-    breakdownCollapse.parentNode?.insertBefore(section, breakdownCollapse.nextSibling);
-  } else {
-    scoresPanel.appendChild(section);
-  }
-}
-
 // ─── Score Legend (collapsible) ───
 
 export function renderScoreLegend(analysis: SetAnalysis): void {
@@ -861,118 +641,6 @@ export function renderScoreLegend(analysis: SetAnalysis): void {
   `;
 
   container.appendChild(details);
-}
-
-// ─── Focus Section ("What to Work on Next") ───
-
-// ─── Video Timestamp Helpers ───
-
-/** Convert a frame number to a formatted timestamp string like "0:12". */
-function formatTimestamp(frame: number, fps: number): string {
-  if (fps <= 0) return '';
-  const totalSeconds = Math.round(frame / fps);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, '0')}`;
-}
-
-/** Find the frame number for a given issue name from the analysis topIssues array. */
-function findIssueFrame(analysis: SetAnalysis, issueName: string): number | null {
-  const issue = analysis.topIssues.find((i) => i.name === issueName);
-  return issue ? issue.frame : null;
-}
-
-/** Create a clickable timestamp element that seeks the video to a specific frame. */
-function createTimestampLink(frame: number, fps: number): HTMLSpanElement {
-  const el = document.createElement('span');
-  el.className = 'cue-timestamp';
-  el.dataset.frame = String(frame);
-  el.textContent = `[${formatTimestamp(frame, fps)}]`;
-  el.title = 'Click to see this moment in the video';
-  el.setAttribute('role', 'button');
-  el.setAttribute('tabindex', '0');
-  el.addEventListener('click', () => {
-    const video = document.getElementById('result-video') as HTMLVideoElement | null;
-    if (video && fps > 0) {
-      video.currentTime = frame / fps;
-      video.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  });
-  el.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      el.click();
-    }
-  });
-  return el;
-}
-
-export function renderFocusSection(analysis: SetAnalysis, fps: number = 0): void {
-  const scoresPanel = document.querySelector('.scores-panel');
-  if (!scoresPanel) return;
-
-  // Remove existing focus section
-  const existing = document.getElementById('focus-section');
-  if (existing) existing.remove();
-
-  const focusDiv = document.createElement('div');
-  focusDiv.id = 'focus-section';
-
-  if (analysis.topCues.length === 0) {
-    focusDiv.className = 'focus-section focus-great';
-    focusDiv.setAttribute('aria-label', 'Your form looks great');
-    focusDiv.innerHTML = '<h3>Your #1 Focus</h3><p>Your form looks great! Keep practicing to maintain it.</p>';
-  } else {
-    focusDiv.className = 'focus-section';
-    focusDiv.setAttribute('aria-label', 'Your top priority this session');
-
-    const topCue = analysis.topCues[0];
-    const exercises = getCorrectiveExercises(topCue.issue);
-
-    let exercisesHtml = '';
-    if (exercises.length > 0) {
-      exercisesHtml = `
-        <div class="focus-exercises">
-          <h4>Try These Exercises</h4>
-          ${exercises.map((ex: CorrectiveExercise) => `
-            <div class="exercise-card corrective-exercise-card">
-              ${ex.svg ? `<div class="corrective-exercise-svg">${ex.svg}</div>` : ''}
-              <div>
-                <strong>${escapeHtml(ex.name)}</strong> <span class="exercise-sets">${escapeHtml(ex.sets)}</span>${ex.videoUrl ? ` <a href="${escapeHtml(ex.videoUrl)}" target="_blank" rel="noopener" class="video-link" title="Watch demo video">&#9654; Watch</a>` : ''}
-                <p>${escapeHtml(ex.description)}</p>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      `;
-    }
-
-    focusDiv.innerHTML = `
-      <h3>Your #1 Focus</h3>
-      <p class="focus-cue">${escapeHtml(topCue.cue)}</p>
-      <p class="focus-why">${escapeHtml(topCue.explanation)}</p>
-      ${exercisesHtml}
-    `;
-
-    // Add video timestamp link if fps is available
-    const focusFrame = findIssueFrame(analysis, topCue.issue);
-    if (focusFrame !== null && fps > 0) {
-      const timestampP = document.createElement('p');
-      timestampP.className = 'focus-timestamp';
-      timestampP.textContent = 'See this at ';
-      timestampP.appendChild(createTimestampLink(focusFrame, fps));
-      const focusWhy = focusDiv.querySelector('.focus-why');
-      if (focusWhy) {
-        focusWhy.after(timestampP);
-      } else {
-        focusDiv.appendChild(timestampP);
-      }
-    }
-  }
-
-  // Insert before coaching section (Tier 2: action items grouped together)
-  const coachingSection = $('coaching-section');
-  coachingSection.parentNode?.insertBefore(focusDiv, coachingSection);
 }
 
 // ─── Milestone Detection ───
@@ -1072,85 +740,6 @@ export function renderTierMessage(analysis: SetAnalysis): void {
   // Styling handled by .tier-message CSS class
 
   container.appendChild(msgEl);
-}
-
-/** Render "What You Did Well" section immediately after the overall score card. */
-export function renderPositiveFeedback(analysis: SetAnalysis): void {
-  // Find or create the positive feedback section
-  let positiveSection = document.getElementById('positive-feedback-section');
-  if (!positiveSection) {
-    // Create it right after the overall score card (lead with encouragement)
-    const overallScoreCard = $('overall-score-card');
-    positiveSection = document.createElement('div');
-    positiveSection.id = 'positive-feedback-section';
-    positiveSection.className = 'card card--static positive-section';
-    positiveSection.setAttribute('aria-label', 'What you did well');
-    overallScoreCard.parentNode?.insertBefore(positiveSection, overallScoreCard.nextSibling);
-  }
-
-  const highlights = analysis.positiveHighlights;
-  positiveSection.style.display = 'block';
-
-  let html = '<h3 class="section-heading-sm">What You Did Well</h3>';
-
-  if (highlights.length === 0) {
-    html += `
-      <div class="positive-item">
-        <span class="positive-item-icon" aria-hidden="true">&#10003;</span>
-        <span class="positive-item-text">You completed this set well across all dimensions. Keep it up!</span>
-      </div>
-    `;
-  } else {
-    for (const item of highlights) {
-      html += `
-        <div class="positive-item">
-          <span class="positive-item-icon" aria-hidden="true">&#10003;</span>
-          <span class="positive-item-text">${escapeHtml(item)}</span>
-        </div>
-      `;
-    }
-  }
-
-  positiveSection.innerHTML = html;
-}
-
-// ─── Beginner Summary Section ───
-
-/** Render a simplified summary card for beginners with positives and one focus item. */
-export function renderBeginnerSummary(analysis: SetAnalysis): void {
-  const existing = document.getElementById('beginner-summary-section');
-  if (existing) existing.remove();
-
-  if (analysis.config.experienceLevel !== 'beginner') return;
-
-  const overallScoreCard = $('overall-score-card');
-  const summaryDiv = document.createElement('div');
-  summaryDiv.id = 'beginner-summary-section';
-  summaryDiv.className = 'card card--static beginner-summary';
-  summaryDiv.setAttribute('aria-label', 'Session summary for beginners');
-
-  // Positives: top 2-3 highlights
-  const highlights = analysis.positiveHighlights.slice(0, 3);
-  let positivesHtml = '';
-  if (highlights.length > 0) {
-    positivesHtml = '<div class="beginner-positives-group"><h4 class="section-heading-sm">What you did well</h4>';
-    for (const item of highlights) {
-      positivesHtml += `<div class="positive-item"><span class="positive-item-icon" aria-hidden="true">&#10003;</span><span class="positive-item-text">${escapeHtml(item)}</span></div>`;
-    }
-    positivesHtml += '</div>';
-  }
-
-  // One thing to focus on
-  let focusHtml = '';
-  if (analysis.topCues.length > 0) {
-    const topCue = analysis.topCues[0];
-    focusHtml = `<div class="beginner-focus"><h4 class="section-heading-sm">One thing to focus on</h4><div class="focus-cue">${escapeHtml(topCue.cue)}</div></div>`;
-  }
-
-  summaryDiv.innerHTML = positivesHtml + focusHtml;
-
-  // Insert right after the overall score card
-  overallScoreCard.parentNode?.insertBefore(summaryDiv, overallScoreCard.nextSibling);
 }
 
 // ─── Confidence Badge Helpers ───
@@ -1672,91 +1261,6 @@ export function renderVelocityChart(analysis: SetAnalysis): void {
   }
 }
 
-export function renderCoachingCues(analysis: SetAnalysis, fps: number = 0): void {
-  const container = $('coaching-cues');
-  container.innerHTML = '';
-
-  if (analysis.topCues.length === 0) {
-    container.innerHTML = '<div class="cue-card"><div class="cue-text">Great form! No major issues detected.</div></div>';
-    return;
-  }
-
-  for (let cueIdx = 0; cueIdx < analysis.topCues.length; cueIdx++) {
-    const cue = analysis.topCues[cueIdx];
-    const card = document.createElement('div');
-    card.className = 'cue-card';
-    card.style.borderLeftColor = cue.priority <= 1 ? 'var(--danger)' : cue.priority <= 3 ? 'var(--orange)' : 'var(--accent)';
-
-    const displayName = ISSUE_DISPLAY_NAMES[cue.issue] ?? formatIssueName(cue.issue);
-
-    // Exercise progressions
-    const progressions = getExerciseProgressions(cue.issue);
-    let progressionHtml = '';
-    if (progressions.length > 0) {
-      progressionHtml = `
-        <details class="progression-details">
-          <summary>Progression Path</summary>
-          <div class="progression-path">
-            ${progressions.map((p, idx) => `
-              <div class="progression-step">
-                <div class="progression-step-num" style="background: ${idx === 0 ? 'var(--accent)' : idx === progressions.length - 1 ? 'var(--success)' : 'var(--warning)'};">${idx + 1}</div>
-                <div>
-                  <div class="progression-level">${escapeHtml(p.level)}</div>
-                  <div class="progression-exercise">${escapeHtml(p.exercise)}</div>
-                  <div class="progression-criteria">${escapeHtml(p.criteria)}</div>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </details>
-      `;
-    }
-
-    // Alternate cue variants (only for top 2 cues)
-    let alternatesHtml = '';
-    if (cueIdx < 2) {
-      const dbEntry = CUE_DATABASE[cue.issue];
-      if (dbEntry?.alternateCues && dbEntry.alternateCues.length > 0) {
-        const altText = dbEntry.alternateCues.map((alt) => `"${escapeHtml(alt)}"`).join(' or ');
-        alternatesHtml = `
-          <div class="cue-alternates">
-            Also try: ${altText}
-          </div>
-        `;
-      }
-    }
-
-    const isBeginnerCues = analysis.config.experienceLevel === 'beginner';
-    const severityText = isBeginnerCues ? beginnerSeverity(cue.priority) : (cue.priority <= 1 ? 'HIGH' : cue.priority <= 3 ? 'MED' : 'LOW');
-    const severitySColor = cue.priority <= 1 ? 'var(--danger)' : cue.priority <= 3 ? 'var(--orange)' : 'var(--accent)';
-
-    card.innerHTML = `
-      <div class="cue-text">${escapeHtml(cue.cue)}</div>
-      ${alternatesHtml}
-      <div class="cue-explanation">${escapeHtml(cue.explanation)}</div>
-      <div class="cue-issue">
-        <span class="issue-indicator">
-          <span class="issue-dot" style="background: ${severitySColor}" aria-hidden="true"></span>
-          <span class="cue-priority" style="color: ${severitySColor};">${severityText}</span>
-        </span>
-        Issue: ${escapeHtml(displayName)}
-      </div>
-      ${progressionHtml}
-    `;
-
-    // Add clickable video timestamp link after the cue text
-    const issueFrame = findIssueFrame(analysis, cue.issue);
-    if (issueFrame !== null && fps > 0) {
-      const cueTextEl = card.querySelector('.cue-text');
-      if (cueTextEl) {
-        cueTextEl.appendChild(createTimestampLink(issueFrame, fps));
-      }
-    }
-
-    container.appendChild(card);
-  }
-}
-
 export function renderFatigueWarning(analysis: SetAnalysis): void {
   const warning = $('fatigue-warning');
   warning.style.display = analysis.fatigueDetected ? 'block' : 'none';
@@ -1800,262 +1304,6 @@ export function renderCompetitionDepthJudgment(rep: RepScore, repIdx: number): s
       <span class="judgment-text">DEPTH</span>
     </div>`;
   }
-}
-
-// ─── Mobility Assessment Section ───
-
-export function renderMobilityAssessment(analysis: SetAnalysis): void {
-  const scoresPanel = document.querySelector('.scores-panel');
-  if (!scoresPanel) return;
-
-  // Remove existing
-  const existing = document.getElementById('mobility-section');
-  if (existing) existing.remove();
-
-  const findings = analysis.mobilityFindings;
-  if (findings.length === 0) return;
-
-  const section = document.createElement('div');
-  section.id = 'mobility-section';
-  section.className = 'card card--static mobility-section';
-  section.setAttribute('aria-label', 'Mobility assessment');
-
-  let html = `
-    <h3 class="mobility-heading">Mobility Assessment</h3>
-    <p class="mobility-subheading">Based on your form, here are areas to work on</p>
-  `;
-
-  for (const f of findings) {
-    html += `
-      <div class="mobility-finding mobility-card mobility-finding-card">
-        <div class="mobility-area-title">${escapeHtml(f.area)}</div>
-        <p class="mobility-limitation">${escapeHtml(f.limitation)}</p>
-        <details class="mobility-test-details">
-          <summary class="mobility-test-summary">Self-test: Can you pass this?</summary>
-          <p class="mobility-test-content">${escapeHtml(f.test)}</p>
-        </details>
-        <div>
-          <strong class="mobility-rec-heading">Recommended:</strong>
-          <ul class="mobility-stretch-list">
-            ${f.stretches.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
-          </ul>
-          <p class="mobility-frequency">${escapeHtml(f.frequency)}</p>
-        </div>
-      </div>
-    `;
-  }
-
-  section.innerHTML = html;
-  scoresPanel.appendChild(section);
-}
-
-// ─── Warm-Up Protocol Section ───
-
-export function renderWarmUpProtocol(analysis: SetAnalysis): void {
-  const scoresPanel = document.querySelector('.scores-panel');
-  if (!scoresPanel) return;
-
-  // Remove existing
-  const existing = document.getElementById('warmup-section');
-  if (existing) existing.remove();
-
-  const protocol = analysis.warmupProtocol;
-  if (protocol.length === 0) return;
-
-  const totalMinutes = protocol.reduce((sum, step) => {
-    const match = step.duration.match(/(\d+)/);
-    return sum + (match ? parseInt(match[1]) : 2);
-  }, 0);
-
-  const section = document.createElement('div');
-  section.id = 'warmup-section';
-  section.className = 'card card--static';
-  section.setAttribute('aria-label', 'Recommended warm-up');
-
-  let html = `
-    <details>
-      <summary class="warmup-summary">
-        <span class="collapse-chevron">&#9654;</span>
-        Recommended Warm-Up (~${totalMinutes} min)
-      </summary>
-      <div class="warmup-content">
-  `;
-
-  protocol.forEach((step, i) => {
-    html += `
-      <div class="warmup-step warmup-step-card">
-        <div class="warmup-step-number">${i + 1}</div>
-        <div class="warmup-step-flex">
-          <div class="warmup-step-name-text">${escapeHtml(step.name)} <span class="warmup-step-duration">${escapeHtml(step.duration)}</span></div>
-          <p class="warmup-step-desc-text">${escapeHtml(step.description)}</p>
-        </div>
-      </div>
-    `;
-  });
-
-  html += `
-      </div>
-      <button id="start-warmup-btn" class="warmup-start-btn">
-        Start Guided Warmup
-      </button>
-    </details>
-  `;
-  section.innerHTML = html;
-  scoresPanel.appendChild(section);
-
-  // Attach warmup timer launcher
-  document.getElementById('start-warmup-btn')?.addEventListener('click', () => {
-    launchWarmupOverlay(protocol);
-  });
-}
-
-// ─── Warmup Timer Overlay ───
-
-/** Format seconds as MM:SS. */
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-/** Announce a step name via Web Speech API, if available. */
-function announceStep(stepName: string): void {
-  if (typeof speechSynthesis === 'undefined') return;
-  try {
-    // Cancel any ongoing speech
-    speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(stepName);
-    utterance.rate = 0.9;
-    utterance.volume = 0.8;
-    speechSynthesis.speak(utterance);
-  } catch {
-    // Speech not available — silently ignore
-  }
-}
-
-/** Trigger a vibration pattern for step transitions. */
-function vibrateStepTransition(): void {
-  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-    try {
-      navigator.vibrate([100, 50, 100]);
-    } catch {
-      // Vibration not available — silently ignore
-    }
-  }
-}
-
-function launchWarmupOverlay(protocol: WarmUpStep[]): void {
-  // Remove existing overlay if any
-  document.getElementById('warmup-overlay')?.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'warmup-overlay';
-  overlay.className = 'warmup-overlay';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-label', 'Guided warmup timer');
-
-  // Build dots HTML
-  const dotsHtml = protocol
-    .map((_, i) => `<div class="warmup-dot" data-dot="${i}"></div>`)
-    .join('');
-
-  overlay.innerHTML = `
-    <div class="warmup-countdown" id="warmup-time">0:00</div>
-    <div class="warmup-step-name" id="warmup-step-name"></div>
-    <div class="warmup-step-desc" id="warmup-step-desc"></div>
-    <div class="warmup-step-counter" id="warmup-step-counter"></div>
-    <div class="warmup-progress">
-      <div class="warmup-progress-fill" id="warmup-progress-fill" style="width: 0%"></div>
-    </div>
-    <div class="warmup-dots" id="warmup-dots">${dotsHtml}</div>
-    <div class="warmup-controls">
-      <button id="warmup-pause-btn">Pause</button>
-      <button id="warmup-skip-btn">Skip</button>
-      <button id="warmup-stop-btn" class="warmup-stop-btn">Stop</button>
-    </div>
-  `;
-
-  document.body.appendChild(overlay);
-
-  const timeEl = document.getElementById('warmup-time')!;
-  const nameEl = document.getElementById('warmup-step-name')!;
-  const descEl = document.getElementById('warmup-step-desc')!;
-  const counterEl = document.getElementById('warmup-step-counter')!;
-  const progressFill = document.getElementById('warmup-progress-fill')!;
-  const pauseBtn = document.getElementById('warmup-pause-btn')!;
-  const skipBtn = document.getElementById('warmup-skip-btn')!;
-  const stopBtn = document.getElementById('warmup-stop-btn')!;
-
-  let stepDuration = 0;
-
-  const updateDots = (currentIndex: number) => {
-    const dots = overlay.querySelectorAll('.warmup-dot');
-    dots.forEach((dot, i) => {
-      dot.classList.remove('active', 'completed');
-      if (i < currentIndex) dot.classList.add('completed');
-      else if (i === currentIndex) dot.classList.add('active');
-    });
-  };
-
-  const timer = new WarmupTimer(protocol, {
-    onTick: (state: TimerState) => {
-      timeEl.textContent = formatTime(state.timeRemaining);
-      counterEl.textContent = `Step ${state.currentStepIndex + 1} of ${state.totalSteps}`;
-      // Progress within current step
-      const elapsed = stepDuration - state.timeRemaining;
-      const pct = stepDuration > 0 ? (elapsed / stepDuration) * 100 : 0;
-      progressFill.style.width = `${Math.min(100, pct)}%`;
-      updateDots(state.currentStepIndex);
-    },
-    onStepChange: (step: WarmUpStep, index: number) => {
-      stepDuration = getStepDuration(step);
-      nameEl.textContent = step.name;
-      descEl.textContent = step.description;
-      progressFill.style.width = '0%';
-      announceStep(step.name);
-      if (index > 0) vibrateStepTransition();
-    },
-    onComplete: () => {
-      timeEl.textContent = 'Done!';
-      nameEl.textContent = 'Warmup Complete';
-      descEl.textContent = 'You are ready to lift.';
-      counterEl.textContent = '';
-      progressFill.style.width = '100%';
-      // Mark all dots completed
-      overlay.querySelectorAll('.warmup-dot').forEach(dot => dot.classList.add('completed'));
-      pauseBtn.style.display = 'none';
-      skipBtn.style.display = 'none';
-      stopBtn.textContent = 'Close';
-      stopBtn.classList.remove('warmup-stop-btn');
-      announceStep('Warmup complete');
-      vibrateStepTransition();
-    },
-  });
-
-  pauseBtn.addEventListener('click', () => {
-    const state = timer.getState();
-    if (state.isPaused) {
-      timer.resume();
-      pauseBtn.textContent = 'Pause';
-    } else {
-      timer.pause();
-      pauseBtn.textContent = 'Resume';
-    }
-  });
-
-  skipBtn.addEventListener('click', () => timer.skip());
-
-  stopBtn.addEventListener('click', () => {
-    timer.stop();
-    // Cancel any speech
-    if (typeof speechSynthesis !== 'undefined') {
-      try { speechSynthesis.cancel(); } catch { /* ignore */ }
-    }
-    overlay.remove();
-  });
-
-  // Start the timer
-  timer.start();
 }
 
 // ─── Share / Print Report ───

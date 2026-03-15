@@ -164,14 +164,14 @@ function detectDeadliftReps(hipAngles: number[]): RepRange[] {
 // ─── Deadlift Scoring ───
 
 /** Ideal trunk angles from vertical per deadlift type [min, max]. */
-const DEADLIFT_TRUNK_RANGES: Record<DeadliftType, [number, number]> = {
+export const DEADLIFT_TRUNK_RANGES: Record<DeadliftType, [number, number]> = {
   conventional: [35, 65],  // More horizontal torso
   sumo: [25, 50],          // More upright
   romanian: [30, 55],      // Moderate
 };
 
 /** Scoring weights for deadlift. */
-const DEADLIFT_WEIGHTS = {
+export const DEADLIFT_WEIGHTS = {
   backPosition: 0.25,
   hipHinge: 0.20,
   lockout: 0.20,
@@ -180,7 +180,7 @@ const DEADLIFT_WEIGHTS = {
   control: 0.15,
 };
 
-const DEADLIFT_COMPETITION_WEIGHTS = {
+export const DEADLIFT_COMPETITION_WEIGHTS = {
   backPosition: 0.25,
   hipHinge: 0.20,
   lockout: 0.30,
@@ -190,13 +190,13 @@ const DEADLIFT_COMPETITION_WEIGHTS = {
 };
 
 /** Hip hinge depth thresholds (min hip angle — lower = deeper hinge). */
-const HIP_HINGE_THRESHOLDS: Record<ExperienceLevel, number> = {
+export const HIP_HINGE_THRESHOLDS: Record<ExperienceLevel, number> = {
   beginner: 100,       // Partial range OK
   intermediate: 85,    // Near full hinge
   advanced: 75,        // Full ROM
 };
 
-function scoreBackPosition(
+export function scoreBackPosition(
   maxTrunkAngle: number,
   config: DeadliftConfig,
   calibration: CalibrationData | null,
@@ -214,7 +214,7 @@ function scoreBackPosition(
   return clamp(85 - (deviation - tolerance) * 1.5, 0, 100);
 }
 
-function scoreHipHinge(minHipAngle: number, config: DeadliftConfig): number {
+export function scoreHipHinge(minHipAngle: number, config: DeadliftConfig): number {
   const threshold = HIP_HINGE_THRESHOLDS[config.experienceLevel];
 
   if (minHipAngle <= threshold - 20) return 100;
@@ -226,7 +226,7 @@ function scoreHipHinge(minHipAngle: number, config: DeadliftConfig): number {
   return clamp(80 - over * 2, 0, 100);
 }
 
-function scoreDeadliftLockout(rep: RepData, calibration: CalibrationData | null): number {
+export function scoreDeadliftLockout(rep: RepData, calibration: CalibrationData | null): number {
   const lastAngles = rep.frameAngles.slice(-5);
   if (lastAngles.length === 0) return 50;
 
@@ -240,7 +240,7 @@ function scoreDeadliftLockout(rep: RepData, calibration: CalibrationData | null)
   return clamp(75 - (diff - 20) * 1.5, 0, 100);
 }
 
-function scoreDeadliftSymmetry(rep: RepData): number {
+export function scoreDeadliftSymmetry(rep: RepData): number {
   const symmetryValues = rep.frameAngles.map(fa => fa.hipSymmetry).filter((v): v is number => v !== null);
   if (symmetryValues.length === 0) return 90;
   const maxAsymmetry = Math.max(...symmetryValues);
@@ -251,7 +251,7 @@ function scoreDeadliftSymmetry(rep: RepData): number {
 }
 
 /** Control score: smoothness of the pull (no hitching). */
-function scoreDeadliftControl(rep: RepData): number {
+export function scoreDeadliftControl(rep: RepData): number {
   // Check for velocity reversals during ascent (hitching)
   const bottomRelIdx = rep.frameAngles.length > 0
     ? rep.frameAngles.reduce((minI, fa, i, arr) => fa.hipAngle < arr[minI].hipAngle ? i : minI, 0)
@@ -273,7 +273,7 @@ function scoreDeadliftControl(rep: RepData): number {
 
 // ─── Deadlift Issue Detection ───
 
-function detectDeadliftIssues(
+export function detectDeadliftIssues(
   rep: RepData,
   config: DeadliftConfig,
   calibration: CalibrationData | null,
@@ -471,7 +471,7 @@ const DEADLIFT_CUE_DATABASE: Record<string, { cue: string; priority: number; exp
   },
 };
 
-function getDeadliftCues(issues: FormIssue[], experienceLevel?: string): CoachingCue[] {
+export function getDeadliftCues(issues: FormIssue[], experienceLevel?: string): CoachingCue[] {
   const cueMap = new Map<string, CoachingCue>();
   for (const issue of issues) {
     const entry = DEADLIFT_CUE_DATABASE[issue.name];
@@ -485,7 +485,7 @@ function getDeadliftCues(issues: FormIssue[], experienceLevel?: string): Coachin
 
 // ─── Positive Feedback ───
 
-function getDeadliftPositiveFeedback(scores: {
+export function getDeadliftPositiveFeedback(scores: {
   backPosition: number;
   hipHinge: number;
   lockout: number;
