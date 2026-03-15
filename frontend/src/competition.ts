@@ -324,6 +324,22 @@ export function getCompetitionCues(rep: RepData, repScore: RepScore): CoachingCu
   return cues;
 }
 
+// ─── Meet Attempt Plan ───
+
+/**
+ * Generate a three-attempt plan for a competition based on estimated 1RM.
+ * Uses standard powerlifting strategy: opener ~88%, second ~94%, third ~100%.
+ * Rounds to nearest plate increment (2.5 kg or 5 lbs).
+ */
+export function generateAttemptPlan(estimated1RM: number, unit: string): { opener: number; second: number; third: number } {
+  const increment = unit === 'kg' ? 2.5 : 5;
+  return {
+    opener: Math.round(estimated1RM * 0.88 / increment) * increment,
+    second: Math.round(estimated1RM * 0.94 / increment) * increment,
+    third: Math.round(estimated1RM * 1.00 / increment) * increment,
+  };
+}
+
 // ─── RPE/RIR Estimation ───
 
 /**

@@ -42,6 +42,36 @@ import { WarmupTimer, getStepDuration } from './warmup-timer';
 import type { TimerState } from './warmup-timer';
 import { exportRepClip, downloadClip, shareClip } from './gif-export';
 import type { ClipExportOptions } from './gif-export';
+import { computeDOTS } from './one-rm';
+import { generateAttemptPlan } from './competition';
+
+// ─── Beginner-Friendly Labels ───
+
+const BEGINNER_DIMENSION_LABELS: Record<string, string> = {
+  'Depth': 'How Deep You Went',
+  'Knee Tracking': 'Knee Position',
+  'Trunk Position': 'Upper Body Position',
+  'Trunk': 'Upper Body Position',
+  'Torso Position': 'Upper Body Position',
+  'Symmetry': 'Balance (Left vs Right)',
+  'Tempo': 'Speed Control',
+  'Lockout': 'Standing Up Fully',
+  'ROM': 'Range of Motion',
+  'Back Position': 'Back Position',
+  'Row ROM': 'Pull Range',
+  'Control': 'Movement Control',
+  'Torso Stability': 'Core Stability',
+  'Overhead Stability': 'Overhead Control',
+  'Press Path': 'Bar Path',
+  'Balance': 'Balance',
+};
+
+/** Convert technical severity labels to beginner-friendly ones. */
+function beginnerSeverity(priority: number): string {
+  if (priority <= 1) return 'Fix First';
+  if (priority <= 3) return 'Work On';
+  return 'Minor';
+}
 
 // Module-level state for clip export (set by showResults)
 let _clipExportFps = 0;
@@ -354,6 +384,7 @@ export function showResults(analysis: SetAnalysis, frameData: FrameData, session
   renderGamification(analysis.overallScore, sessions);
   renderMilestones(analysis.overallScore, sessions);
   renderPositiveFeedback(analysis);
+  if (isBeginner) renderBeginnerSummary(analysis);
 
   // --- Tier 2: Action Items (what to do next) ---
   renderFocusSection(analysis, fps);
@@ -636,6 +667,8 @@ export function renderScoreBreakdown(analysis: SetAnalysis): void {
     confidenceNotes['Knee Tracking'] = 'Camera angle unclear — knee tracking may be less precise';
   }
 
+  const isBegExp = analysis.config.experienceLevel === 'beginner';
+
   for (const { label, score } of avgScores) {
     const color = scoreColor(score);
     const level = score >= 90 ? 'Excellent' : score >= 80 ? 'Good' : score >= 70 ? 'Fair' : score >= 60 ? 'Needs Work' : 'Focus Here';
@@ -643,9 +676,10 @@ export function renderScoreBreakdown(analysis: SetAnalysis): void {
     const noteHtml = noteText
       ? `<div class="confidence-note" style="font-size: 0.7rem; color: var(--text-muted); font-style: italic; margin-top: 0.15rem;">${escapeHtml(noteText)}</div>`
       : '';
+    const displayLabel = isBegExp ? (BEGINNER_DIMENSION_LABELS[label] ?? label) : label;
     html += `
       <div class="score-bar-row">
-        <span class="score-bar-label">${escapeHtml(label)}</span>
+        <span class="score-bar-label">${escapeHtml(displayLabel)}</span>
         <div class="score-bar-track" role="progressbar" aria-valuenow="${score}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeHtml(label)} score: ${score} out of 100, ${level}${noteText ? '. ' + noteText : ''}">
           <div class="score-bar-fill" style="width: ${score}%; background: ${color}"></div>
         </div>
@@ -699,6 +733,59 @@ export function renderOneRMEstimate(estimate: OneRMEstimate): void {
       </div>
     `).join('');
 
+  // DOTS score: read bodyweight and sex from DOM
+  let dotsHtml = '';
+  const bwInput = document.getElementById('bodyweight-input') as HTMLInputElement | null;
+  const bwUnitSelect = document.getElementById('bodyweight-unit') as HTMLSelectElement | null;
+  const rawBw = bwInput ? parseFloat(bwInput.value) : 0;
+  const bwUnit = bwUnitSelect?.value ?? 'kg';
+  if (rawBw > 0 && estimate.average > 0) {
+    const isMaleBtn = document.querySelector('.sex-toggle-btn.active') as HTMLElement | null;
+    const isMale = isMaleBtn?.dataset.sex !== 'female';
+    // Convert to kg if needed for DOTS computation
+    const bwKg = bwUnit === 'lbs' ? rawBw * 0.453592 : rawBw;
+    const totalKg = estimate.unit === 'lbs' ? estimate.average * 0.453592 : estimate.average;
+    const dotsResult = computeDOTS(totalKg, bwKg, isMale);
+    if (dotsResult) {
+      const level = dotsResult.score >= 500 ? 'Elite' : dotsResult.score >= 400 ? 'Advanced' : dotsResult.score >= 300 ? 'Intermediate' : 'Novice';
+      const levelColor = dotsResult.score >= 500 ? 'var(--danger)' : dotsResult.score >= 400 ? 'var(--warning)' : dotsResult.score >= 300 ? 'var(--accent)' : 'var(--text-muted)';
+      dotsHtml = `
+        <div style="background: var(--bg-input); border-radius: var(--radius-sm); padding: 0.75rem; margin-top: 0.75rem;">
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem; font-weight: 600;">DOTS Score</div>
+          <div style="display: flex; align-items: baseline; gap: 0.5rem;">
+            <span style="font-size: 1.5rem; font-weight: 800; color: var(--accent);">${dotsResult.score.toFixed(1)}</span>
+            <span style="font-size: 0.85rem; font-weight: 600; color: ${levelColor};">${level}</span>
+          </div>
+          <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.15rem;">Relative strength at ${rawBw} ${escapeHtml(bwUnit)} (${isMale ? 'male' : 'female'})</div>
+        </div>
+      `;
+    }
+  }
+
+  // Competition attempt plan
+  let attemptHtml = '';
+  const compModeCheckbox = document.getElementById('competition-mode') as HTMLInputElement | null;
+  if (compModeCheckbox?.checked && estimate.average > 0) {
+    const plan = generateAttemptPlan(estimate.average, estimate.unit);
+    attemptHtml = `
+      <div style="background: var(--bg-input); border-radius: var(--radius-sm); padding: 0.75rem; margin-top: 0.75rem;">
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; font-weight: 600;">Meet Attempt Plan</div>
+        <div style="display: flex; justify-content: space-between; padding: 0.25rem 0; font-size: 0.85rem;">
+          <span style="color: var(--text-secondary);">Opener (~88%)</span>
+          <span style="color: var(--success); font-weight: 700;">${plan.opener} ${escapeHtml(estimate.unit)}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 0.25rem 0; font-size: 0.85rem;">
+          <span style="color: var(--text-secondary);">2nd Attempt (~94%)</span>
+          <span style="color: var(--warning); font-weight: 700;">${plan.second} ${escapeHtml(estimate.unit)}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 0.25rem 0; font-size: 0.85rem;">
+          <span style="color: var(--text-secondary);">3rd Attempt (~100%)</span>
+          <span style="color: var(--danger); font-weight: 700;">${plan.third} ${escapeHtml(estimate.unit)}</span>
+        </div>
+      </div>
+    `;
+  }
+
   section.innerHTML = `
     <details>
       <summary style="cursor: pointer; font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; list-style: none; display: flex; align-items: center; gap: 0.35rem; user-select: none;">
@@ -711,7 +798,9 @@ export function renderOneRMEstimate(estimate: OneRMEstimate): void {
           <div style="font-size: 0.8rem; color: var(--text-muted);">Based on ${estimate.reps} reps at ${estimate.weight} ${escapeHtml(estimate.unit)}</div>
           <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Epley: ${estimate.epley} | Brzycki: ${estimate.brzycki}</div>
         </div>
-        <div style="background: var(--bg-input); border-radius: var(--radius-sm); padding: 0.75rem;">
+        ${dotsHtml}
+        ${attemptHtml}
+        <div style="background: var(--bg-input); border-radius: var(--radius-sm); padding: 0.75rem; margin-top: 0.75rem;">
           <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; font-weight: 600;">Training Percentages</div>
           ${tableRows}
         </div>
@@ -1023,6 +1112,45 @@ export function renderPositiveFeedback(analysis: SetAnalysis): void {
   }
 
   positiveSection.innerHTML = html;
+}
+
+// ─── Beginner Summary Section ───
+
+/** Render a simplified summary card for beginners with positives and one focus item. */
+export function renderBeginnerSummary(analysis: SetAnalysis): void {
+  const existing = document.getElementById('beginner-summary-section');
+  if (existing) existing.remove();
+
+  if (analysis.config.experienceLevel !== 'beginner') return;
+
+  const overallScoreCard = $('overall-score-card');
+  const summaryDiv = document.createElement('div');
+  summaryDiv.id = 'beginner-summary-section';
+  summaryDiv.className = 'card beginner-summary';
+  summaryDiv.setAttribute('aria-label', 'Session summary for beginners');
+
+  // Positives: top 2-3 highlights
+  const highlights = analysis.positiveHighlights.slice(0, 3);
+  let positivesHtml = '';
+  if (highlights.length > 0) {
+    positivesHtml = '<div style="margin-bottom: 0.75rem;"><h4 class="section-heading-sm" style="margin-bottom: 0.5rem;">What you did well</h4>';
+    for (const item of highlights) {
+      positivesHtml += `<div class="positive-item"><span class="positive-item-icon" aria-hidden="true">&#10003;</span><span class="positive-item-text">${escapeHtml(item)}</span></div>`;
+    }
+    positivesHtml += '</div>';
+  }
+
+  // One thing to focus on
+  let focusHtml = '';
+  if (analysis.topCues.length > 0) {
+    const topCue = analysis.topCues[0];
+    focusHtml = `<div class="beginner-focus"><h4 class="section-heading-sm" style="margin-bottom: 0.5rem;">One thing to focus on</h4><div class="focus-cue">${escapeHtml(topCue.cue)}</div></div>`;
+  }
+
+  summaryDiv.innerHTML = positivesHtml + focusHtml;
+
+  // Insert right after the overall score card
+  overallScoreCard.parentNode?.insertBefore(summaryDiv, overallScoreCard.nextSibling);
 }
 
 // ─── Confidence Badge Helpers ───
@@ -1598,7 +1726,8 @@ export function renderCoachingCues(analysis: SetAnalysis, fps: number = 0): void
       }
     }
 
-    const severityText = cue.priority <= 1 ? 'HIGH' : cue.priority <= 3 ? 'MED' : 'LOW';
+    const isBeginnerCues = analysis.config.experienceLevel === 'beginner';
+    const severityText = isBeginnerCues ? beginnerSeverity(cue.priority) : (cue.priority <= 1 ? 'HIGH' : cue.priority <= 3 ? 'MED' : 'LOW');
     const severitySColor = cue.priority <= 1 ? 'var(--danger)' : cue.priority <= 3 ? 'var(--orange)' : 'var(--accent)';
 
     card.innerHTML = `
@@ -1608,7 +1737,7 @@ export function renderCoachingCues(analysis: SetAnalysis, fps: number = 0): void
       <div class="cue-issue" style="display: flex; align-items: center; gap: 0.5rem;">
         <span style="display: inline-flex; align-items: center; gap: 4px;">
           <span style="width: 8px; height: 8px; border-radius: 50%; background: ${severitySColor}; display: inline-block;" aria-hidden="true"></span>
-          <span style="font-size: 0.7rem; font-weight: 700; color: ${severitySColor}; text-transform: uppercase;">${severityText}</span>
+          <span class="cue-priority" style="font-weight: 700; color: ${severitySColor};">${severityText}</span>
         </span>
         Issue: ${escapeHtml(displayName)}
       </div>
@@ -1699,7 +1828,7 @@ export function renderMobilityAssessment(analysis: SetAnalysis): void {
 
   for (const f of findings) {
     html += `
-      <div class="mobility-finding" style="background: var(--bg-input, #1e1e1e); border-radius: var(--radius-sm, 8px); padding: 0.85rem; margin-bottom: 0.5rem;">
+      <div class="mobility-finding mobility-card" style="padding: 0.85rem;">
         <div style="font-weight: 700; color: var(--accent, #00d4ff); font-size: 0.95rem; margin-bottom: 0.25rem;">${escapeHtml(f.area)}</div>
         <p style="font-size: 0.85rem; color: var(--text, #e0e0e0); margin-bottom: 0.5rem;">${escapeHtml(f.limitation)}</p>
         <details style="margin-bottom: 0.5rem;">
@@ -1755,7 +1884,7 @@ export function renderWarmUpProtocol(analysis: SetAnalysis): void {
 
   protocol.forEach((step, i) => {
     html += `
-      <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.65rem; padding: 0.5rem 0.65rem; background: var(--bg-input, #1e1e1e); border-radius: var(--radius-sm, 8px);">
+      <div class="warmup-step" style="margin-bottom: 0.65rem; padding: 0.5rem 0.65rem; background: var(--bg-input, #1e1e1e); border-radius: var(--radius-sm, 8px);">
         <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--accent, #00d4ff); color: var(--bg-primary, #0a0a0a); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; flex-shrink: 0;">${i + 1}</div>
         <div style="flex: 1;">
           <div style="font-weight: 600; font-size: 0.875rem; color: var(--text, #e0e0e0);">${escapeHtml(step.name)} <span style="color: var(--accent, #00d4ff); font-size: 0.75rem; font-weight: 500;">${escapeHtml(step.duration)}</span></div>

@@ -1129,6 +1129,85 @@ initLiveMode({
   initHistorySection,
 });
 
+// ─── Keyboard Shortcuts ───
+
+document.addEventListener('keydown', (e: KeyboardEvent) => {
+  // Guard: don't fire when user is typing in an input/select/textarea
+  const tag = (e.target as HTMLElement)?.tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+
+  if (e.key === 'h' || e.key === 'H') {
+    const historySection = document.getElementById('history-section');
+    if (historySection && historySection.style.display !== 'none') {
+      historySection.scrollIntoView({ behavior: 'smooth' });
+    }
+  }
+
+  if (e.key === 'Escape') {
+    // Close any open modal/overlay
+    const overlays = document.querySelectorAll<HTMLElement>(
+      '#confirm-modal-overlay, #goal-modal-overlay, .warmup-overlay, #goal-celebration-overlay',
+    );
+    for (const overlay of overlays) {
+      overlay.remove();
+    }
+  }
+});
+
+// ─── Exercise Tab Arrow Key Navigation (ARIA-compliant) ───
+
+const exerciseToggleContainer = document.querySelector('.exercise-toggle');
+if (exerciseToggleContainer) {
+  const exerciseTabs = Array.from(exerciseToggleContainer.querySelectorAll<HTMLButtonElement>('.exercise-tab'));
+
+  // Set initial roving tabindex: active tab gets tabindex=0, others get -1
+  exerciseTabs.forEach((tab) => {
+    tab.setAttribute('tabindex', tab.classList.contains('active') ? '0' : '-1');
+  });
+
+  exerciseToggleContainer.addEventListener('keydown', (e: Event) => {
+    const ke = e as KeyboardEvent;
+    const currentIdx = exerciseTabs.findIndex(t => t === document.activeElement);
+    if (currentIdx < 0) return;
+
+    let nextIdx: number | null = null;
+
+    if (ke.key === 'ArrowRight' || ke.key === 'ArrowDown') {
+      ke.preventDefault();
+      nextIdx = (currentIdx + 1) % exerciseTabs.length;
+    } else if (ke.key === 'ArrowLeft' || ke.key === 'ArrowUp') {
+      ke.preventDefault();
+      nextIdx = (currentIdx - 1 + exerciseTabs.length) % exerciseTabs.length;
+    } else if (ke.key === 'Home') {
+      ke.preventDefault();
+      nextIdx = 0;
+    } else if (ke.key === 'End') {
+      ke.preventDefault();
+      nextIdx = exerciseTabs.length - 1;
+    }
+
+    if (nextIdx !== null) {
+      // Roving tabindex: move tabindex=0 to the new tab
+      exerciseTabs.forEach(t => t.setAttribute('tabindex', '-1'));
+      exerciseTabs[nextIdx].setAttribute('tabindex', '0');
+      exerciseTabs[nextIdx].focus();
+      exerciseTabs[nextIdx].click();
+    }
+  });
+}
+
+// ─── Sex Toggle Buttons ───
+
+document.querySelectorAll<HTMLButtonElement>('.sex-toggle-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll<HTMLButtonElement>('.sex-toggle-btn').forEach((b) => {
+      b.classList.toggle('active', b === btn);
+      b.setAttribute('aria-checked', String(b === btn));
+    });
+    persistSettings();
+  });
+});
+
 // ─── Shared Link Handling ───
 
 const shared = decodeAnalysisUrl(location.hash);

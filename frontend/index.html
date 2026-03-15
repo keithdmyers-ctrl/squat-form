@@ -3516,6 +3516,67 @@
       width: 44px;
       height: 44px;
     }
+
+    /* ===== Font Size Consolidation (Design Expert) ===== */
+    :root {
+      --font-2xs: 0.65rem;
+      --font-caption: 0.7rem;
+    }
+
+    .text-2xs { font-size: var(--font-2xs); }
+    .text-caption { font-size: var(--font-caption); }
+    .text-xs { font-size: var(--font-xs); }
+    .text-sm { font-size: var(--font-sm); }
+    .text-muted { color: var(--text-muted); }
+    .text-secondary { color: var(--text-secondary); }
+    .text-uppercase { text-transform: uppercase; letter-spacing: 0.5px; }
+    .fw-600 { font-weight: 600; }
+    .fw-700 { font-weight: 700; }
+
+    /* ===== Extracted Component Classes (Design Expert) ===== */
+    .coaching-cue-card { background: var(--bg-input); border-radius: var(--radius-sm); padding: 0.75rem 1rem; margin-bottom: 0.5rem; }
+    .cue-priority { font-size: var(--font-2xs); text-transform: uppercase; letter-spacing: 0.5px; }
+    .mobility-card { background: var(--bg-input); border-radius: var(--radius-sm); padding: 0.75rem; margin-bottom: 0.5rem; border-left: 3px solid var(--info); }
+    .warmup-step { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.5rem 0; }
+
+    /* ===== Beginner Summary (Beginner UX) ===== */
+    .beginner-summary { padding: 1.25rem; margin-bottom: 1rem; }
+    .beginner-focus .focus-cue {
+      background: var(--bg-input); border-radius: var(--radius-sm);
+      padding: 0.75rem 1rem; margin-top: 0.5rem;
+      border-left: 3px solid var(--warning);
+    }
+
+    /* ===== Light Theme Polish (Design Expert) ===== */
+    [data-theme="light"] .warmup-overlay { background: var(--bg-primary); }
+    [data-theme="light"] .goal-celebration { background: rgba(255,255,255,0.95); }
+
+    /* ===== Sex Toggle for DOTS (Experienced Lifter) ===== */
+    .sex-toggle-group {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+    .sex-toggle-btn {
+      background: var(--bg-input);
+      border: none;
+      color: var(--text-muted);
+      padding: 0.4rem 0.75rem;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: background var(--transition-fast), color var(--transition-fast);
+      min-height: 36px;
+    }
+    .sex-toggle-btn.active {
+      background: var(--accent);
+      color: var(--bg-primary);
+      font-weight: 600;
+    }
+    .sex-toggle-btn:not(.active):hover {
+      background: var(--bg-card-hover);
+    }
   </style>
 </head>
 <body>
@@ -3760,6 +3821,13 @@
                   <option value="kg">kg</option>
                   <option value="lbs">lbs</option>
                 </select>
+              </div>
+            </div>
+            <div class="form-group advanced-setting" id="sex-group">
+              <label>Sex <span class="weight-optional-label">(for DOTS score)</span></label>
+              <div class="sex-toggle-group" role="radiogroup" aria-label="Sex for DOTS calculation">
+                <button type="button" class="sex-toggle-btn active" data-sex="male" role="radio" aria-checked="true">M</button>
+                <button type="button" class="sex-toggle-btn" data-sex="female" role="radio" aria-checked="false">F</button>
               </div>
             </div>
             <div class="form-group advanced-setting" id="rpe-group">

@@ -28,7 +28,7 @@ import { getDimensionLabels } from './exercise-core';
 
 // ─── Chart Mode State ───
 
-type ChartMode = 'score' | 'weight' | 'rpe' | 'bodyweight';
+type ChartMode = 'score' | 'weight' | 'rpe' | 'bodyweight' | 'depth' | 'knee' | 'trunk';
 let currentChartMode: ChartMode = 'score';
 let currentExerciseFilter: string = 'all';
 
@@ -78,11 +78,19 @@ export function renderHistorySection(sessions: SessionRecord[]): void {
 
 function renderChartWithToggle(container: HTMLElement, sessions: SessionRecord[]): void {
   // Build mode toggle buttons
+  // Check if per-dimension data exists
+  const hasDepthData = sessions.filter(s => s.avg_depth != null).length >= 2;
+  const hasKneeData = sessions.filter(s => s.avg_knee_tracking != null).length >= 2;
+  const hasTrunkData = sessions.filter(s => s.avg_trunk != null).length >= 2;
+
   const modes: { key: ChartMode; label: string }[] = [
     { key: 'score', label: 'Score' },
     { key: 'weight', label: 'Weight' },
     { key: 'rpe', label: 'RPE' },
     { key: 'bodyweight', label: 'Bodyweight' },
+    ...(hasDepthData ? [{ key: 'depth' as ChartMode, label: 'Depth' }] : []),
+    ...(hasKneeData ? [{ key: 'knee' as ChartMode, label: 'Knee' }] : []),
+    ...(hasTrunkData ? [{ key: 'trunk' as ChartMode, label: 'Trunk' }] : []),
   ];
 
   let toggleHtml = '<div class="chart-mode-toggle" role="group" aria-label="Chart metric">';
@@ -159,6 +167,9 @@ function renderHistoryChart(sessions: SessionRecord[], mode: ChartMode): string 
       case 'weight': return s.weight;
       case 'rpe': return s.rpe;
       case 'bodyweight': return s.bodyweight;
+      case 'depth': return s.avg_depth;
+      case 'knee': return s.avg_knee_tracking;
+      case 'trunk': return s.avg_trunk;
     }
   };
 
@@ -167,6 +178,9 @@ function renderHistoryChart(sessions: SessionRecord[], mode: ChartMode): string 
       case 'weight': return 'Weight';
       case 'rpe': return 'RPE';
       case 'bodyweight': return 'Bodyweight';
+      case 'depth': return 'Depth Score';
+      case 'knee': return 'Knee Tracking';
+      case 'trunk': return 'Trunk Score';
     }
   };
 
@@ -175,6 +189,9 @@ function renderHistoryChart(sessions: SessionRecord[], mode: ChartMode): string 
       case 'weight': return s.weight_unit ?? '';
       case 'rpe': return '';
       case 'bodyweight': return s.bodyweight_unit ?? '';
+      case 'depth': return '';
+      case 'knee': return '';
+      case 'trunk': return '';
     }
   };
 
