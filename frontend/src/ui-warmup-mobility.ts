@@ -150,7 +150,7 @@ function vibrateStepTransition(): void {
   }
 }
 
-function launchWarmupOverlay(protocol: WarmUpStep[]): void {
+export function launchWarmupOverlay(protocol: WarmUpStep[]): void {
   // Remove existing overlay if any
   document.getElementById('warmup-overlay')?.remove();
 

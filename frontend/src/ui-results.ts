@@ -42,13 +42,13 @@ import {
   BEGINNER_DIMENSION_LABELS,
   beginnerSeverity,
 } from './ui-coaching';
-import { renderTrainingRecommendations, renderOneRMEstimate } from './ui-training';
+import { renderTrainingRecommendations, renderOneRMEstimate, renderMeetPrepPlan } from './ui-training';
 import { renderMobilityAssessment, renderWarmUpProtocol } from './ui-warmup-mobility';
 
 // ─── Re-exports from sub-modules ───
 
 export { renderCoachingCues, renderPositiveFeedback, renderBeginnerSummary, renderFocusSection, BEGINNER_DIMENSION_LABELS, beginnerSeverity } from './ui-coaching';
-export { renderTrainingRecommendations, renderOneRMEstimate } from './ui-training';
+export { renderTrainingRecommendations, renderOneRMEstimate, renderMeetPrepPlan } from './ui-training';
 export { renderMobilityAssessment, renderWarmUpProtocol } from './ui-warmup-mobility';
 
 // ─── Progress Insights (session-history-aware coaching) ───
@@ -230,7 +230,9 @@ export function showResults(analysis: SetAnalysis, frameData: FrameData, session
   _clipExportAnalysis = analysis;
 
   const section = $('results-section');
+  section.classList.remove('visible');
   section.style.display = 'block';
+  requestAnimationFrame(() => section.classList.add('visible'));
 
   // Add results-section class for staggered animations
   const scoresPanel = section.querySelector('.scores-panel');
@@ -268,6 +270,7 @@ export function showResults(analysis: SetAnalysis, frameData: FrameData, session
   renderProgressInsights(analysis, sessions);
   if (!isBeginner) {
     renderTrainingRecommendations(trainingPhase, oneRMEstimate, sessions, exerciseType);
+    renderMeetPrepPlan(trainingPhase, oneRMEstimate);
   }
 
   // --- Tier 3: Details (collapsed for beginners, expanded for advanced) ---
@@ -301,6 +304,7 @@ export function showResults(analysis: SetAnalysis, frameData: FrameData, session
   }
 
   // --- Tier 4: Actions ---
+  renderReanalyzeButton();
   renderShareButtons(analysis);
   renderPostResultsCTA();
   renderAboutAnalysisLink();
@@ -504,6 +508,117 @@ function renderSetConfidence(analysis: SetAnalysis): void {
   container.appendChild(el);
 }
 
+// ─── B1: Ideal vs Yours Angle Comparison SVG ───
+
+/** Ideal angles for common scoring dimensions (degrees). */
+const IDEAL_ANGLES: Record<string, number> = {
+  'Depth': 70,                // knee angle at parallel depth
+  'How Deep You Went': 70,
+  'Torso Position': 25,       // trunk lean angle from vertical
+  'Upper Body Position': 25,
+  'Back Position': 15,        // deadlift back angle
+  'Lockout': 175,             // standing fully upright
+  'Standing Up Fully': 175,
+};
+
+/**
+ * Render a small inline SVG (60x80) showing a stick figure at the ideal angle
+ * overlaid with the user's actual angle. Returns empty string if no angle data
+ * is available for this dimension.
+ */
+function renderAngleComparison(idealAngle: number, actualAngle: number, label: string): string {
+  const diff = Math.abs(idealAngle - actualAngle);
+  const color = diff <= 8 ? 'var(--success, #4ade80)' : diff <= 18 ? 'var(--warning, #fbbf24)' : 'var(--danger, #f87171)';
+  const ghostColor = 'var(--text-muted, #808080)';
+
+  // Build a simple thigh-shin stick figure (pivot at center)
+  // We draw from a hip point down. Angles are knee angles for depth,
+  // trunk angles for torso position.
+  const isKneeBased = label === 'Depth' || label === 'How Deep You Went';
+  const cx = 30;
+  const pivotY = isKneeBased ? 30 : 20;
+
+  if (isKneeBased) {
+    // Draw thigh going down and shin at knee angle
+    const thighLen = 22;
+    const shinLen = 22;
+    const thighEndY = pivotY + thighLen;
+
+    // For the ideal: knee angle determines shin direction
+    const idealRad = (idealAngle * Math.PI) / 180;
+    const idealShinX = cx + Math.sin(Math.PI - idealRad) * shinLen;
+    const idealShinY = thighEndY + Math.cos(Math.PI - idealRad) * shinLen;
+
+    const actualRad = (actualAngle * Math.PI) / 180;
+    const actualShinX = cx + Math.sin(Math.PI - actualRad) * shinLen;
+    const actualShinY = thighEndY + Math.cos(Math.PI - actualRad) * shinLen;
+
+    return `<svg class="dimension-visual" width="60" height="80" viewBox="0 0 60 80" xmlns="http://www.w3.org/2000/svg" aria-label="${escapeHtml(label)}: ideal ${idealAngle} degrees vs yours ${Math.round(actualAngle)} degrees">
+      <!-- Ghost (ideal) -->
+      <line x1="${cx}" y1="${pivotY}" x2="${cx}" y2="${thighEndY}" stroke="${ghostColor}" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+      <line x1="${cx}" y1="${thighEndY}" x2="${idealShinX.toFixed(1)}" y2="${idealShinY.toFixed(1)}" stroke="${ghostColor}" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${thighEndY}" r="2" fill="${ghostColor}" opacity="0.4"/>
+      <!-- User (actual) -->
+      <line x1="${cx}" y1="${pivotY}" x2="${cx}" y2="${thighEndY}" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="${cx}" y1="${thighEndY}" x2="${actualShinX.toFixed(1)}" y2="${actualShinY.toFixed(1)}" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${thighEndY}" r="2.5" fill="${color}"/>
+      <!-- Angle label -->
+      <text x="30" y="76" text-anchor="middle" fill="${color}" font-size="9" font-weight="600">${Math.round(actualAngle)}&deg;</text>
+    </svg>`;
+  } else {
+    // Trunk lean: draw a vertical line (ideal) and an angled line (actual) from hip
+    const trunkLen = 30;
+
+    const idealRad = (idealAngle * Math.PI) / 180;
+    const idealTopX = cx + Math.sin(idealRad) * trunkLen;
+    const idealTopY = pivotY + trunkLen - Math.cos(idealRad) * trunkLen;
+
+    const actualRad = (actualAngle * Math.PI) / 180;
+    const actualTopX = cx + Math.sin(actualRad) * trunkLen;
+    const actualTopY = pivotY + trunkLen - Math.cos(actualRad) * trunkLen;
+
+    const legY = pivotY + trunkLen;
+
+    return `<svg class="dimension-visual" width="60" height="80" viewBox="0 0 60 80" xmlns="http://www.w3.org/2000/svg" aria-label="${escapeHtml(label)}: ideal ${idealAngle} degrees vs yours ${Math.round(actualAngle)} degrees">
+      <!-- Legs (shared) -->
+      <line x1="${cx - 8}" y1="${legY + 18}" x2="${cx}" y2="${legY}" stroke="${ghostColor}" stroke-width="1.5" opacity="0.3" stroke-linecap="round"/>
+      <line x1="${cx + 8}" y1="${legY + 18}" x2="${cx}" y2="${legY}" stroke="${ghostColor}" stroke-width="1.5" opacity="0.3" stroke-linecap="round"/>
+      <!-- Ghost (ideal trunk) -->
+      <line x1="${cx}" y1="${legY}" x2="${idealTopX.toFixed(1)}" y2="${idealTopY.toFixed(1)}" stroke="${ghostColor}" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+      <circle cx="${idealTopX.toFixed(1)}" cy="${(idealTopY - 4).toFixed(1)}" r="3" fill="${ghostColor}" opacity="0.4"/>
+      <!-- User (actual trunk) -->
+      <line x1="${cx}" y1="${legY}" x2="${actualTopX.toFixed(1)}" y2="${actualTopY.toFixed(1)}" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="${actualTopX.toFixed(1)}" cy="${(actualTopY - 4).toFixed(1)}" r="3.5" fill="${color}"/>
+      <!-- Angle label -->
+      <text x="30" y="76" text-anchor="middle" fill="${color}" font-size="9" font-weight="600">${Math.round(actualAngle)}&deg;</text>
+    </svg>`;
+  }
+}
+
+/**
+ * Get the average actual angle for a dimension from analysis reps.
+ * Returns null if no angle data makes sense for this dimension.
+ */
+function getActualAngleForDimension(label: string, analysis: SetAnalysis): number | null {
+  if (analysis.reps.length === 0) return null;
+
+  switch (label) {
+    case 'Depth':
+    case 'How Deep You Went': {
+      const angles = analysis.reps.map(r => r.minKneeAngle).filter((a): a is number => a != null);
+      return angles.length > 0 ? angles.reduce((s, v) => s + v, 0) / angles.length : null;
+    }
+    case 'Torso Position':
+    case 'Upper Body Position':
+    case 'Back Position': {
+      const angles = analysis.reps.map(r => r.maxTrunkAngle).filter((a): a is number => a != null);
+      return angles.length > 0 ? angles.reduce((s, v) => s + v, 0) / angles.length : null;
+    }
+    default:
+      return null;
+  }
+}
+
 /** Map a camelCase dimension key to a human-readable label. */
 function dimensionKeyToLabel(key: string): string {
   const DIMENSION_KEY_LABELS: Record<string, string> = {
@@ -576,6 +691,17 @@ export function renderScoreBreakdown(analysis: SetAnalysis): void {
       ? `<div class="confidence-note">${escapeHtml(noteText)}</div>`
       : '';
     const displayLabel = isBegExp ? (BEGINNER_DIMENSION_LABELS[label] ?? label) : label;
+
+    // B1: Generate angle comparison SVG for applicable dimensions
+    let angleSvg = '';
+    const idealAngle = IDEAL_ANGLES[label] ?? IDEAL_ANGLES[displayLabel];
+    if (idealAngle != null) {
+      const actualAngle = getActualAngleForDimension(label, analysis);
+      if (actualAngle != null) {
+        angleSvg = renderAngleComparison(idealAngle, actualAngle, displayLabel);
+      }
+    }
+
     html += `
       <div class="score-bar-row">
         <span class="score-bar-label">${escapeHtml(displayLabel)}</span>
@@ -584,6 +710,7 @@ export function renderScoreBreakdown(analysis: SetAnalysis): void {
         </div>
         <span class="score-bar-value" style="color: ${color}">${score}</span>
         <span class="score-bar-level" style="color: ${color}">${level}</span>
+        ${angleSvg}
       </div>
       ${noteHtml}
     `;
@@ -1306,6 +1433,63 @@ export function renderCompetitionDepthJudgment(rep: RepScore, repIdx: number): s
   }
 }
 
+// ─── Re-analyze Button (G3) ───
+
+function renderReanalyzeButton(): void {
+  const existing = document.getElementById('reanalyze-section');
+  if (existing) existing.remove();
+
+  // Check if cached poses are available via the global hook
+  const win = window as unknown as Record<string, unknown>;
+  const hasCached = typeof win.__hasCachedPoses === 'function'
+    && (win.__hasCachedPoses as () => boolean)();
+  if (!hasCached) return;
+
+  const scoresPanel = document.querySelector('.scores-panel');
+  if (!scoresPanel) return;
+
+  const container = document.createElement('div');
+  container.id = 'reanalyze-section';
+  container.style.cssText = 'text-align: center; margin: 0.75rem 0;';
+
+  const btn = document.createElement('button');
+  btn.className = 'btn btn-sm';
+  btn.style.cssText = 'font-size: var(--font-xs, 0.75rem); background: var(--bg-input, #1e1e1e); border: 1px solid var(--accent, #00d4ff); color: var(--accent, #00d4ff);';
+  btn.textContent = 'Re-analyze with Different Settings';
+  btn.setAttribute('aria-label', 'Re-analyze the same video with different settings');
+
+  btn.addEventListener('click', () => {
+    // Scroll to settings panel and expand it
+    const settingsContent = document.getElementById('settings-content');
+    const showSettingsBtn = document.getElementById('show-settings-btn');
+    if (settingsContent) settingsContent.style.display = 'block';
+    if (showSettingsBtn) showSettingsBtn.textContent = 'Hide settings';
+    settingsContent?.scrollIntoView({ behavior: 'smooth' });
+
+    // Add a temporary "Run Re-analysis" button near settings
+    const existingRunBtn = document.getElementById('reanalyze-run-btn');
+    if (existingRunBtn) existingRunBtn.remove();
+
+    const runBtn = document.createElement('button');
+    runBtn.id = 'reanalyze-run-btn';
+    runBtn.className = 'btn btn-primary';
+    runBtn.style.cssText = 'margin-top: 0.5rem; width: 100%;';
+    runBtn.textContent = 'Run Re-analysis (skip pose detection)';
+    runBtn.addEventListener('click', () => {
+      runBtn.remove();
+      const reanalyze = (window as unknown as Record<string, unknown>).__reanalyzeWithCachedPoses as (() => Promise<void>) | undefined;
+      if (reanalyze) reanalyze();
+    });
+
+    if (settingsContent) {
+      settingsContent.appendChild(runBtn);
+    }
+  });
+
+  container.appendChild(btn);
+  scoresPanel.appendChild(container);
+}
+
 // ─── Share / Print Report ───
 
 export function renderShareButtons(analysis: SetAnalysis): void {
@@ -1321,6 +1505,7 @@ export function renderShareButtons(analysis: SetAnalysis): void {
   section.className = 'share-buttons-row';
 
   section.innerHTML = `
+    <button class="btn btn-sm share-btn" id="share-result-btn" aria-label="Share result image">Share Result</button>
     <button class="btn btn-sm share-btn" id="share-link-btn" aria-label="Copy shareable link">Share Link</button>
     <button class="btn btn-sm share-btn" id="save-image-btn" aria-label="Save result as image">Save Image</button>
     <button class="btn btn-sm share-btn" id="export-analysis-csv-btn" aria-label="Export this analysis as CSV">Export CSV</button>
@@ -1329,6 +1514,38 @@ export function renderShareButtons(analysis: SetAnalysis): void {
   `;
 
   scoresPanel.appendChild(section);
+
+  // Share Result (Web Share API on mobile, fallback to download)
+  document.getElementById('share-result-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('share-result-btn');
+    if (btn) btn.textContent = 'Generating...';
+    try {
+      const blob = await generateShareCard(analysis, 'story');
+      const file = new File([blob], 'form-score.png', { type: 'image/png' });
+
+      // Try Web Share API (mobile)
+      if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function') {
+        const shareData = { files: [file], title: `Lift Form: ${analysis.grade} (${analysis.overallScore}/100)` };
+        if (navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+          if (btn) { btn.textContent = 'Shared!'; setTimeout(() => { btn.textContent = 'Share Result'; }, 2000); }
+          return;
+        }
+      }
+
+      // Fallback: download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `form-score-${analysis.grade}-${analysis.overallScore}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+      if (btn) { btn.textContent = 'Saved!'; setTimeout(() => { btn.textContent = 'Share Result'; }, 2000); }
+    } catch (err) {
+      // User cancelled share or error
+      if (btn) { btn.textContent = 'Share Result'; }
+    }
+  });
 
   // Share link
   document.getElementById('share-link-btn')?.addEventListener('click', () => {

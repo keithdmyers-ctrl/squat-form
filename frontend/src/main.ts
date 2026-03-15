@@ -31,8 +31,9 @@ import {
   getSessions,
 } from './storage';
 import { initLiveMode } from './live-mode';
-import { estimateOneRM } from './one-rm';
+import { estimateOneRM, computeDOTS } from './one-rm';
 import { decodeAnalysisUrl } from './share';
+import { launchWarmupOverlay } from './ui-warmup-mobility';
 import { mergeMultiAngleAnalysis } from './multi-angle';
 import type { MultiAngleResult } from './multi-angle';
 import type { TrainingPhase } from './programming';
@@ -75,6 +76,10 @@ let analysisCancelled = false;
 
 /** Track the current object URL to revoke it when done. */
 let currentObjectUrl: string | null = null;
+
+/** Cached frame data and fps for re-analysis without re-running pose detection. */
+let cachedFrameData: FrameData | null = null;
+let cachedFps: number = 0;
 
 // ─── Initialize Settings ───
 
@@ -167,6 +172,34 @@ function initOnboarding(): void {
 
   // Focus trapping and Escape handling
   document.addEventListener('keydown', onboardingKeydownHandler);
+}
+
+// ─── B2: Pre-Analysis Warmup Card ───
+
+function initWarmupCard(): void {
+  const warmupCard = document.getElementById('warmup-card');
+  const warmupBtn = document.getElementById('warmup-card-btn');
+  if (!warmupCard || !warmupBtn) return;
+
+  // Show only for beginners
+  const updateVisibility = () => {
+    warmupCard.style.display = experienceSelect.value === 'beginner' ? '' : 'none';
+  };
+  updateVisibility();
+  experienceSelect.addEventListener('change', updateVisibility);
+
+  // Generic 5-step beginner warmup protocol
+  const beginnerWarmup = [
+    { name: 'Light Cardio', description: 'Jog in place, jumping jacks, or march in place to raise your heart rate.', duration: '2 min', purpose: 'Raise core body temperature', durationSeconds: 120 },
+    { name: 'Hip Circles', description: 'Stand on one leg and make large circles with the other. 30 seconds each direction, each side.', duration: '2 min', purpose: 'Loosen hip joint', durationSeconds: 120 },
+    { name: 'Leg Swings', description: 'Hold onto something for balance. Swing one leg forward and back, then side to side. 30 seconds each side.', duration: '1 min', purpose: 'Dynamic hip flexibility', durationSeconds: 60 },
+    { name: 'Bodyweight Squats', description: 'Perform 10 slow bodyweight squats focusing on controlled depth and upright torso.', duration: '1 min', purpose: 'Groove the movement pattern', durationSeconds: 60 },
+    { name: 'Ankle Mobility', description: 'In a half-kneeling position, push your knee over your toes. 30 seconds each ankle.', duration: '1 min', purpose: 'Improve ankle dorsiflexion', durationSeconds: 60 },
+  ];
+
+  warmupBtn.addEventListener('click', () => {
+    launchWarmupOverlay(beginnerWarmup);
+  });
 }
 
 // ─── Quick Start ───
@@ -265,6 +298,9 @@ function initHistorySection(): void {
 // ─── Upload Mode ───
 
 initUploadMode((file: File) => {
+  // Clear cached data from previous analysis when new video is uploaded
+  cachedFrameData = null;
+  cachedFps = 0;
   runAnalysis(file);
 });
 
@@ -274,7 +310,10 @@ async function runAnalysis(file: File): Promise<void> {
   // Reset UI
   hideError();
   const resultsSection = document.getElementById('results-section');
-  if (resultsSection) resultsSection.style.display = 'none';
+  if (resultsSection) {
+    resultsSection.classList.remove('visible');
+    resultsSection.style.display = 'none';
+  }
 
   analyzeBtn.disabled = true;
   analysisCancelled = false;
@@ -539,12 +578,24 @@ async function runAnalysis(file: File): Promise<void> {
       console.warn('Snapshot capture failed:', err);
     }
 
+    // Compute DOTS score for session record (if bodyweight and 1RM available)
+    let dotsScore: number | undefined;
+    if (bodyweight > 0 && oneRMEstimate && oneRMEstimate.average > 0) {
+      const isMaleBtn = document.querySelector('.sex-toggle-btn.active') as HTMLElement | null;
+      const isMale = isMaleBtn?.dataset.sex !== 'female';
+      const bwKg = bwUnit === 'lbs' ? bodyweight * 0.453592 : bodyweight;
+      const totalKg = unit === 'lbs' ? oneRMEstimate.average * 0.453592 : oneRMEstimate.average;
+      const dotsResult = computeDOTS(totalKg, bwKg, isMale);
+      if (dotsResult) dotsScore = dotsResult.score;
+    }
+
     saveSession(
       analysis, squatTypeSelect.value, experienceSelect.value,
       weight, unit, oneRMEstimate?.average,
       exerciseType, variantName,
       bodyweight, bwUnit, rpe,
       sessionSnapshots,
+      dotsScore,
     );
 
     // Step 7: Determine training phase (user-selected or auto-detected)
@@ -554,6 +605,10 @@ async function runAnalysis(file: File): Promise<void> {
       : suggestNextPhase(
           previousSessions.map(s => ({ score: s.overall_score, date: s.date })),
         ).phase;
+
+    // Cache frame data and fps for re-analysis
+    cachedFrameData = frameData;
+    cachedFps = fps;
 
     // Step 8: Display results with session context and training phase
     showProgress(97, 'Rendering results...');
@@ -570,11 +625,12 @@ async function runAnalysis(file: File): Promise<void> {
       if (resultsSection) {
         const indicator = document.createElement('div');
         indicator.id = 'multi-angle-indicator';
+        indicator.className = 'multi-angle-indicator';
         const qualityColors: Record<string, string> = {
-          good: 'var(--success, #4ade80)',
-          fair: 'var(--warning, #fbbf24)',
-          poor: 'var(--danger, #f87171)',
-          failed: 'var(--danger, #f87171)',
+          good: 'var(--success)',
+          fair: 'var(--warning)',
+          poor: 'var(--danger)',
+          failed: 'var(--danger)',
         };
         const qualityLabels: Record<string, string> = {
           good: 'Good -- reps aligned perfectly',
@@ -583,16 +639,9 @@ async function runAnalysis(file: File): Promise<void> {
           failed: 'Failed -- using side view only',
         };
         const q = multiAngleResult.alignmentQuality;
-        indicator.style.cssText = `
-          display: flex; align-items: center; gap: 0.5rem;
-          padding: 0.5rem 0.75rem; margin-bottom: 0.75rem;
-          border-radius: var(--radius-sm, 6px);
-          background: var(--bg-card, #121212);
-          border: 1px solid ${qualityColors[q]};
-          font-size: 0.8rem; color: var(--text-secondary, #b0b0b0);
-        `;
+        indicator.style.setProperty('--multi-angle-color', qualityColors[q]);
         indicator.innerHTML = `
-          <span style="color: ${qualityColors[q]}; font-weight: 600;">Multi-Angle</span>
+          <span class="multi-angle-indicator-label">Multi-Angle</span>
           <span>${qualityLabels[q]}</span>
         `;
         // Insert at top of results section
@@ -612,6 +661,12 @@ async function runAnalysis(file: File): Promise<void> {
 
     // Update history section
     initHistorySection();
+
+    // Show session notes prompt (E5)
+    renderSessionNotePrompt();
+
+    // Show exercise suggestion (G5)
+    renderExerciseSuggestion(exerciseType);
 
   } catch (err) {
     hideProgress();
@@ -705,6 +760,201 @@ async function runAnalysis(file: File): Promise<void> {
   }
 }
 
+// ─── Session Notes Prompt (E5) ───
+
+function renderSessionNotePrompt(): void {
+  const existing = document.getElementById('session-note-prompt');
+  if (existing) existing.remove();
+
+  const section = document.getElementById('results-section');
+  if (!section) return;
+
+  const container = document.createElement('div');
+  container.id = 'session-note-prompt';
+  container.className = 'card card--static';
+  container.style.cssText = 'margin-top: 0.75rem; padding: 0.75rem;';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.id = 'session-note';
+  input.placeholder = 'Add a note (optional)';
+  input.style.cssText = 'width: 100%; padding: 0.4rem 0.6rem; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border, #333); background: var(--bg-input, #1e1e1e); color: var(--text-primary, #e0e0e0); font-size: var(--font-sm, 0.875rem); margin-bottom: 0.5rem;';
+
+  const tagsDiv = document.createElement('div');
+  tagsDiv.style.cssText = 'display: flex; flex-wrap: wrap; gap: 0.35rem;';
+  const quickTags = ['Belt', 'Sleeves', 'Wraps', 'No belt', 'Fatigued', 'Fresh'];
+  const activeTagSet = new Set<string>();
+
+  for (const tag of quickTags) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = tag;
+    btn.className = 'btn btn-sm';
+    btn.style.cssText = 'font-size: var(--font-2xs, 0.65rem); padding: 0.15rem 0.5rem; border-radius: 10px; background: var(--bg-input, #1e1e1e); border: 1px solid var(--border, #333); color: var(--text-muted, #808080); cursor: pointer;';
+    btn.addEventListener('click', () => {
+      if (activeTagSet.has(tag)) {
+        activeTagSet.delete(tag);
+        btn.style.background = 'var(--bg-input, #1e1e1e)';
+        btn.style.borderColor = 'var(--border, #333)';
+        btn.style.color = 'var(--text-muted, #808080)';
+      } else {
+        activeTagSet.add(tag);
+        btn.style.background = 'var(--accent, #00d4ff)';
+        btn.style.borderColor = 'var(--accent, #00d4ff)';
+        btn.style.color = 'var(--bg-primary, #0a0a0a)';
+      }
+      saveNoteAndTags();
+    });
+    tagsDiv.appendChild(btn);
+  }
+
+  function saveNoteAndTags(): void {
+    try {
+      const sessions = JSON.parse(localStorage.getItem('squat_form_sessions') || '[]');
+      if (sessions.length > 0) {
+        const note = input.value.trim();
+        const tags = Array.from(activeTagSet);
+        if (note) sessions[0].notes = note;
+        else delete sessions[0].notes;
+        if (tags.length > 0) sessions[0].tags = tags;
+        else delete sessions[0].tags;
+        localStorage.setItem('squat_form_sessions', JSON.stringify(sessions));
+      }
+    } catch { /* ignore storage errors */ }
+  }
+
+  input.addEventListener('blur', saveNoteAndTags);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveNoteAndTags();
+  });
+
+  container.appendChild(input);
+  container.appendChild(tagsDiv);
+
+  // Insert after the share section or at end of results
+  const shareSection = document.getElementById('share-section');
+  if (shareSection?.parentNode) {
+    shareSection.parentNode.insertBefore(container, shareSection.nextSibling);
+  } else {
+    section.appendChild(container);
+  }
+}
+
+// ─── Exercise Suggestion Engine (G5) ───
+
+function renderExerciseSuggestion(currentExercise: string): void {
+  const existing = document.getElementById('exercise-suggestion');
+  if (existing) existing.remove();
+
+  const sessions = getSessions();
+  if (sessions.length < 3) return; // Need enough history
+
+  const section = document.getElementById('results-section');
+  if (!section) return;
+
+  const exerciseCounts: Record<string, number> = {};
+  for (const s of sessions) {
+    const ex = s.exercise_type ?? 'squat';
+    exerciseCounts[ex] = (exerciseCounts[ex] ?? 0) + 1;
+  }
+
+  const total = sessions.length;
+  let suggestion = '';
+
+  const allExercises = ['squat', 'deadlift', 'bench_press'];
+  const missing = allExercises.filter(ex => (exerciseCounts[ex] ?? 0) === 0);
+
+  // Check if >80% are one exercise and another has 0 sessions
+  for (const ex of allExercises) {
+    if ((exerciseCounts[ex] ?? 0) / total > 0.8 && missing.length > 0) {
+      const label = missing[0] === 'deadlift' ? 'deadlift' : missing[0] === 'bench_press' ? 'bench press' : 'squat';
+      suggestion = `You have ${exerciseCounts[ex]} ${ex.replace('_', ' ')} sessions but none for ${label}. Try analyzing a ${label} set to check your form across lifts.`;
+      break;
+    }
+  }
+
+  // If no strong imbalance, check depth
+  if (!suggestion) {
+    const recentSquats = sessions.filter(s => (s.exercise_type ?? 'squat') === 'squat').slice(0, 5);
+    const lowDepth = recentSquats.filter(s => s.avg_depth !== undefined && s.avg_depth < 60);
+    if (lowDepth.length >= 3) {
+      suggestion = 'Your depth scores have been consistently low. Consider adding mobility work -- ankle and hip stretches before squatting can help.';
+    }
+  }
+
+  // All squats? Suggest deadlift
+  if (!suggestion && (exerciseCounts['squat'] ?? 0) === total && total >= 5) {
+    suggestion = 'All your sessions are squats. Try analyzing a deadlift set to check your hip hinge pattern.';
+  }
+
+  if (!suggestion) return;
+
+  const card = document.createElement('div');
+  card.id = 'exercise-suggestion';
+  card.className = 'card card--static';
+  card.style.cssText = 'margin-top: 0.75rem; padding: 0.75rem; border-left: 3px solid var(--info, #60a5fa);';
+  card.innerHTML = `
+    <div style="font-size: var(--font-xs, 0.75rem); font-weight: 600; color: var(--info, #60a5fa); margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 0.5px;">Suggestion</div>
+    <div style="font-size: var(--font-sm, 0.875rem); color: var(--text-secondary, #b0b0b0);">${suggestion}</div>
+  `;
+
+  // Insert at end of results, before post-results CTA
+  const cta = document.getElementById('post-results-cta');
+  if (cta?.parentNode) {
+    cta.parentNode.insertBefore(card, cta);
+  } else {
+    section.appendChild(card);
+  }
+}
+
+// ─── Re-analyze with Cached Poses (G3) ───
+
+/** Re-run analysis using cached pose data (skips pose detection). */
+async function reanalyzeWithCachedPoses(): Promise<void> {
+  if (!cachedFrameData || cachedFps <= 0) return;
+
+  const compToggle = document.getElementById('competition-mode') as HTMLInputElement | null;
+  const exerciseType = getExerciseType();
+
+  const exerciseConfig: ExerciseConfig = {
+    exerciseType,
+    experienceLevel: experienceSelect.value as ExperienceLevel,
+    competitionMode: compToggle?.checked ?? false,
+    squatType: squatTypeSelect.value as SquatType,
+    deadliftType: (deadliftTypeSelect?.value ?? 'conventional') as DeadliftType,
+    benchType: (benchTypeSelect?.value ?? 'flat') as BenchType,
+    ohpType: (ohpTypeSelect?.value ?? 'strict') as OverheadPressType,
+    rowType: (rowTypeSelect?.value ?? 'bent_over') as BarBellRowType,
+    lungeType: (lungeTypeSelect?.value ?? 'forward') as LungeType,
+  };
+
+  const analysis = analyzeExercise(cachedFrameData, cachedFps, exerciseConfig);
+  if (analysis.repCount === 0) return;
+
+  const rawWeight = parseFloat(weightInput.value);
+  const weight = isFinite(rawWeight) ? rawWeight : 0;
+  const unit = getWeightUnit();
+  const oneRMEstimate = estimateOneRM(weight, analysis.repCount, unit);
+
+  const previousSessions = getSessions();
+  const selectedPhase = trainingPhaseSelect?.value as TrainingPhase | '' | undefined;
+  const trainingPhase: TrainingPhase | undefined = selectedPhase
+    ? selectedPhase as TrainingPhase
+    : suggestNextPhase(
+        previousSessions.map(s => ({ score: s.overall_score, date: s.date })),
+      ).phase;
+
+  showResults(analysis, cachedFrameData, previousSessions, oneRMEstimate, cachedFps, trainingPhase, exerciseType);
+
+  // Setup annotated playback
+  resultVideo.currentTime = 0;
+  setupVideoPlayback(resultVideo, overlayCanvas, cachedFrameData, analysis, cachedFps);
+}
+
+// Export for use in ui-results.ts
+(window as unknown as Record<string, unknown>).__reanalyzeWithCachedPoses = reanalyzeWithCachedPoses;
+(window as unknown as Record<string, unknown>).__hasCachedPoses = () => cachedFrameData !== null && cachedFps > 0;
+
 /** Custom error class for analysis-specific errors with categorization. */
 class AnalysisError extends Error {
   type: 'no_poses' | 'no_reps' | 'generic';
@@ -767,8 +1017,63 @@ function initHeaderHistoryLink(): void {
 // Pre-warm MediaPipe model in background (downloads WASM + model early)
 prewarmMediaPipe();
 
+// ─── Offline Status Indicator (G1) ───
+
+function initOfflineStatus(): void {
+  const statusEl = document.getElementById('offline-status');
+  if (!statusEl) return;
+
+  function updateStatus(): void {
+    if (!navigator.onLine) {
+      statusEl!.textContent = 'Offline';
+      statusEl!.className = 'offline-status offline';
+    } else if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      statusEl!.textContent = 'Ready offline';
+      statusEl!.className = 'offline-status ready';
+    } else {
+      statusEl!.textContent = 'Loading AI model...';
+      statusEl!.className = 'offline-status loading';
+    }
+  }
+
+  // Initial state
+  updateStatus();
+
+  // When model pre-warm finishes (PoseProcessor init succeeded), mark as ready
+  // We observe the service worker registration as a proxy
+  window.addEventListener('online', updateStatus);
+  window.addEventListener('offline', updateStatus);
+
+  // Check periodically if model has been cached (short-lived interval)
+  let checkCount = 0;
+  const checkInterval = setInterval(() => {
+    checkCount++;
+    if (checkCount > 30) {
+      clearInterval(checkInterval);
+      return;
+    }
+    // If service worker is controlling the page, the model is cached
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      statusEl.textContent = 'Ready offline';
+      statusEl.className = 'offline-status ready';
+      clearInterval(checkInterval);
+    }
+  }, 2000);
+
+  // Also update when service worker becomes active
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      statusEl.textContent = 'Ready offline';
+      statusEl.className = 'offline-status ready';
+    });
+  }
+}
+
+initOfflineStatus();
+
 // Show onboarding for first-time visitors (prescreen merged in)
 initOnboarding();
+initWarmupCard();
 initQuickStart();
 initExampleVideo();
 initHistorySection();
@@ -909,12 +1214,13 @@ if (shared) {
   const section = document.getElementById('results-section');
   if (section) {
     section.style.display = 'block';
+    requestAnimationFrame(() => section.classList.add('visible'));
     // Remove existing shared view
     document.getElementById('shared-result-view')?.remove();
 
     const view = document.createElement('div');
     view.id = 'shared-result-view';
-    view.className = 'card';
+    view.className = 'card card--static';
     view.setAttribute('aria-label', 'Shared result');
 
     // Sanitize all shared data to prevent XSS via crafted share URLs
@@ -929,24 +1235,25 @@ if (shared) {
       ? shared.topIssues.map((i: unknown) => esc(String(i).replace(/_/g, ' '))).join(', ')
       : '';
 
-    const gradeColor = safeGrade === 'A' ? 'var(--grade-a)' : safeGrade === 'B' ? 'var(--grade-b)' : safeGrade === 'C' ? 'var(--grade-c)' : 'var(--grade-d)';
+    const gradeColorVal = safeGrade === 'A' ? 'var(--grade-a)' : safeGrade === 'B' ? 'var(--grade-b)' : safeGrade === 'C' ? 'var(--grade-c)' : 'var(--grade-d)';
     const weightInfo = shared.weight ? `${Number(shared.weight)} ${esc(String(shared.unit ?? 'lbs'))}` : '';
     const rmInfo = shared.estimated1rm ? `Est. 1RM: ${Number(shared.estimated1rm)} ${esc(String(shared.unit ?? 'lbs'))}` : '';
 
+    view.style.setProperty('--grade-color', gradeColorVal);
     view.innerHTML = `
-      <div style="text-align: center; padding: 1rem 0;">
-        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">Shared Result -- ${safeDate}</div>
-        <div style="width: 100px; height: 100px; border-radius: 50%; border: 4px solid ${gradeColor}; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 1rem;">
-          <div style="font-size: 2.4rem; font-weight: 800; color: ${gradeColor};">${safeGrade}</div>
-          <div style="font-size: 0.9rem; font-weight: 600; color: ${gradeColor};">${safeScore}/100</div>
+      <div class="shared-result-wrapper">
+        <div class="shared-result-date">Shared Result -- ${safeDate}</div>
+        <div class="shared-result-circle">
+          <div class="shared-result-grade">${safeGrade}</div>
+          <div class="shared-result-score">${safeScore}/100</div>
         </div>
-        <div style="font-size: 0.9rem; color: var(--text-secondary);">
+        <div class="shared-result-meta">
           ${safeReps} reps | ${safeType} | ${safeLevel}
           ${weightInfo ? ` | ${weightInfo}` : ''}
         </div>
-        ${rmInfo ? `<div style="font-size: 0.85rem; color: var(--accent); margin-top: 0.25rem;">${rmInfo}</div>` : ''}
-        ${safeIssues ? `<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">Top issues: ${safeIssues}</div>` : ''}
-        <div style="margin-top: 1rem;">
+        ${rmInfo ? `<div class="shared-result-1rm">${rmInfo}</div>` : ''}
+        ${safeIssues ? `<div class="shared-result-issues">Top issues: ${safeIssues}</div>` : ''}
+        <div class="shared-result-action">
           <button class="btn btn-primary shared-analyze-btn">Analyze Your Own Squat</button>
         </div>
       </div>

@@ -256,7 +256,7 @@
       transition: transform var(--transition-normal), box-shadow var(--transition-normal), border-color var(--transition-normal);
     }
 
-    .card:hover {
+    .card:not(.card--static):hover {
       transform: translateY(-2px);
       box-shadow: var(--shadow-elevated);
       border-color: var(--border-hover);
@@ -915,6 +915,11 @@
     /* ===== Results Section ===== */
     #results-section {
       display: none;
+      opacity: 0;
+      transition: opacity 250ms ease;
+    }
+    #results-section.visible {
+      opacity: 1;
     }
 
     #results-section:focus {
@@ -1208,7 +1213,6 @@
       background: var(--bg-card);
       border-radius: var(--radius);
       padding: 1.25rem;
-      border-left: 4px solid var(--accent);
       margin-bottom: var(--space-md);
       border: 1px solid transparent;
       border-left: 4px solid var(--accent);
@@ -1537,6 +1541,10 @@
       flex-wrap: wrap;
     }
 
+    .chart-exercise-filter {
+      margin-bottom: 0.25rem;
+    }
+
     .chart-mode-btn {
       background: var(--bg-input);
       color: var(--text-muted);
@@ -1700,6 +1708,29 @@
     #header-history-link:hover {
       background: var(--accent-glow);
       border-color: var(--accent);
+    }
+
+    .offline-status {
+      font-size: var(--font-2xs);
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      display: inline-block;
+      margin-top: var(--space-xs);
+    }
+    .offline-status.loading {
+      background: rgba(251, 191, 36, 0.15);
+      color: var(--warning);
+      border: 1px solid var(--warning);
+    }
+    .offline-status.ready {
+      background: rgba(74, 222, 128, 0.15);
+      color: var(--success);
+      border: 1px solid var(--success);
+    }
+    .offline-status.offline {
+      background: rgba(248, 113, 113, 0.15);
+      color: var(--danger);
+      border: 1px solid var(--danger);
     }
 
     /* ===== Footer ===== */
@@ -2287,7 +2318,7 @@
         box-shadow: none;
         page-break-inside: avoid;
       }
-      .card:hover, .rep-card:hover, .exercise-card:hover, .focus-section:hover {
+      .card:not(.card--static):hover, .rep-card:hover, .exercise-card:hover, .focus-section:hover {
         transform: none;
         box-shadow: none;
       }
@@ -2323,7 +2354,7 @@
         transform: none;
       }
 
-      .card:hover, .rep-card:hover, .exercise-card:hover, .focus-section:hover {
+      .card:not(.card--static):hover, .rep-card:hover, .exercise-card:hover, .focus-section:hover {
         transform: none;
       }
 
@@ -3261,6 +3292,7 @@
     .comparison-session-grade {
       font-size: 2rem;
       font-weight: 800;
+      color: var(--grade-color);
     }
 
     .comparison-session-score {
@@ -3293,6 +3325,7 @@
     .comparison-delta-value {
       font-size: 1.1rem;
       font-weight: 700;
+      color: var(--delta-color);
     }
 
     .comparison-dim-row {
@@ -3955,8 +3988,13 @@
     /* Score bar level label */
     .score-bar-level {
       font-size: var(--font-caption);
-      min-width: 5.5em;
+      min-width: 5em;
       text-align: left;
+      opacity: 0.7;
+    }
+
+    @media (max-width: 600px) {
+      .score-bar-level { display: none; }
     }
 
     /* Issue severity text on rep cards */
@@ -4042,6 +4080,256 @@
 
     /* Collapsible content margin */
     .collapsible-content { margin-top: 0.75rem; }
+
+    /* ===== D1: Extracted inline styles ===== */
+
+    /* History action buttons */
+    .history-action-btn {
+      font-size: var(--font-xs);
+    }
+    .history-action-btn--primary {
+      background: var(--accent);
+      color: var(--bg-primary);
+    }
+    .history-action-btn--outline {
+      background: var(--bg-input);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
+    .history-action-btn--default {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+    }
+    .history-action-btn--muted {
+      background: var(--bg-input);
+      border: 1px solid var(--border-hover);
+      color: var(--text-muted);
+    }
+    .history-action-btn--disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .history-action-btn--enabled {
+      opacity: 1;
+      cursor: pointer;
+    }
+
+    /* Goal modal */
+    .goal-modal-section {
+      margin-bottom: var(--space-md);
+    }
+    .goal-modal-empty {
+      font-size: var(--font-sm);
+      color: var(--text-muted);
+      margin-bottom: var(--space-md);
+    }
+    .goal-modal-heading {
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+      margin-bottom: var(--space-xs);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .goal-modal-achieved {
+      opacity: 0.7;
+    }
+    .goal-modal-form-title {
+      font-size: var(--font-sm);
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .goal-modal-max-note {
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+      margin-top: var(--space-sm);
+    }
+    .goal-modal-close-wrapper {
+      text-align: center;
+      margin-top: var(--space-md);
+    }
+
+    /* Shared result view */
+    .shared-result-wrapper {
+      text-align: center;
+      padding: 1rem 0;
+    }
+    .shared-result-date {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+    .shared-result-circle {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      border: 4px solid var(--grade-color);
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+    .shared-result-grade {
+      font-size: 2.4rem;
+      font-weight: 800;
+      color: var(--grade-color);
+    }
+    .shared-result-score {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--grade-color);
+    }
+    .shared-result-meta {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+    .shared-result-1rm {
+      font-size: 0.85rem;
+      color: var(--accent);
+      margin-top: 0.25rem;
+    }
+    .shared-result-issues {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+    .shared-result-action {
+      margin-top: 1rem;
+    }
+
+    /* Multi-angle indicator */
+    .multi-angle-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      margin-bottom: 0.75rem;
+      border-radius: var(--radius-sm);
+      background: var(--bg-card);
+      border: 1px solid var(--multi-angle-color);
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+    .multi-angle-indicator-label {
+      color: var(--multi-angle-color);
+      font-weight: 600;
+    }
+
+    /* Comparison close button */
+    .comparison-close-btn {
+      font-size: 0.75rem;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    /* Comparison overflow container */
+    .comparison-dims-container {
+      margin-bottom: 0.5rem;
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    /* ===== G4: Light mode polish ===== */
+    [data-theme="light"] .multi-angle-indicator {
+      border-color: var(--border);
+    }
+
+    /* B1: Angle comparison SVG in score breakdown */
+    .dimension-visual {
+      display: none;
+      flex-shrink: 0;
+      margin-left: var(--space-xs);
+    }
+    @media (min-width: 481px) {
+      .dimension-visual { display: inline-block; }
+    }
+
+    /* B2: Pre-analysis warmup card */
+    .warmup-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      margin-bottom: var(--space-md);
+      text-align: center;
+    }
+    .warmup-card h3 {
+      font-size: var(--font-lg);
+      color: var(--accent);
+      margin-bottom: var(--space-xs);
+    }
+    .warmup-card p {
+      font-size: var(--font-sm);
+      color: var(--text-secondary);
+      margin-bottom: var(--space-sm);
+    }
+    .warmup-card .btn-warmup {
+      background: var(--accent);
+      color: var(--bg-primary);
+      border: none;
+      padding: 0.5rem 1.25rem;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: var(--font-sm);
+      cursor: pointer;
+      transition: background var(--transition-fast);
+    }
+    .warmup-card .btn-warmup:hover { background: var(--accent-hover); }
+
+    /* B3: Glossary tooltips */
+    .glossary-term {
+      border-bottom: 1px dotted var(--accent-dim);
+      cursor: help;
+      position: relative;
+    }
+    .glossary-term:hover,
+    .glossary-term:focus {
+      color: var(--accent);
+    }
+
+    /* B4: Progress narrative */
+    .progress-narrative {
+      padding: var(--space-sm) var(--space-md);
+      margin-bottom: var(--space-sm);
+      font-size: var(--font-sm);
+      color: var(--text-secondary);
+      border-left: 3px solid var(--accent);
+      background: var(--bg-card);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    }
+    .progress-narrative ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .progress-narrative li {
+      margin-bottom: 0.25rem;
+    }
+    .progress-narrative li::before {
+      content: "\2022 ";
+      color: var(--accent);
+      font-weight: bold;
+    }
+
+    /* B5: Camera positioning guide overlay */
+    .positioning-guide-text {
+      font-size: var(--font-sm);
+      color: var(--text-primary);
+      text-align: center;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 0.4rem 0.75rem;
+      border-radius: var(--radius-sm);
+      position: absolute;
+      bottom: 50px;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      z-index: 5;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
@@ -4115,6 +4403,7 @@
     <h1>Lift Form Analyzer</h1>
     <p>AI-powered form analysis for squat, deadlift &amp; bench &mdash; your video never leaves your device <button class="btn-link" id="reshow-onboarding" aria-label="Show how it works">(How does this work?)</button></p>
     <button id="header-history-link" aria-label="View session history">History (<span id="header-history-count">0</span>)</button>
+    <span id="offline-status" class="offline-status"></span>
   </header>
 
   <main id="main-content">
@@ -4132,6 +4421,13 @@
 
       <!-- Upload Panel (default) -->
       <div id="upload-panel" role="tabpanel" aria-labelledby="mode-upload" tabindex="0">
+
+      <!-- B2: Pre-analysis warmup card (shown for beginners) -->
+      <div id="warmup-card" class="warmup-card" style="display: none;">
+        <h3>Warm Up First</h3>
+        <p>A quick 5-step warmup helps you move better and prevents injury.</p>
+        <button id="warmup-card-btn" class="btn-warmup" aria-label="Start a guided warmup before analyzing your form">Start Warmup</button>
+      </div>
 
       <!-- Quick Start -->
       <div class="quick-start">

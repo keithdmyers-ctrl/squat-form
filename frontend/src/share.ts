@@ -58,10 +58,13 @@ export function decodeAnalysisUrl(hash: string): SharedAnalysisSummary | null {
   }
 }
 
-/** Generate a shareable image card as a canvas blob. */
-export async function generateShareCard(analysis: SetAnalysis): Promise<Blob> {
-  const width = 600;
-  const height = 315;
+/** Generate a shareable image card as a canvas blob.
+ * @param format - 'standard' (600x315 link preview) or 'story' (1080x1920 story format)
+ */
+export async function generateShareCard(analysis: SetAnalysis, format: 'standard' | 'story' = 'standard'): Promise<Blob> {
+  const isStory = format === 'story';
+  const width = isStory ? 1080 : 600;
+  const height = isStory ? 1920 : 315;
 
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -75,43 +78,45 @@ export async function generateShareCard(analysis: SetAnalysis): Promise<Blob> {
 
   // Border accent
   ctx.strokeStyle = '#00d4ff';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = isStory ? 4 : 2;
   ctx.strokeRect(1, 1, width - 2, height - 2);
+
+  const scale = isStory ? 2.5 : 1;
 
   // Title
   ctx.fillStyle = '#00d4ff';
-  ctx.font = 'bold 20px -apple-system, BlinkMacSystemFont, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText('Lift Form Analyzer', 24, 40);
+  ctx.font = `bold ${Math.round(20 * scale)}px -apple-system, BlinkMacSystemFont, sans-serif`;
+  ctx.textAlign = isStory ? 'center' : 'left';
+  ctx.fillText('Lift Form Analyzer', isStory ? width / 2 : 24, isStory ? 180 : 40);
 
   // Grade circle
   const gradeX = width / 2;
-  const gradeY = 140;
-  const gradeR = 55;
+  const gradeY = isStory ? height * 0.4 : 140;
+  const gradeR = isStory ? 140 : 55;
 
   const gradeColor = analysis.grade === 'A' ? '#4ade80' : analysis.grade === 'B' ? '#2dd4bf' : analysis.grade === 'C' ? '#fbbf24' : '#fb923c';
 
   ctx.beginPath();
   ctx.arc(gradeX, gradeY, gradeR, 0, Math.PI * 2);
   ctx.strokeStyle = gradeColor;
-  ctx.lineWidth = 4;
+  ctx.lineWidth = isStory ? 8 : 4;
   ctx.stroke();
 
   ctx.fillStyle = gradeColor;
-  ctx.font = 'bold 48px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.font = `bold ${Math.round(48 * scale)}px -apple-system, BlinkMacSystemFont, sans-serif`;
   ctx.textAlign = 'center';
-  ctx.fillText(analysis.grade, gradeX, gradeY + 16);
+  ctx.fillText(analysis.grade, gradeX, gradeY + 16 * scale);
 
   // Score
   ctx.fillStyle = '#e0e0e0';
-  ctx.font = 'bold 18px -apple-system, BlinkMacSystemFont, sans-serif';
-  ctx.fillText(`${analysis.overallScore}/100`, gradeX, gradeY + gradeR + 28);
+  ctx.font = `bold ${Math.round(18 * scale)}px -apple-system, BlinkMacSystemFont, sans-serif`;
+  ctx.fillText(`${analysis.overallScore}/100`, gradeX, gradeY + gradeR + 28 * scale);
 
   // Stats
   ctx.fillStyle = '#a0a0a0';
-  ctx.font = '14px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.font = `${Math.round(14 * scale)}px -apple-system, BlinkMacSystemFont, sans-serif`;
   ctx.textAlign = 'center';
-  const statsY = height - 40;
+  const statsY = isStory ? height - 200 : height - 40;
   ctx.fillText(
     `${analysis.repCount} reps | ${analysis.config.squatType.replace('_', ' ')} | ${analysis.config.experienceLevel}`,
     width / 2, statsY,
@@ -119,9 +124,9 @@ export async function generateShareCard(analysis: SetAnalysis): Promise<Blob> {
 
   // Date
   ctx.fillStyle = '#8a8a8a';
-  ctx.font = '12px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.font = `${Math.round(12 * scale)}px -apple-system, BlinkMacSystemFont, sans-serif`;
   ctx.textAlign = 'right';
-  ctx.fillText(new Date().toLocaleDateString(), width - 24, height - 12);
+  ctx.fillText(new Date().toLocaleDateString(), width - 24 * scale, height - 12 * scale);
 
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {

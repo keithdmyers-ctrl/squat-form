@@ -24,6 +24,9 @@ export function saveSession(
   bodyweightUnit?: string,
   rpe?: number,
   snapshots?: Array<{ dataUrl: string; phase: string; repIndex: number }>,
+  dotsScore?: number,
+  notes?: string,
+  tags?: string[],
 ): void {
   const sessions = getSessions();
 
@@ -60,6 +63,9 @@ export function saveSession(
     bodyweight_unit: bodyweightUnit,
     rpe: rpe && rpe >= 6 && rpe <= 10 ? rpe : undefined,
     snapshots: snapshots && snapshots.length > 0 ? snapshots : undefined,
+    dots_score: dotsScore && dotsScore > 0 ? dotsScore : undefined,
+    notes: notes || undefined,
+    tags: tags && tags.length > 0 ? tags : undefined,
   });
   if (sessions.length > MAX_SESSIONS) sessions.length = MAX_SESSIONS;
   try {

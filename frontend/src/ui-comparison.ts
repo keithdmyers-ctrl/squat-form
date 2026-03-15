@@ -82,7 +82,7 @@ export function renderComparisonView(sessionA: SessionRecord, sessionB: SessionR
 
   const container = document.createElement('div');
   container.id = 'comparison-view';
-  container.className = 'card';
+  container.className = 'card card--static';
   container.setAttribute('aria-label', 'Session comparison');
 
   const dateA = formatShortDate(sessionA.date);
@@ -205,30 +205,30 @@ export function renderComparisonView(sessionA: SessionRecord, sessionB: SessionR
   container.innerHTML = `
     <div class="comparison-header">
       <h3 class="comparison-title">Session Comparison</h3>
-      <button id="close-comparison" class="btn btn-sm" style="font-size: 0.75rem; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted);">Close</button>
+      <button id="close-comparison" class="btn btn-sm comparison-close-btn">Close</button>
     </div>
     <div class="comparison-scores-grid">
       <div>
         <div class="comparison-session-date">${escapeHtml(dateA)}</div>
-        <div class="comparison-session-grade" style="color: ${colorA};">${sessionA.grade}</div>
+        <div class="comparison-session-grade" style="--grade-color: ${colorA};">${sessionA.grade}</div>
         <div class="comparison-session-score">${sessionA.overall_score}</div>
         <div class="comparison-session-reps">${sessionA.rep_count} reps</div>
         ${sessionA.weight != null ? `<div class="comparison-session-weight">${sessionA.weight}${sessionA.weight_unit ?? ''}</div>` : ''}
         ${sessionA.rpe != null ? `<div class="comparison-session-rpe">RPE ${sessionA.rpe}</div>` : ''}
       </div>
       <div class="comparison-delta">
-        <div class="comparison-delta-value" style="color: ${deltaColor};">${deltaSign}${scoreDelta}</div>
+        <div class="comparison-delta-value" style="--delta-color: ${deltaColor};">${deltaSign}${scoreDelta}</div>
       </div>
       <div>
         <div class="comparison-session-date">${escapeHtml(dateB)}</div>
-        <div class="comparison-session-grade" style="color: ${colorB};">${sessionB.grade}</div>
+        <div class="comparison-session-grade" style="--grade-color: ${colorB};">${sessionB.grade}</div>
         <div class="comparison-session-score">${sessionB.overall_score}</div>
         <div class="comparison-session-reps">${sessionB.rep_count} reps</div>
         ${sessionB.weight != null ? `<div class="comparison-session-weight">${sessionB.weight}${sessionB.weight_unit ?? ''}</div>` : ''}
         ${sessionB.rpe != null ? `<div class="comparison-session-rpe">RPE ${sessionB.rpe}</div>` : ''}
       </div>
     </div>
-    ${dimRows ? `<div style="margin-bottom: 0.5rem; max-width: 100%; overflow-x: auto;">${dimRows}</div>` : ''}
+    ${dimRows ? `<div class="comparison-dims-container">${dimRows}</div>` : ''}
     ${repChart}
     ${snapshotSection}
   `;

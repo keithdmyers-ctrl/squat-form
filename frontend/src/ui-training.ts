@@ -14,6 +14,8 @@ import {
 } from './programming';
 import { computeDOTS } from './one-rm';
 import { generateAttemptPlan } from './competition';
+import { generateMeetPrepPlan } from './meet-prep-plan';
+import type { MeetPrepPlan } from './meet-prep-plan';
 
 // ─── Training Recommendations ───
 
@@ -170,14 +172,18 @@ export function renderOneRMEstimate(estimate: OneRMEstimate): void {
     }
   }
 
-  // Competition attempt plan
+  // Attempt plan: show whenever 1RM data is available and weight was entered
   let attemptHtml = '';
   const compModeCheckbox = document.getElementById('competition-mode') as HTMLInputElement | null;
-  if (compModeCheckbox?.checked && estimate.average > 0) {
+  const weightInputEl = document.getElementById('weight-input') as HTMLInputElement | null;
+  const hasWeight = weightInputEl && parseFloat(weightInputEl.value) > 0;
+  if (hasWeight && estimate.average > 0) {
     const plan = generateAttemptPlan(estimate.average, estimate.unit);
+    const isCompMode = compModeCheckbox?.checked ?? false;
+    const planLabel = isCompMode ? 'Competition Meet Attempts' : 'Estimated Meet Attempts';
     attemptHtml = `
       <div class="one-rm-panel">
-        <div class="one-rm-panel-heading">Meet Attempt Plan</div>
+        <div class="one-rm-panel-heading">${escapeHtml(planLabel)}</div>
         <div class="one-rm-row">
           <span class="attempt-row-label">Opener (~88%)</span>
           <span class="attempt-opener">${plan.opener} ${escapeHtml(estimate.unit)}</span>
@@ -233,5 +239,128 @@ export function renderOneRMEstimate(estimate: OneRMEstimate): void {
     breakdownCollapse.parentNode?.insertBefore(section, breakdownCollapse.nextSibling);
   } else {
     scoresPanel.appendChild(section);
+  }
+}
+
+// ─── Meet Prep Week Planner (E4) ───
+
+const MEET_PREP_STORAGE_KEY = 'squat_form_meet_prep';
+
+function loadMeetPrepDate(): string {
+  try {
+    return localStorage.getItem(MEET_PREP_STORAGE_KEY) ?? '';
+  } catch { return ''; }
+}
+
+function saveMeetPrepDate(date: string): void {
+  try {
+    localStorage.setItem(MEET_PREP_STORAGE_KEY, date);
+  } catch { /* ignore */ }
+}
+
+export function renderMeetPrepPlan(
+  phase?: TrainingPhase,
+  oneRMEstimate?: OneRMEstimate | null,
+): void {
+  const existing = document.getElementById('meet-prep-plan');
+  if (existing) existing.remove();
+
+  // Only show when peaking and 1RM is available
+  if (phase !== 'peaking' || !oneRMEstimate || oneRMEstimate.average <= 0) return;
+
+  const section = document.getElementById('results-section');
+  if (!section) return;
+
+  const card = document.createElement('div');
+  card.id = 'meet-prep-plan';
+  card.className = 'card card--static';
+  card.setAttribute('aria-label', 'Meet prep plan');
+
+  const heading = document.createElement('h4');
+  heading.className = 'section-heading-sm';
+  heading.textContent = 'Meet Prep Plan';
+  card.appendChild(heading);
+
+  const desc = document.createElement('p');
+  desc.className = 'training-rec-desc';
+  desc.textContent = 'Set your meet date to generate a periodized taper plan based on your estimated 1RM.';
+  card.appendChild(desc);
+
+  const dateRow = document.createElement('div');
+  dateRow.style.cssText = 'display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;';
+
+  const dateLabel = document.createElement('label');
+  dateLabel.textContent = 'Meet date:';
+  dateLabel.style.cssText = 'font-size: var(--font-sm, 0.875rem); color: var(--text-secondary, #b0b0b0);';
+  dateLabel.setAttribute('for', 'meet-date-input');
+
+  const dateInput = document.createElement('input');
+  dateInput.type = 'date';
+  dateInput.id = 'meet-date-input';
+  dateInput.style.cssText = 'padding: 0.3rem 0.5rem; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border, #333); background: var(--bg-input, #1e1e1e); color: var(--text-primary, #e0e0e0); font-size: var(--font-sm, 0.875rem);';
+
+  // Restore saved date
+  const savedDate = loadMeetPrepDate();
+  if (savedDate) dateInput.value = savedDate;
+
+  // Set min to tomorrow
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  dateInput.min = tomorrow.toISOString().slice(0, 10);
+
+  dateRow.appendChild(dateLabel);
+  dateRow.appendChild(dateInput);
+  card.appendChild(dateRow);
+
+  const gridContainer = document.createElement('div');
+  gridContainer.id = 'meet-prep-grid';
+  card.appendChild(gridContainer);
+
+  function renderGrid(): void {
+    const meetDate = dateInput.value;
+    if (!meetDate || !oneRMEstimate) {
+      gridContainer.innerHTML = '';
+      return;
+    }
+
+    saveMeetPrepDate(meetDate);
+    const plan = generateMeetPrepPlan(meetDate, oneRMEstimate.average, oneRMEstimate.unit);
+
+    if (plan.weeks.length === 0) {
+      gridContainer.innerHTML = '<p style="font-size: var(--font-sm); color: var(--text-muted);">Meet date must be in the future.</p>';
+      return;
+    }
+
+    let html = `<div style="font-size: var(--font-xs, 0.75rem); color: var(--text-muted, #808080); margin-bottom: 0.5rem;">${plan.weeksOut} weeks out</div>`;
+    html += '<div style="display: grid; gap: 0.35rem;">';
+
+    for (const week of plan.weeks) {
+      const isCurrentWeek = week.weekNumber === plan.weeksOut;
+      const highlightStyle = isCurrentWeek ? 'border: 1px solid var(--accent, #00d4ff); background: var(--accent-glow, rgba(0,212,255,0.15));' : 'border: 1px solid var(--border, #333);';
+      html += `
+        <div style="padding: 0.4rem 0.6rem; border-radius: var(--radius-sm, 6px); ${highlightStyle} display: flex; justify-content: space-between; align-items: center; font-size: var(--font-sm, 0.875rem);">
+          <span style="color: var(--text-secondary, #b0b0b0);">${escapeHtml(week.label)}</span>
+          <span style="color: var(--text-primary, #e0e0e0); font-weight: 600;">
+            ${week.sets}x${escapeHtml(week.reps)} @ ${week.intensityPct}%${week.weight ? ` (${week.weight} ${escapeHtml(oneRMEstimate.unit)})` : ''}
+          </span>
+        </div>
+      `;
+    }
+
+    html += '</div>';
+    gridContainer.innerHTML = html;
+  }
+
+  dateInput.addEventListener('change', renderGrid);
+
+  // Render immediately if saved date exists
+  if (savedDate) renderGrid();
+
+  // Insert after training recommendations
+  const trainingRec = document.getElementById('training-recommendations');
+  if (trainingRec?.parentNode) {
+    trainingRec.parentNode.insertBefore(card, trainingRec.nextSibling);
+  } else {
+    section.appendChild(card);
   }
 }

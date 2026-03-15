@@ -28,7 +28,7 @@ import { getDimensionLabels } from './exercise-core';
 
 // ─── Chart Mode State ───
 
-type ChartMode = 'score' | 'weight' | 'rpe' | 'bodyweight' | 'depth' | 'knee' | 'trunk';
+type ChartMode = 'score' | 'weight' | 'rpe' | 'bodyweight' | 'depth' | 'knee' | 'trunk' | 'dots';
 let currentChartMode: ChartMode = 'score';
 let currentExerciseFilter: string = 'all';
 
@@ -36,6 +36,92 @@ let currentExerciseFilter: string = 'all';
 function filterByExercise(sessions: SessionRecord[]): SessionRecord[] {
   if (currentExerciseFilter === 'all') return sessions;
   return sessions.filter(s => (s.exercise_type ?? 'squat') === currentExerciseFilter);
+}
+
+// ─── B4: Plain-Language Progress Narrative ───
+
+function renderProgressSummary(sessions: SessionRecord[]): string {
+  if (sessions.length <= 1) {
+    return '<div class="progress-narrative"><ul><li>Welcome! After your next session, you\'ll see your progress here.</li></ul></div>';
+  }
+
+  const bullets: string[] = [];
+  const latest = sessions[0];
+  const first = sessions[sessions.length - 1];
+  const scoreDiff = latest.overall_score - first.overall_score;
+
+  if (scoreDiff > 0) {
+    bullets.push(
+      `Your overall score improved by ${scoreDiff} point${scoreDiff !== 1 ? 's' : ''} over ${sessions.length} session${sessions.length !== 1 ? 's' : ''}.`,
+    );
+  } else if (scoreDiff < 0) {
+    // Declining scores
+    const topIssue = latest.top_issue
+      ? (ISSUE_DISPLAY_NAMES[latest.top_issue] ?? formatIssueName(latest.top_issue))
+      : null;
+    const focusMsg = topIssue ? ` Focus on ${topIssue}.` : '';
+    bullets.push(
+      `Your scores dipped this session -- this can happen when you're trying heavier weights.${focusMsg}`,
+    );
+  } else {
+    bullets.push(`Your score is holding steady at ${latest.overall_score}. Consistency is key!`);
+  }
+
+  // Find biggest dimension improvement if we have per-dimension data
+  if (sessions.length >= 2) {
+    const dimChecks: { name: string; key: keyof SessionRecord }[] = [
+      { name: 'Depth', key: 'avg_depth' },
+      { name: 'Knee Tracking', key: 'avg_knee_tracking' },
+      { name: 'Trunk Position', key: 'avg_trunk' },
+    ];
+
+    let bestDim = '';
+    let bestImprovement = 0;
+
+    for (const dim of dimChecks) {
+      const latestVal = latest[dim.key] as number | undefined;
+      const firstVal = first[dim.key] as number | undefined;
+      if (latestVal != null && firstVal != null) {
+        const improvement = latestVal - firstVal;
+        if (improvement > bestImprovement) {
+          bestImprovement = improvement;
+          bestDim = dim.name;
+        }
+      }
+    }
+
+    if (bestDim && bestImprovement >= 3) {
+      bullets.push(
+        `${bestDim} improved ${Math.round(bestImprovement)} points over ${sessions.length} sessions.`,
+      );
+    }
+
+    // Consistency check: look at standard deviation of scores
+    const scores = sessions.slice(0, 5).map(s => s.overall_score);
+    if (scores.length >= 3) {
+      const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+      const variance = scores.reduce((s, v) => s + (v - avg) ** 2, 0) / scores.length;
+      const stdDev = Math.sqrt(variance);
+      if (stdDev <= 5) {
+        // Find most consistent dimension
+        for (const dim of dimChecks) {
+          const vals = sessions.slice(0, 5).map(s => s[dim.key] as number | undefined).filter((v): v is number => v != null);
+          if (vals.length >= 3) {
+            const dAvg = vals.reduce((a, b) => a + b, 0) / vals.length;
+            const dVar = vals.reduce((s, v) => s + (v - dAvg) ** 2, 0) / vals.length;
+            if (Math.sqrt(dVar) <= 4) {
+              bullets.push(`${dim.name} is your most consistent dimension.`);
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (bullets.length === 0) return '';
+
+  return `<div class="progress-narrative"><ul>${bullets.map(b => `<li>${escapeHtml(b)}</li>`).join('')}</ul></div>`;
 }
 
 // ─── Session History View ───
@@ -63,6 +149,17 @@ export function renderHistorySection(sessions: SessionRecord[]): void {
 
   section.style.display = 'block';
 
+  // B4: Render progress narrative above the chart
+  const existingNarrative = section.querySelector('.progress-narrative');
+  if (existingNarrative) existingNarrative.remove();
+  const narrativeHtml = renderProgressSummary(sessions);
+  if (narrativeHtml) {
+    const chartContainer = document.getElementById('history-chart');
+    if (chartContainer) {
+      chartContainer.insertAdjacentHTML('beforebegin', narrativeHtml);
+    }
+  }
+
   // Render chart with mode toggle
   const chartContainer = document.getElementById('history-chart');
   if (chartContainer) {
@@ -82,12 +179,14 @@ function renderChartWithToggle(container: HTMLElement, sessions: SessionRecord[]
   const hasDepthData = sessions.filter(s => s.avg_depth != null).length >= 2;
   const hasKneeData = sessions.filter(s => s.avg_knee_tracking != null).length >= 2;
   const hasTrunkData = sessions.filter(s => s.avg_trunk != null).length >= 2;
+  const hasDotsData = sessions.filter(s => s.dots_score != null).length >= 2;
 
   const modes: { key: ChartMode; label: string }[] = [
     { key: 'score', label: 'Score' },
     { key: 'weight', label: 'Weight' },
     { key: 'rpe', label: 'RPE' },
     { key: 'bodyweight', label: 'Bodyweight' },
+    ...(hasDotsData ? [{ key: 'dots' as ChartMode, label: 'DOTS' }] : []),
     ...(hasDepthData ? [{ key: 'depth' as ChartMode, label: 'Depth' }] : []),
     ...(hasKneeData ? [{ key: 'knee' as ChartMode, label: 'Knee' }] : []),
     ...(hasTrunkData ? [{ key: 'trunk' as ChartMode, label: 'Trunk' }] : []),
@@ -111,7 +210,7 @@ function renderChartWithToggle(container: HTMLElement, sessions: SessionRecord[]
         label: t === 'deadlift' ? 'DL' : t === 'bench_press' ? 'BP' : t === 'overhead_press' ? 'OHP' : t === 'barbell_row' ? 'ROW' : t === 'lunge' ? 'LU' : 'SQ',
       })),
     ];
-    filterHtml = '<div class="chart-mode-toggle" role="group" aria-label="Exercise filter" style="margin-bottom: 0.25rem;">';
+    filterHtml = '<div class="chart-mode-toggle chart-exercise-filter" role="group" aria-label="Exercise filter">';
     for (const f of filters) {
       const active = f.key === currentExerciseFilter ? ' active' : '';
       filterHtml += `<button type="button" class="chart-mode-btn exercise-filter-btn${active}" data-exercise-filter="${f.key}" aria-pressed="${f.key === currentExerciseFilter}">${f.label}</button>`;
@@ -167,6 +266,7 @@ function renderHistoryChart(sessions: SessionRecord[], mode: ChartMode): string 
       case 'weight': return s.weight;
       case 'rpe': return s.rpe;
       case 'bodyweight': return s.bodyweight;
+      case 'dots': return s.dots_score;
       case 'depth': return s.avg_depth;
       case 'knee': return s.avg_knee_tracking;
       case 'trunk': return s.avg_trunk;
@@ -178,6 +278,7 @@ function renderHistoryChart(sessions: SessionRecord[], mode: ChartMode): string 
       case 'weight': return 'Weight';
       case 'rpe': return 'RPE';
       case 'bodyweight': return 'Bodyweight';
+      case 'dots': return 'DOTS Score';
       case 'depth': return 'Depth Score';
       case 'knee': return 'Knee Tracking';
       case 'trunk': return 'Trunk Score';
@@ -189,6 +290,7 @@ function renderHistoryChart(sessions: SessionRecord[], mode: ChartMode): string 
       case 'weight': return s.weight_unit ?? '';
       case 'rpe': return '';
       case 'bodyweight': return s.bodyweight_unit ?? '';
+      case 'dots': return '';
       case 'depth': return '';
       case 'knee': return '';
       case 'trunk': return '';
@@ -247,7 +349,7 @@ function renderScoreChart(sessions: SessionRecord[]): string {
   let dotsHtml = '';
   for (const p of points) {
     const color = p.score >= 80 ? 'var(--success)' : p.score >= 60 ? 'var(--warning)' : 'var(--danger)';
-    dotsHtml += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${color}" stroke="var(--bg-primary, #0f0f0f)" stroke-width="1.5"><title>Score: ${p.score} (${p.grade})</title></circle>`;
+    dotsHtml += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${color}" stroke="var(--bg-primary)" stroke-width="1.5"><title>Score: ${p.score} (${p.grade})</title></circle>`;
   }
 
   // X-axis labels (first and last date)
@@ -300,7 +402,7 @@ function renderRpeChart(recent: SessionRecord[]): string {
   let dotsHtml = '';
   for (const p of points) {
     const color = p.value >= 9 ? 'var(--danger)' : p.value >= 8 ? 'var(--warning)' : 'var(--success)';
-    dotsHtml += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${color}" stroke="var(--bg-primary, #0f0f0f)" stroke-width="1.5"><title>RPE: ${p.value}</title></circle>`;
+    dotsHtml += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${color}" stroke="var(--bg-primary)" stroke-width="1.5"><title>RPE: ${p.value}</title></circle>`;
   }
 
   const firstDate = formatShortDate(recent[0].date);
@@ -366,7 +468,7 @@ function renderAutoScaleChart(
   for (const p of points) {
     const color = 'var(--accent)';
     const unitStr = p.unit ? ` ${p.unit}` : '';
-    dotsHtml += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${color}" stroke="var(--bg-primary, #0f0f0f)" stroke-width="1.5"><title>${label}: ${p.value}${unitStr}</title></circle>`;
+    dotsHtml += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${color}" stroke="var(--bg-primary)" stroke-width="1.5"><title>${label}: ${p.value}${unitStr}</title></circle>`;
   }
 
   const firstDate = formatShortDate(recent[0].date);
@@ -424,6 +526,21 @@ function renderHistoryList(container: HTMLElement, sessions: SessionRecord[], sh
       metricHtml = `<span class="history-metric">RPE ${s.rpe}</span>`;
     } else if (currentChartMode === 'bodyweight' && s.bodyweight != null) {
       metricHtml = `<span class="history-metric">${s.bodyweight}${s.bodyweight_unit ?? ''}</span>`;
+    } else if (currentChartMode === 'dots' && s.dots_score != null) {
+      metricHtml = `<span class="history-metric">DOTS ${s.dots_score.toFixed(1)}</span>`;
+    }
+
+    // Notes and tags (E5)
+    let notesHtml = '';
+    if (s.notes || (s.tags && s.tags.length > 0)) {
+      const parts: string[] = [];
+      if (s.tags && s.tags.length > 0) {
+        parts.push(s.tags.map(t => escapeHtml(t)).join(', '));
+      }
+      if (s.notes) {
+        parts.push(escapeHtml(s.notes));
+      }
+      notesHtml = `<div style="font-size: var(--font-2xs, 0.65rem); color: var(--text-muted, #808080); grid-column: 1 / -1; margin-top: -0.15rem;">${parts.join(' -- ')}</div>`;
     }
 
     html += `
@@ -435,16 +552,17 @@ function renderHistoryList(container: HTMLElement, sessions: SessionRecord[], sh
         <span class="history-reps">${s.rep_count} reps${metricHtml ? ' ' : ''}${metricHtml}</span>
         <span class="history-issue">${escapeHtml(topIssue)}</span>
         <button class="history-delete-btn" data-delete-idx="${idx}" aria-label="Delete session from ${dateStr}" title="Delete this session">&times;</button>
+        ${notesHtml}
       </div>
     `;
   }
 
   html += '</div>';
   html += '<div class="history-actions">';
-  html += `<button id="compare-btn" class="btn btn-sm" style="font-size: var(--font-xs); background: var(--accent); color: var(--bg-primary);${displaySessions.length < 2 ? ' opacity: 0.4; cursor: not-allowed;' : ''}" aria-label="Compare selected sessions" disabled>Compare (0/2)</button>`;
-  html += '<button id="set-goals-btn" class="btn btn-sm" style="font-size: var(--font-xs); background: var(--bg-input); border: 1px solid var(--accent); color: var(--accent);" aria-label="Set performance goals">Set Goals</button>';
-  html += '<button id="export-csv-btn" class="btn btn-sm" style="font-size: var(--font-xs); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary);" aria-label="Export session history as CSV">Export CSV</button>';
-  html += '<button id="clear-history-btn" class="btn btn-sm" style="font-size: var(--font-xs); background: var(--bg-input, #222); border: 1px solid var(--border-hover, #444); color: var(--text-muted);" aria-label="Clear session history">Clear History</button>';
+  html += `<button id="compare-btn" class="btn btn-sm history-action-btn history-action-btn--primary${displaySessions.length < 2 ? ' history-action-btn--disabled' : ''}" aria-label="Compare selected sessions" disabled>Compare (0/2)</button>`;
+  html += '<button id="set-goals-btn" class="btn btn-sm history-action-btn history-action-btn--outline" aria-label="Set performance goals">Set Goals</button>';
+  html += '<button id="export-csv-btn" class="btn btn-sm history-action-btn history-action-btn--default" aria-label="Export session history as CSV">Export CSV</button>';
+  html += '<button id="clear-history-btn" class="btn btn-sm history-action-btn history-action-btn--muted" aria-label="Clear session history">Clear History</button>';
   html += '</div>';
 
   container.innerHTML = html;
@@ -458,13 +576,13 @@ function renderHistoryList(container: HTMLElement, sessions: SessionRecord[], sh
     if (!compareBtn) return;
     if (selectedIndices.size === 2) {
       compareBtn.disabled = false;
-      compareBtn.style.opacity = '1';
-      compareBtn.style.cursor = 'pointer';
+      compareBtn.classList.remove('history-action-btn--disabled');
+      compareBtn.classList.add('history-action-btn--enabled');
       compareBtn.textContent = 'Compare';
     } else {
       compareBtn.disabled = true;
-      compareBtn.style.opacity = '0.4';
-      compareBtn.style.cursor = 'not-allowed';
+      compareBtn.classList.remove('history-action-btn--enabled');
+      compareBtn.classList.add('history-action-btn--disabled');
       compareBtn.textContent = `Compare (${selectedIndices.size}/2)`;
     }
   }
@@ -668,7 +786,7 @@ function showGoalModal(sessions: SessionRecord[]): void {
 
     // Active goals
     if (activeGoals.length > 0) {
-      html += '<div style="margin-bottom: var(--space-md);">';
+      html += '<div class="goal-modal-section">';
       for (const goal of activeGoals) {
         const labels = getDimensionLabels(goal.exerciseType);
         const dimKey = goal.dimension as keyof typeof labels;
@@ -711,17 +829,17 @@ function showGoalModal(sessions: SessionRecord[]): void {
       }
       html += '</div>';
     } else if (achievedGoals.length === 0) {
-      html += '<p style="font-size: var(--font-sm); color: var(--text-muted); margin-bottom: var(--space-md);">No goals set yet. Add a goal below to track your progress.</p>';
+      html += '<p class="goal-modal-empty">No goals set yet. Add a goal below to track your progress.</p>';
     }
 
     // Recently achieved goals (show last 2)
     if (achievedGoals.length > 0) {
-      html += '<div style="margin-bottom: var(--space-md);">';
-      html += '<div style="font-size: var(--font-xs); color: var(--text-muted); margin-bottom: var(--space-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Achieved</div>';
+      html += '<div class="goal-modal-section">';
+      html += '<div class="goal-modal-heading">Achieved</div>';
       for (const goal of achievedGoals.slice(0, 2)) {
         const label = DIMENSION_LABELS[goal.dimension] ?? goal.dimension;
         html += `
-          <div class="goal-card" style="opacity: 0.7;">
+          <div class="goal-card goal-modal-achieved">
             <div class="goal-card-header">
               <span>${escapeHtml(label)}</span>
               <span class="goal-status-badge achieved">Achieved</span>
@@ -737,7 +855,7 @@ function showGoalModal(sessions: SessionRecord[]): void {
     if (activeGoals.length < MAX_ACTIVE_GOALS) {
       html += `
         <div class="goal-form" id="goal-add-form">
-          <div style="font-size: var(--font-sm); font-weight: 600; color: var(--text-primary);">Add Goal</div>
+          <div class="goal-modal-form-title">Add Goal</div>
           <label for="goal-dimension">Dimension</label>
           <select id="goal-dimension">
             <option value="overall">Overall</option>
@@ -760,16 +878,16 @@ function showGoalModal(sessions: SessionRecord[]): void {
             <option value="lunge">Lunge</option>
           </select>
           <div class="goal-form-actions">
-            <button id="goal-add-btn" class="btn btn-sm" style="background: var(--accent); color: var(--bg-primary); font-size: var(--font-xs);">Add Goal</button>
+            <button id="goal-add-btn" class="btn btn-sm history-action-btn history-action-btn--primary">Add Goal</button>
           </div>
         </div>
       `;
     } else {
-      html += '<p style="font-size: var(--font-xs); color: var(--text-muted); margin-top: var(--space-sm);">Maximum of 3 active goals reached. Remove a goal to add a new one.</p>';
+      html += '<p class="goal-modal-max-note">Maximum of 3 active goals reached. Remove a goal to add a new one.</p>';
     }
 
     // Close button
-    html += '<div style="text-align: center; margin-top: var(--space-md);"><button id="goal-close-btn" class="btn btn-sm" style="font-size: var(--font-xs); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary);">Close</button></div>';
+    html += '<div class="goal-modal-close-wrapper"><button id="goal-close-btn" class="btn btn-sm history-action-btn history-action-btn--default">Close</button></div>';
 
     card.innerHTML = html;
 

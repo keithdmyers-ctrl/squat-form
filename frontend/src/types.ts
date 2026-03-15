@@ -343,4 +343,7 @@ export interface SessionRecord {
     phase: string;
     repIndex: number;
   }>;
+  dots_score?: number;
+  notes?: string;
+  tags?: string[];
 }
