@@ -1145,20 +1145,45 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
   const tag = (e.target as HTMLElement)?.tagName;
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
 
-  if (e.key === 'h' || e.key === 'H') {
-    const historySection = document.getElementById('history-section');
-    if (historySection && historySection.style.display !== 'none') {
-      historySection.scrollIntoView({ behavior: 'smooth' });
+  switch (e.key) {
+    case 'h':
+    case 'H': {
+      const historySection = document.getElementById('history-section');
+      if (historySection && historySection.style.display !== 'none') {
+        historySection.scrollIntoView({ behavior: 'smooth' });
+      }
+      break;
     }
-  }
-
-  if (e.key === 'Escape') {
-    // Close any open modal/overlay
-    const overlays = document.querySelectorAll<HTMLElement>(
-      '#confirm-modal-overlay, #goal-modal-overlay, .warmup-overlay, #goal-celebration-overlay',
-    );
-    for (const overlay of overlays) {
-      overlay.remove();
+    case 'n':
+    case 'N': {
+      // Focus the file input / start new analysis
+      const uploadSection = document.getElementById('upload-section');
+      if (uploadSection) {
+        uploadSection.scrollIntoView({ behavior: 'smooth' });
+        videoInput?.focus();
+      }
+      break;
+    }
+    case 'Escape': {
+      // Close any open modal/overlay
+      const overlays = document.querySelectorAll<HTMLElement>(
+        '#confirm-modal-overlay, #goal-modal-overlay, .warmup-overlay, #goal-celebration-overlay',
+      );
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      break;
+    }
+    case '1': case '2': case '3': case '4': case '5':
+    case '6': case '7': case '8': case '9': {
+      // Jump to rep N in results
+      const repIndex = parseInt(e.key) - 1;
+      const repCards = document.querySelectorAll<HTMLElement>('.rep-card');
+      if (repCards[repIndex]) {
+        repCards[repIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        repCards[repIndex].click();
+      }
+      break;
     }
   }
 });
