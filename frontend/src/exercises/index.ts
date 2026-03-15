@@ -7,6 +7,8 @@ import type {
   DeadliftType,
   BenchType,
   OverheadPressType,
+  BarBellRowType,
+  LungeType,
   SquatType,
   ExperienceLevel,
   FrameData,
@@ -19,6 +21,10 @@ import { analyzeBenchSequence } from './bench';
 import type { BenchConfig } from './bench';
 import { analyzeOHPSequence } from './overhead-press';
 import type { OverheadPressConfig } from './overhead-press';
+import { analyzeRowSequence } from './barbell-row';
+import type { BarBellRowConfig } from './barbell-row';
+import { analyzeLungeSequence } from './lunge';
+import type { LungeConfig } from './lunge';
 
 export interface ExerciseConfig {
   exerciseType: ExerciseType;
@@ -29,6 +35,8 @@ export interface ExerciseConfig {
   deadliftType?: DeadliftType;
   benchType?: BenchType;
   ohpType?: OverheadPressType;
+  rowType?: BarBellRowType;
+  lungeType?: LungeType;
 }
 
 /**
@@ -68,6 +76,24 @@ export function analyzeExercise(
       return analyzeOHPSequence(frames, fps, ohpConfig);
     }
 
+    case 'barbell_row': {
+      const rowConfig: BarBellRowConfig = {
+        rowType: config.rowType ?? 'bent_over',
+        experienceLevel: config.experienceLevel,
+        competitionMode: config.competitionMode,
+      };
+      return analyzeRowSequence(frames, fps, rowConfig);
+    }
+
+    case 'lunge': {
+      const lungeConfig: LungeConfig = {
+        lungeType: config.lungeType ?? 'forward',
+        experienceLevel: config.experienceLevel,
+        competitionMode: config.competitionMode,
+      };
+      return analyzeLungeSequence(frames, fps, lungeConfig);
+    }
+
     case 'squat':
     default: {
       return analyzeSequence(frames, fps, {
@@ -85,6 +111,8 @@ export const EXERCISE_LABELS: Record<ExerciseType, string> = {
   deadlift: 'Deadlift',
   bench_press: 'Bench Press',
   overhead_press: 'Overhead Press',
+  barbell_row: 'Barbell Row',
+  lunge: 'Lunge',
 };
 
 /** Display labels for deadlift variants. */
@@ -106,4 +134,19 @@ export const OHP_LABELS: Record<OverheadPressType, string> = {
   strict: 'Strict Press',
   push_press: 'Push Press',
   behind_neck: 'Behind the Neck',
+};
+
+/** Display labels for barbell row variants. */
+export const ROW_LABELS: Record<BarBellRowType, string> = {
+  pendlay: 'Pendlay Row',
+  bent_over: 'Bent-Over Row',
+  yates: 'Yates Row',
+};
+
+/** Display labels for lunge variants. */
+export const LUNGE_LABELS: Record<LungeType, string> = {
+  forward: 'Forward Lunge',
+  reverse: 'Reverse Lunge',
+  walking: 'Walking Lunge',
+  bulgarian: 'Bulgarian Split Squat',
 };

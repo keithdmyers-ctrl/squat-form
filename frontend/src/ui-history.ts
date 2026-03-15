@@ -339,6 +339,9 @@ function renderHistoryList(container: HTMLElement, sessions: SessionRecord[]): v
     const topIssue = s.top_issue ? (ISSUE_DISPLAY_NAMES[s.top_issue] ?? formatIssueName(s.top_issue)) : 'None';
     const exerciseLabel = s.exercise_type === 'deadlift' ? 'DL'
       : s.exercise_type === 'bench_press' ? 'BP'
+      : s.exercise_type === 'overhead_press' ? 'OHP'
+      : s.exercise_type === 'barbell_row' ? 'ROW'
+      : s.exercise_type === 'lunge' ? 'LU'
       : 'SQ';
 
     // Build extra metric info based on current chart mode

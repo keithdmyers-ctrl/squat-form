@@ -185,6 +185,72 @@ const CORRECTIVE_EXERCISES: Record<string, CorrectiveExercise[]> = {
     { name: 'Pause at Shoulders', description: 'Lower the bar to your shoulders and hold for 2 seconds before pressing again. Builds control and eliminates momentum from the eccentric.', sets: '3x5, 2 sec pause' },
     { name: 'Eccentric-Only Overhead Press', description: 'Push press the bar up, then lower it as slowly as possible (5 seconds) back to your shoulders. Builds eccentric control with heavier weight.', sets: '3x3, 5 sec down' },
   ],
+
+  // ─── Barbell Row Corrective Exercises ───
+
+  torso_rise: [
+    { name: 'Seal Row', description: 'Lie face-down on an elevated bench and row the bar up. The bench support eliminates torso rise and isolates the back.', sets: '3x10' },
+    { name: 'Chest-Supported Row', description: 'Row with your chest supported on an incline bench. Removes the temptation to use momentum from the torso.', sets: '3x10' },
+    { name: 'Strict Pendlay Row', description: 'Row from the floor with a dead stop each rep. Reset your back angle between reps to enforce strict position.', sets: '3x6' },
+  ],
+  insufficient_rom_row: [
+    { name: 'Cable Row (full ROM)', description: 'Use a cable machine to row with a full range of motion, squeezing shoulder blades together at the top.', sets: '3x12' },
+    { name: 'Band Pull-Apart', description: 'Hold a band at shoulder width and pull it apart by squeezing your shoulder blades together. Builds the upper back strength for full ROM rows.', sets: '3x15' },
+    { name: 'Dumbbell Row', description: 'Row a dumbbell with one arm braced on a bench. The unilateral movement allows a fuller range of motion.', sets: '3x10 each side' },
+  ],
+  jerky_pull: [
+    { name: 'Tempo Row', description: 'Row with a 2-second pull and 2-second lower. Eliminates jerking by forcing constant tension.', sets: '3x8, 2 sec each way' },
+    { name: 'Pause Row', description: 'Pull the bar to your chest and hold for 1 second before lowering. Builds control at the top of the movement.', sets: '3x6, 1 sec pause' },
+    { name: 'Machine Row', description: 'Use a plate-loaded or cable row machine. The fixed path teaches smooth, controlled pulling.', sets: '3x12' },
+  ],
+  asymmetric_row: [
+    { name: 'Single-Arm Dumbbell Row', description: 'Row a dumbbell with one arm at a time, braced on a bench. Identifies and corrects strength imbalances between sides.', sets: '3x10 each side' },
+    { name: 'Cable Row', description: 'Use a single-handle cable attachment and row one arm at a time. The constant tension exposes asymmetries.', sets: '3x10 each side' },
+    { name: 'Meadows Row', description: 'Row a landmine barbell with one arm in a staggered stance. The unique angle builds balanced lat and upper back strength.', sets: '3x8 each side' },
+  ],
+  fast_lowering_row: [
+    { name: 'Tempo Eccentric Row', description: 'Row the bar up normally, then lower it over 3-4 seconds. Builds eccentric control and time under tension.', sets: '3x8, 3-4 sec down' },
+    { name: 'Chest-Supported Row', description: 'Row with your chest on an incline bench. The support makes it easier to control the lowering phase.', sets: '3x10' },
+    { name: 'Cable Row', description: 'The constant cable tension forces you to control the eccentric. Focus on a slow, smooth return.', sets: '3x12' },
+  ],
+  excessive_hip_extension: [
+    { name: 'Seal Row', description: 'Lie face-down on an elevated bench and row. Completely eliminates hip extension from the movement.', sets: '3x10' },
+    { name: 'Chest-Supported Row', description: 'Row with your chest on an incline bench. The bench prevents hip extension and momentum.', sets: '3x10' },
+    { name: 'Pendlay Row', description: 'Row from the floor with a dead stop each rep. The strict start position discourages hip extension.', sets: '3x6' },
+  ],
+
+  // ─── Lunge Corrective Exercises ───
+
+  knee_past_toes_lunge: [
+    { name: 'Reverse Lunge', description: 'Step backward into a lunge instead of forward. This naturally limits how far the front knee travels forward.', sets: '3x10 each side' },
+    { name: 'Step-Back Lunge', description: 'Focus on stepping far enough back that your front shin stays vertical. Use a mirror or video to check.', sets: '3x8 each side' },
+    { name: 'Ankle Mobility Drill', description: 'Perform banded ankle distractions to build controlled range. Better ankle mobility allows proper knee tracking.', sets: '3x30 sec each side' },
+  ],
+  insufficient_depth_lunge: [
+    { name: 'Goblet Reverse Lunge', description: 'Hold a dumbbell at your chest and reverse lunge. The counterbalance helps you achieve greater depth with control.', sets: '3x10 each side' },
+    { name: 'TRX Assisted Lunge', description: 'Hold TRX straps for balance and lunge deeply. The assistance lets you train the bottom range safely.', sets: '3x10 each side' },
+    { name: 'Hip Flexor Stretch', description: 'Kneel on one knee and push your hips forward. Tight hip flexors limit lunge depth — stretching them unlocks range of motion.', sets: '3x30 sec each side' },
+  ],
+  forward_lean_lunge: [
+    { name: 'Goblet Lunge', description: 'Hold a dumbbell at your chest and lunge. The front-loaded weight naturally cues an upright torso.', sets: '3x10 each side' },
+    { name: 'Overhead Lunge', description: 'Lunge with arms extended overhead holding a light plate or PVC. Any forward lean becomes immediately obvious.', sets: '3x8 each side' },
+    { name: 'Zercher Lunge', description: 'Hold a barbell in the crook of your elbows and lunge. The front-loaded position forces you to stay upright.', sets: '3x8 each side' },
+  ],
+  knee_valgus_lunge: [
+    { name: 'Banded Lateral Walk', description: 'Place a band above your knees and walk sideways, keeping tension. Strengthens hip abductors to prevent knee cave.', sets: '3x10 each direction' },
+    { name: 'Single-Leg Glute Bridge', description: 'Bridge on one leg at a time, squeezing your glute at the top. Builds the single-leg hip stability needed for lunges.', sets: '3x12 each side' },
+    { name: 'Monster Walk', description: 'With a band above your knees, take wide diagonal steps forward. Builds hip stability in a movement pattern similar to lunging.', sets: '3x10 each direction' },
+  ],
+  uneven_stride: [
+    { name: 'Walking Lunge with Pause', description: 'Walk forward in a lunge, pausing at the bottom of each rep for 2 seconds. The pause lets you check and correct stride length.', sets: '3x8 each side, 2 sec pause' },
+    { name: 'Alternating Reverse Lunge', description: 'Alternate reverse lunges in place, focusing on stepping the same distance back each time. Use floor markers if needed.', sets: '3x10 each side' },
+    { name: 'Split Squat Hold', description: 'Hold the bottom of a split squat for time. Builds stability and body awareness in the lunge position.', sets: '3x20 sec each side' },
+  ],
+  incomplete_lockout_lunge: [
+    { name: 'Split Squat', description: 'Perform stationary split squats, focusing on fully standing up and locking your hips at the top of each rep.', sets: '3x10 each side' },
+    { name: 'Lunge to Balance', description: 'Lunge forward, then drive up and balance on the front leg with the back knee raised. Forces complete hip extension.', sets: '3x8 each side' },
+    { name: 'Step-Up', description: 'Step onto a box or bench, fully extending your hip and knee at the top. Hold the top position for 1 second.', sets: '3x10 each side' },
+  ],
 };
 
 /** Get corrective exercises for a given issue name. */
@@ -323,6 +389,72 @@ export const PROGRESSION_DATABASE: Record<string, ExerciseProgression[]> = {
     { level: 'Start here', exercise: 'Tempo OHP (3x5) with 3-sec lowering', criteria: 'Can control bar for full 3 seconds on the way down' },
     { level: 'Progress to', exercise: 'Pause at Shoulders (3x5) with 2-sec pause', criteria: 'Smooth controlled lowering with clean pause' },
     { level: 'Goal', exercise: 'Full OHP with controlled descent', criteria: 'Bar lowered under control (1-2 sec) every rep' },
+  ],
+
+  // ─── Barbell Row Progressions ───
+
+  torso_rise: [
+    { level: 'Start here', exercise: 'Seal Row (3x10)', criteria: 'Can row without any torso rise' },
+    { level: 'Progress to', exercise: 'Strict Pendlay Row (3x6)', criteria: 'Torso stays parallel to floor throughout the pull' },
+    { level: 'Goal', exercise: 'Bent-over row with stable torso', criteria: 'No torso rise at working weight' },
+  ],
+  insufficient_rom_row: [
+    { level: 'Start here', exercise: 'Cable Row (3x12) with full squeeze', criteria: 'Shoulder blades fully retracted at top' },
+    { level: 'Progress to', exercise: 'Dumbbell Row (3x10) with pause at top', criteria: 'Bar or dumbbell touches torso every rep' },
+    { level: 'Goal', exercise: 'Full ROM barbell row', criteria: 'Bar contacts lower chest/upper abdomen on every rep' },
+  ],
+  jerky_pull: [
+    { level: 'Start here', exercise: 'Tempo Row (3x8) with 2-sec pull/lower', criteria: 'Smooth controlled movement throughout' },
+    { level: 'Progress to', exercise: 'Pause Row (3x6) with 1-sec hold', criteria: 'No jerking or momentum at any point' },
+    { level: 'Goal', exercise: 'Smooth barbell row at working weight', criteria: 'Controlled pull and lower on every rep' },
+  ],
+  asymmetric_row: [
+    { level: 'Start here', exercise: 'Single-Arm DB Row (3x10 each side)', criteria: 'Equal reps and control on both sides' },
+    { level: 'Progress to', exercise: 'Cable Row (3x10 each side)', criteria: 'Same weight and tempo both sides' },
+    { level: 'Goal', exercise: 'Symmetrical barbell row', criteria: 'Bar stays level and rises evenly with no lateral drift' },
+  ],
+  fast_lowering_row: [
+    { level: 'Start here', exercise: 'Tempo Eccentric Row (3x8) with 3-sec lower', criteria: 'Can control the bar for full 3 seconds on the way down' },
+    { level: 'Progress to', exercise: 'Chest-Supported Row (3x10)', criteria: 'Smooth controlled lowering with no dropping' },
+    { level: 'Goal', exercise: 'Barbell row with controlled eccentric', criteria: 'Bar lowered under control (1-2 sec) every rep' },
+  ],
+  excessive_hip_extension: [
+    { level: 'Start here', exercise: 'Seal Row (3x10)', criteria: 'Can row without any hip movement' },
+    { level: 'Progress to', exercise: 'Pendlay Row (3x6) with strict form', criteria: 'Hips stay locked in position throughout' },
+    { level: 'Goal', exercise: 'Bent-over row with no hip extension', criteria: 'Hip angle stays constant through the entire set' },
+  ],
+
+  // ─── Lunge Progressions ───
+
+  knee_past_toes_lunge: [
+    { level: 'Start here', exercise: 'Reverse Lunge (3x10 each side)', criteria: 'Front shin stays near vertical' },
+    { level: 'Progress to', exercise: 'Step-Back Lunge (3x8 each side)', criteria: 'Consistent stride length with vertical shin' },
+    { level: 'Goal', exercise: 'Forward lunge with controlled knee travel', criteria: 'Knee tracks over toes without excessive forward drift' },
+  ],
+  insufficient_depth_lunge: [
+    { level: 'Start here', exercise: 'TRX Assisted Lunge (3x10 each side)', criteria: 'Can reach full depth with assistance' },
+    { level: 'Progress to', exercise: 'Goblet Reverse Lunge (3x10 each side)', criteria: 'Back knee nearly touches floor' },
+    { level: 'Goal', exercise: 'Full depth lunge consistently', criteria: 'Back knee reaches 1-2 inches from floor every rep' },
+  ],
+  forward_lean_lunge: [
+    { level: 'Start here', exercise: 'Goblet Lunge (3x10 each side)', criteria: 'Can maintain upright torso with front load' },
+    { level: 'Progress to', exercise: 'Overhead Lunge (3x8 each side)', criteria: 'Arms stay overhead with no forward lean' },
+    { level: 'Goal', exercise: 'Lunge with proper torso angle', criteria: 'Torso stays within 10 degrees of vertical throughout' },
+  ],
+  knee_valgus_lunge: [
+    { level: 'Start here', exercise: 'Banded Lateral Walk (3x10 each direction)', criteria: 'Can maintain tension without knee cave' },
+    { level: 'Progress to', exercise: 'Single-Leg Glute Bridge (3x12 each side)', criteria: 'Full hip extension with stable knee position' },
+    { level: 'Goal', exercise: 'Lunge with proper knee tracking', criteria: 'Knee tracks over toes with no inward collapse' },
+  ],
+  uneven_stride: [
+    { level: 'Start here', exercise: 'Split Squat Hold (3x20 sec each side)', criteria: 'Can hold stable position with even stance' },
+    { level: 'Progress to', exercise: 'Alternating Reverse Lunge (3x10 each side)', criteria: 'Consistent stride length both sides' },
+    { level: 'Goal', exercise: 'Even stride on all lunge variations', criteria: 'Stride length within 10% between left and right sides' },
+  ],
+  incomplete_lockout_lunge: [
+    { level: 'Start here', exercise: 'Split Squat (3x10 each side)', criteria: 'Full hip and knee extension at top' },
+    { level: 'Progress to', exercise: 'Lunge to Balance (3x8 each side)', criteria: 'Can balance on front leg with full lockout' },
+    { level: 'Goal', exercise: 'Full lockout on every lunge rep', criteria: 'Complete hip and knee extension at top of every rep' },
   ],
 };
 

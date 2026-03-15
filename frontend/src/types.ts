@@ -32,6 +32,8 @@ export const ExerciseType = {
   DEADLIFT: 'deadlift',
   BENCH_PRESS: 'bench_press',
   OVERHEAD_PRESS: 'overhead_press',
+  BARBELL_ROW: 'barbell_row',
+  LUNGE: 'lunge',
 } as const;
 export type ExerciseType = (typeof ExerciseType)[keyof typeof ExerciseType];
 
@@ -55,6 +57,21 @@ export const OverheadPressType = {
   BEHIND_NECK: 'behind_neck',
 } as const;
 export type OverheadPressType = (typeof OverheadPressType)[keyof typeof OverheadPressType];
+
+export const BarBellRowType = {
+  PENDLAY: 'pendlay',
+  BENT_OVER: 'bent_over',
+  YATES: 'yates',
+} as const;
+export type BarBellRowType = (typeof BarBellRowType)[keyof typeof BarBellRowType];
+
+export const LungeType = {
+  FORWARD: 'forward',
+  REVERSE: 'reverse',
+  WALKING: 'walking',
+  BULGARIAN: 'bulgarian',
+} as const;
+export type LungeType = (typeof LungeType)[keyof typeof LungeType];
 
 export const SquatType = {
   BODYWEIGHT: 'bodyweight',

@@ -207,6 +207,24 @@ export const OHP_LABELS: ScoreDimensionLabels = {
   lockout: 'Lockout',
 };
 
+export const ROW_LABELS: ScoreDimensionLabels = {
+  depth: 'Row ROM',
+  kneeTracking: 'Control',
+  trunk: 'Back Position',
+  symmetry: 'Symmetry',
+  tempo: 'Tempo',
+  lockout: 'Torso Stability',
+};
+
+export const LUNGE_LABELS: ScoreDimensionLabels = {
+  depth: 'Depth',
+  kneeTracking: 'Knee Tracking',
+  trunk: 'Torso Position',
+  symmetry: 'Balance',
+  tempo: 'Tempo',
+  lockout: 'Lockout',
+};
+
 /**
  * Get the appropriate dimension labels for an exercise type.
  */
@@ -215,6 +233,8 @@ export function getDimensionLabels(exerciseType: ExerciseType | string): ScoreDi
     case 'deadlift': return DEADLIFT_LABELS;
     case 'bench_press': return BENCH_LABELS;
     case 'overhead_press': return OHP_LABELS;
+    case 'barbell_row': return ROW_LABELS;
+    case 'lunge': return LUNGE_LABELS;
     default: return SQUAT_LABELS;
   }
 }

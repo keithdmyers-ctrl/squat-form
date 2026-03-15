@@ -83,7 +83,7 @@ export function saveSettings(
   squatType: string, experienceLevel: string, weight?: string, weightUnit?: string,
   exerciseType?: string, deadliftType?: string, benchType?: string,
   bodyweight?: string, bodyweightUnit?: string, rpe?: string,
-  ohpType?: string,
+  ohpType?: string, rowType?: string, lungeType?: string,
 ): void {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
@@ -95,6 +95,8 @@ export function saveSettings(
       deadlift_type: deadliftType ?? 'conventional',
       bench_type: benchType ?? 'flat',
       ohp_type: ohpType ?? 'strict',
+      row_type: rowType ?? 'bent_over',
+      lunge_type: lungeType ?? 'forward',
       bodyweight: bodyweight ?? '',
       bodyweight_unit: bodyweightUnit ?? 'lbs',
       rpe: rpe ?? '',
@@ -107,6 +109,7 @@ export function saveSettings(
 export function loadSettings(): {
   squat_type: string; experience_level: string; weight?: string; weight_unit?: string;
   exercise_type?: string; deadlift_type?: string; bench_type?: string; ohp_type?: string;
+  row_type?: string; lunge_type?: string;
   bodyweight?: string; bodyweight_unit?: string; rpe?: string;
 } | null {
   try {
