@@ -252,13 +252,16 @@ function detectLungeIssues(
   const issues: FormIssue[] = [];
 
   // 1. Knee past toes: shin angle > 80 degrees
+  // Note: forward knee travel is not inherently harmful (Schoenfeld 2010; Hartmann et al. 2013),
+  // but very excessive forward shin angles can increase patellofemoral loading. Capped at
+  // MODERATE severity since this is position-dependent, not a direct injury mechanism.
   const shinAngles = rep.frameAngles.map(fa => fa.shinAngle);
   const maxShinAngle = shinAngles.length > 0 ? Math.max(...shinAngles) : 0;
   if (maxShinAngle > 80) {
     issues.push({
       name: 'knee_past_toes_lunge',
-      severity: maxShinAngle > 90 ? 'high' : 'moderate',
-      description: 'Front knee is traveling too far past your toes — take a longer stride',
+      severity: maxShinAngle > 90 ? 'moderate' : 'low',
+      description: 'Front knee is traveling far past your toes — a longer stride may shift more work to your glutes',
       value: maxShinAngle,
       threshold: 80,
       phase: SquatPhase.BOTTOM,
@@ -348,10 +351,10 @@ function detectLungeIssues(
 
 const LUNGE_CUE_DATABASE: Record<string, { cue: string; priority: number; explanation: string; explanationBeginner?: string }> = {
   knee_past_toes_lunge: {
-    cue: 'Take a longer stride — keep your shin vertical',
-    priority: 1,
-    explanation: 'Your front knee is traveling too far past your toes, which puts excessive stress on the knee joint. Take a bigger step so your shin stays more vertical at the bottom of the lunge. Think about dropping straight down rather than lunging forward.',
-    explanationBeginner: 'Your front knee is going too far past your toes. Try taking a bigger step forward — at the bottom of the lunge, your shin (the front of your lower leg) should be roughly straight up and down. Think about going DOWN, not forward.',
+    cue: 'Take a longer stride — keep your shin closer to vertical',
+    priority: 2,
+    explanation: 'Your front knee is traveling well past your toes. While some forward knee travel is normal and not inherently harmful (Schoenfeld 2010), a very forward shin angle can increase patellofemoral loading and shifts work away from your glutes and hamstrings. If you have no knee pain, this is a preference — but a longer stride often feels stronger and trains the posterior chain more effectively. Think about dropping straight down rather than lunging forward.',
+    explanationBeginner: 'Your front knee is going pretty far past your toes. This isn\'t necessarily bad, but taking a bigger step usually lets you work your glutes and hamstrings more. At the bottom of the lunge, try to keep your shin (the front of your lower leg) roughly straight up and down. Think about going DOWN, not forward. If your knees feel fine, don\'t stress about this too much!',
   },
   insufficient_depth_lunge: {
     cue: 'Drop your back knee toward the floor — aim for 90° at both knees',

@@ -344,9 +344,13 @@ export function generateAttemptPlan(estimated1RM: number, unit: string): { opene
 
 /**
  * Estimate RPE (Rate of Perceived Exertion) and RIR (Reps in Reserve) from
- * velocity metrics. Based on VBT research (Helms et al. 2016, Sports Med;
- * Zourdos et al. 2016, J Strength Cond Res): the ratio of ascent velocity to
- * descent velocity correlates with proximity to failure.
+ * angular velocity metrics. Uses the ascent/descent angular velocity ratio as
+ * a heuristic proxy for proximity to failure. This is NOT equivalent to
+ * validated velocity-based training (VBT) measurements using linear position
+ * transducers or accelerometers (Helms et al. 2016, Sports Med; Zourdos et al.
+ * 2016, J Strength Cond Res). The thresholds below are approximate and should
+ * be treated as rough estimates — the lifter's own subjective RPE is always
+ * more authoritative than this computed estimate.
  */
 export interface RPEEstimate {
   rpe: number;
@@ -370,10 +374,10 @@ export function estimateRPE(velocity: VelocityMetrics): RPEEstimate | null {
   const rir = Math.max(0, Math.round((10 - rpe) * 2) / 2);
 
   let description: string;
-  if (rpe >= 9.5) description = 'Maximum effort — little to nothing left in the tank';
-  else if (rpe >= 8.5) description = 'Very hard — maybe 1 rep left';
-  else if (rpe >= 7.5) description = 'Hard — could do 2-3 more reps';
-  else description = 'Moderate effort — room to spare';
+  if (rpe >= 9.5) description = 'Estimated maximum effort — little to nothing left in the tank';
+  else if (rpe >= 8.5) description = 'Estimated very hard — maybe 1 rep left';
+  else if (rpe >= 7.5) description = 'Estimated hard — could do 2-3 more reps';
+  else description = 'Estimated moderate effort — room to spare';
 
   return { rpe, rir, description };
 }

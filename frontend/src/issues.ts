@@ -226,13 +226,13 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
     alternateCues: ['Proud chest — show the logo on your shirt', 'Big breath, tight core, then pull'],
     priority: 1,
     explanation:
-      'Spinal flexion under load increases shear forces on the intervertebral discs and stress on the posterior ligaments (McGill 2010). A neutral spine distributes compressive force safely through the vertebral bodies. Before every pull, take a big breath into your belly (Valsalva maneuver increases intra-abdominal pressure and spinal stability), brace your core, and pull your chest up into a "proud chest" position. If you can\'t maintain a flat back, the weight is too heavy.',
+      'Lumbar (lower back) flexion under load increases shear forces on the intervertebral discs and stress on the posterior ligaments (McGill 2010). A neutral spine distributes compressive force safely through the vertebral bodies. Before every pull, take a big breath into your belly (Valsalva maneuver increases intra-abdominal pressure and spinal stability), brace your core, and pull your chest up into a "proud chest" position. If you can\'t maintain a flat back, the weight is too heavy. Note: some upper back (thoracic) rounding is common in heavy deadlifts and is generally less concerning than lower back rounding — many strong pullers intentionally round the upper back to reduce the moment arm. The primary concern is always the lower back.',
     explanationLow:
-      'Slight upper back rounding detected. Focus on pulling your chest up before you start the pull.',
+      'Slight upper back rounding detected. This is common and generally not a concern if your lower back stays flat. Focus on pulling your chest up before you start the pull.',
     explanationHigh:
-      'Significant spinal rounding under load. This is a serious injury risk. Reduce the weight until you can maintain a flat back throughout the pull.',
+      'Significant spinal rounding under load. If this is lower back rounding, it is a serious injury risk — reduce the weight until you can maintain a flat lower back throughout the pull. If only your upper back is rounding, it is less concerning but still worth monitoring.',
     explanationBeginner:
-      'Your back is rounding during the lift, which means your back is doing work it shouldn\'t be. Before you pull, take a big breath, tighten your belly, and stick your chest out proud. If you can\'t keep your back flat, the weight is probably too heavy — drop it down and work your way back up.',
+      'Your back is rounding during the lift, which means your back is doing work it shouldn\'t be. The most important thing is keeping your LOWER back flat — upper back rounding is less of a concern. Before you pull, take a big breath, tighten your belly, and stick your chest out proud. If you can\'t keep your back flat, the weight is probably too heavy — drop it down and work your way back up.',
   },
   hip_shoot: {
     cue: 'Push the floor away — hips and shoulders rise together',

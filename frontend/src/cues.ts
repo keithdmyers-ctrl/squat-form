@@ -33,8 +33,8 @@ const SVG_PAUSE_SQUAT = `<svg viewBox="0 0 80 50" xmlns="http://www.w3.org/2000/
 const CORRECTIVE_EXERCISES: Record<string, CorrectiveExercise[]> = {
   knee_valgus: [
     { name: 'Banded Squats', description: 'Loop a resistance band above your knees. Squat while actively pushing your knees into the band.', sets: '3x10', videoUrl: 'https://www.youtube.com/watch?v=BKqYPNFHbmA' },
-    { name: 'Clamshells', description: 'Lie on your side with knees bent. Open your top knee like a clamshell while keeping feet together.', sets: '3x15 each side', svg: SVG_CLAMSHELL, videoUrl: 'https://www.youtube.com/watch?v=cP0bYqzqPCk' },
-    { name: 'Monster Walks', description: 'With a band above your knees, take wide steps sideways keeping tension on the band.', sets: '3x10 each direction', videoUrl: 'https://www.youtube.com/watch?v=jMCRMnmMBHY' },
+    { name: 'Monster Walks', description: 'With a band above your knees, take wide steps sideways keeping tension on the band. Higher glute medius activation than clamshells (Macadam et al. 2015).', sets: '3x10 each direction', videoUrl: 'https://www.youtube.com/watch?v=jMCRMnmMBHY' },
+    { name: 'Clamshells', description: 'Lie on your side with knees bent. Open your top knee like a clamshell while keeping feet together. Good starting point if monster walks are too challenging.', sets: '3x15 each side', svg: SVG_CLAMSHELL, videoUrl: 'https://www.youtube.com/watch?v=cP0bYqzqPCk' },
   ],
   butt_wink: [
     { name: 'Box Squats', description: 'Squat to a box set at the depth where your lower back stays flat. Pause, then stand.', sets: '3x8', svg: SVG_PAUSE_SQUAT, videoUrl: 'https://www.youtube.com/watch?v=rMWYh5SQplM' },
@@ -161,9 +161,9 @@ const CORRECTIVE_EXERCISES: Record<string, CorrectiveExercise[]> = {
     { name: 'Dead Bugs', description: 'Lie on your back with arms and legs raised. Slowly extend opposite arm and leg while keeping your lower back pressed flat. Builds the core stability needed to resist lean-back.', sets: '3x10 each side' },
   ],
   partial_rom: [
-    { name: 'Behind-the-Neck Press (light)', description: 'Press a light bar from behind your neck. Builds shoulder mobility and strength through a longer range of motion. Use very light weight and stop if painful.', sets: '3x10' },
-    { name: 'Bradford Press', description: 'Alternate pressing the bar from front to behind your neck without fully locking out. Builds pressing strength through the full ROM around your head.', sets: '3x8' },
-    { name: 'Shoulder Dislocates', description: 'Hold a PVC pipe or band with a wide grip and rotate it slowly from your thighs all the way overhead and behind you. Builds shoulder mobility needed for full ROM pressing.', sets: '2x10' },
+    { name: 'Shoulder Dislocates', description: 'Hold a PVC pipe or band with a wide grip and rotate it slowly from your thighs all the way overhead and behind you. Builds shoulder mobility needed for full ROM pressing. Safe for most people.', sets: '2x10' },
+    { name: 'Dumbbell Overhead Press (progressive ROM)', description: 'Press dumbbells overhead, starting with a comfortable range and gradually lowering the start position each week. Dumbbells allow natural shoulder rotation and a safe, individualized range of motion.', sets: '3x10' },
+    { name: 'Bradford Press', description: 'Alternate pressing the bar from front to behind your neck without fully locking out. Builds pressing strength through the full ROM around your head. Skip this if you have any shoulder pain or limited shoulder mobility.', sets: '3x8' },
   ],
   forward_press: [
     { name: 'Landmine Press', description: 'Press a barbell anchored at one end in a landmine attachment. The fixed arc teaches a vertical press path and builds unilateral pressing strength.', sets: '3x10 each side' },
