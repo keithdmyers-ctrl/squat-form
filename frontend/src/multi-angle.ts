@@ -233,7 +233,7 @@ function isFrontViewIssue(issue: FormIssue): boolean {
  * Side view provides: depth, trunk, tempo, lockout scores.
  * Front view provides: knee tracking (FPPA), symmetry scores.
  */
-export function mergeRepScores(sideRep: RepScore, frontRep: RepScore): RepScore {
+export function mergeRepScores(sideRep: RepScore, frontRep: RepScore, experienceLevel?: string): RepScore {
   const overallScore = computeMergedOverall(sideRep, frontRep);
 
   // Merge issues: take all side issues + front-view-specific issues from front
@@ -262,7 +262,7 @@ export function mergeRepScores(sideRep: RepScore, frontRep: RepScore): RepScore 
     tempoScore: sideRep.tempoScore,
     lockoutScore: sideRep.lockoutScore,
     overallScore: totalScore,
-    grade: scoreToGrade(totalScore),
+    grade: scoreToGrade(totalScore, experienceLevel as 'beginner' | 'intermediate' | 'advanced' | undefined),
     issues: mergedIssues,
     cues: mergedCues,
     positiveFeedback: Array.from(positiveSet),
@@ -348,7 +348,7 @@ export function mergeMultiAngleAnalysis(
   for (let si = 0; si < sideAnalysis.reps.length; si++) {
     const fi = mapping.get(si);
     if (fi !== undefined && fi < frontAnalysis.reps.length) {
-      mergedReps.push(mergeRepScores(sideAnalysis.reps[si], frontAnalysis.reps[fi]));
+      mergedReps.push(mergeRepScores(sideAnalysis.reps[si], frontAnalysis.reps[fi], sideAnalysis.config?.experienceLevel));
     } else {
       // No front rep for this side rep -- use side only
       mergedReps.push(sideAnalysis.reps[si]);

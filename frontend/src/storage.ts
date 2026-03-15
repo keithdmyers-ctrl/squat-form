@@ -65,12 +65,20 @@ export function saveSession(
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
   } catch {
-    // Show a non-blocking warning
-    const warning = document.getElementById('storage-warning');
-    if (warning) {
-      warning.style.display = 'block';
-    } else {
-      console.warn('Session could not be saved: storage quota exceeded');
+    // Storage quota exceeded -- strip snapshots and retry
+    for (const s of sessions) {
+      if (s.snapshots) delete s.snapshots;
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    } catch {
+      // Still full -- show warning
+      const warning = document.getElementById('storage-warning');
+      if (warning) {
+        warning.style.display = 'block';
+      } else {
+        console.warn('Session could not be saved: storage quota exceeded');
+      }
     }
   }
 }

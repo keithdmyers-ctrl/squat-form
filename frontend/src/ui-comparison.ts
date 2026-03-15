@@ -106,8 +106,8 @@ export function renderComparisonView(sessionA: SessionRecord, sessionB: SessionR
 
   let dimRows = '';
   for (const dim of dims) {
-    const valA = (sessionA as any)[dim.keyA] as number | undefined;
-    const valB = (sessionB as any)[dim.keyB] as number | undefined;
+    const valA = sessionA[dim.keyA] as number | undefined;
+    const valB = sessionB[dim.keyB] as number | undefined;
     if (valA === undefined && valB === undefined) continue;
 
     const a = valA ?? 0;
