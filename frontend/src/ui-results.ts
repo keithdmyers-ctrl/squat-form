@@ -113,20 +113,18 @@ function renderProgressInsights(analysis: SetAnalysis, sessions: SessionRecord[]
 
   const insightsDiv = document.createElement('div');
   insightsDiv.id = 'progress-insights';
-  insightsDiv.className = 'card';
-  insightsDiv.style.cssText = 'border-left: 3px solid var(--accent); padding: 1rem; margin-bottom: 1rem;';
+  insightsDiv.className = 'card progress-insights-card';
 
   const heading = document.createElement('h4');
-  heading.style.cssText = 'margin: 0 0 0.5rem; font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;';
+  heading.className = 'section-heading-sm';
   heading.textContent = 'Progress Notes';
   insightsDiv.appendChild(heading);
 
   const list = document.createElement('ul');
-  list.style.cssText = 'margin: 0; padding-left: 1.25rem; font-size: 0.9rem; color: var(--text-secondary);';
+  list.className = 'progress-insights-list';
   for (const insight of insights) {
     const li = document.createElement('li');
     li.textContent = insight;
-    li.style.marginBottom = '0.35rem';
     list.appendChild(li);
   }
   insightsDiv.appendChild(list);
@@ -154,9 +152,8 @@ function renderTrainingRecommendations(
 
   const recDiv = document.createElement('div');
   recDiv.id = 'training-recommendations';
-  recDiv.className = 'card';
+  recDiv.className = 'card training-rec-card';
   recDiv.setAttribute('aria-label', 'Training recommendations');
-  recDiv.style.cssText = 'border-left: 3px solid var(--info); padding: 1rem 1.25rem; margin-bottom: 1rem;';
 
   const phaseColors: Record<string, string> = {
     hypertrophy: 'var(--accent)',
@@ -167,12 +164,13 @@ function renderTrainingRecommendations(
   const phaseColor = phaseColors[activePhase] ?? 'var(--accent)';
 
   const heading = document.createElement('h4');
-  heading.style.cssText = 'margin: 0 0 0.5rem; font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;';
+  heading.className = 'section-heading-sm';
   heading.textContent = 'Training Recommendations';
   recDiv.appendChild(heading);
 
   const phaseBadge = document.createElement('div');
-  phaseBadge.style.cssText = `display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; color: var(--bg-primary); background: ${phaseColor}; margin-bottom: 0.5rem;`;
+  phaseBadge.className = 'phase-badge-inline';
+  phaseBadge.style.background = phaseColor;
   phaseBadge.textContent = activePhase.charAt(0).toUpperCase() + activePhase.slice(1) + ' Phase';
   recDiv.appendChild(phaseBadge);
 
@@ -182,7 +180,7 @@ function renderTrainingRecommendations(
   recDiv.appendChild(desc);
 
   const grid = document.createElement('div');
-  grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.5rem; margin-bottom: 0.75rem;';
+  grid.className = 'training-rec-grid';
   for (const item of [
     { label: 'Sets', value: String(rec.sets) },
     { label: 'Reps', value: rec.reps },
@@ -190,26 +188,26 @@ function renderTrainingRecommendations(
     { label: 'Rest', value: rec.restMinutes + ' min' },
   ]) {
     const cell = document.createElement('div');
-    cell.style.cssText = 'background: var(--bg-input); border-radius: 6px; padding: 0.5rem; text-align: center;';
-    cell.innerHTML = `<div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">${escapeHtml(item.label)}</div><div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.15rem;">${escapeHtml(item.value)}</div>`;
+    cell.className = 'training-rec-cell';
+    cell.innerHTML = `<div class="training-rec-cell-label">${escapeHtml(item.label)}</div><div class="training-rec-cell-value">${escapeHtml(item.value)}</div>`;
     grid.appendChild(cell);
   }
   recDiv.appendChild(grid);
 
   if (rec.weightRange) {
     const weightInfo = document.createElement('div');
-    weightInfo.style.cssText = 'background: var(--bg-input); border-radius: 6px; padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; font-size: 0.9rem;';
+    weightInfo.className = 'training-rec-weight';
     weightInfo.innerHTML = `<span style="color: var(--text-muted);">Target weight:</span> <span style="color: var(--accent); font-weight: 700;">${rec.weightRange[0]}-${rec.weightRange[1]} ${escapeHtml(rec.weightUnit ?? 'lbs')}</span>`;
     recDiv.appendChild(weightInfo);
   }
 
   if (rec.focusAreas.length > 0) {
     const focusHeading = document.createElement('div');
-    focusHeading.style.cssText = 'font-size: 0.8rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.35rem;';
+    focusHeading.className = 'section-heading-xs';
     focusHeading.textContent = 'Focus Areas';
     recDiv.appendChild(focusHeading);
     const focusList = document.createElement('ul');
-    focusList.style.cssText = 'margin: 0 0 0.75rem; padding-left: 1.25rem; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6;';
+    focusList.className = 'training-rec-focus-list';
     for (const area of rec.focusAreas) {
       const li = document.createElement('li');
       li.textContent = area;
@@ -221,9 +219,9 @@ function renderTrainingRecommendations(
   if (sessions && sessions.length > 0) {
     const suggestion = suggestNextPhase(sessions.map(s => ({ score: s.overall_score, date: s.date })));
     const suggestionDiv = document.createElement('div');
-    suggestionDiv.style.cssText = 'background: var(--bg-input); border-radius: 6px; padding: 0.6rem 0.75rem; font-size: 0.85rem; border-left: 2px solid var(--text-muted);';
+    suggestionDiv.className = 'training-rec-suggestion';
     const nextPhaseLabel = suggestion.phase.charAt(0).toUpperCase() + suggestion.phase.slice(1);
-    suggestionDiv.innerHTML = `<div style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.2rem;">Suggested Next Phase</div><div style="color: var(--text-primary); font-weight: 600;">${escapeHtml(nextPhaseLabel)}</div><div style="color: var(--text-secondary); margin-top: 0.2rem;">${escapeHtml(suggestion.reason)}</div>`;
+    suggestionDiv.innerHTML = `<div class="training-rec-suggestion-label">Suggested Next Phase</div><div style="color: var(--text-primary); font-weight: 600;">${escapeHtml(nextPhaseLabel)}</div><div style="color: var(--text-secondary); margin-top: 0.2rem;">${escapeHtml(suggestion.reason)}</div>`;
     recDiv.appendChild(suggestionDiv);
   }
 
@@ -292,8 +290,8 @@ export function wrapInCollapsible(wrapperId: string, title: string, targetId: st
   details.setAttribute('aria-label', title);
 
   const summary = document.createElement('summary');
-  summary.style.cssText = 'cursor: pointer; font-size: 0.9rem; color: var(--text-muted, #888); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; list-style: none; display: flex; align-items: center; gap: 0.5rem; user-select: none;';
-  summary.innerHTML = `<span class="collapse-chevron" style="font-size: 0.6rem; transition: transform 0.2s; display: inline-block;">&#9654;</span> ${escapeHtml(title)}`;
+  summary.className = 'collapsible-summary';
+  summary.innerHTML = `<span class="collapse-chevron">&#9654;</span> ${escapeHtml(title)}`;
 
   // Toggle chevron rotation on open/close
   details.addEventListener('toggle', () => {
@@ -361,12 +359,17 @@ export function showResults(analysis: SetAnalysis, frameData: FrameData, session
   renderFocusSection(analysis, fps);
   if (!isBeginner) renderCoachingCues(analysis, fps);
   renderProgressInsights(analysis, sessions);
-  renderTrainingRecommendations(trainingPhase, oneRMEstimate, sessions, exerciseType);
+  if (!isBeginner) {
+    renderTrainingRecommendations(trainingPhase, oneRMEstimate, sessions, exerciseType);
+  }
 
-  // --- Tier 3: Details (collapsed by default, hidden for beginners unless expanded) ---
+  // --- Tier 3: Details (collapsed for beginners, expanded for advanced) ---
+  const isAdvanced = analysis.config.experienceLevel === 'advanced';
   if (!isBeginner) {
     renderScoreBreakdown(analysis);
-    wrapInCollapsible('breakdown-collapse', 'Score Breakdown', 'score-breakdown');
+    if (!isAdvanced) {
+      wrapInCollapsible('breakdown-collapse', 'Score Breakdown', 'score-breakdown');
+    }
   }
   if (oneRMEstimate) {
     renderOneRMEstimate(oneRMEstimate);
@@ -374,7 +377,9 @@ export function showResults(analysis: SetAnalysis, frameData: FrameData, session
   }
   if (!isBeginner) {
     renderRepCards(analysis);
-    wrapInCollapsible('rep-detail-collapse', 'Per-Rep Detail', 'rep-cards-section');
+    if (!isAdvanced) {
+      wrapInCollapsible('rep-detail-collapse', 'Per-Rep Detail', 'rep-cards-section');
+    }
   }
   if (!isBeginner) {
     renderVelocityChart(analysis);
@@ -587,8 +592,7 @@ function renderSetConfidence(analysis: SetAnalysis): void {
   const el = document.createElement('div');
   el.className = 'set-confidence';
   el.setAttribute('aria-label', `Pose detection confidence: ${tier.label} (${Math.round(avgConf * 100)}%)`);
-  el.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; opacity: 0.8; margin-top: 0.35rem;';
-  el.innerHTML = `<span style="color: ${tier.color}; font-size: 0.55rem;" aria-hidden="true">&#9679;</span> <span style="color: ${tier.color}; font-weight: 600;">${tier.label} confidence</span> <span style="color: var(--text-muted, #888); font-size: 0.7rem;">(${Math.round(avgConf * 100)}%)</span>`;
+  el.innerHTML = `<span class="set-confidence-dot" style="color: ${tier.color};" aria-hidden="true">&#9679;</span> <span class="set-confidence-label" style="color: ${tier.color};">${tier.label} confidence</span> <span class="set-confidence-pct">(${Math.round(avgConf * 100)}%)</span>`;
 
   container.appendChild(el);
 }
@@ -663,8 +667,8 @@ export function renderScoreBreakdown(analysis: SetAnalysis): void {
   }
 
   html += `
-    <div class="camera-confidence-note" style="margin-top: 0.75rem; padding: 0.5rem 0.75rem; background: rgba(255, 255, 255, 0.04); border-radius: 6px; border-left: 3px solid var(--text-muted);">
-      <span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">${escapeHtml(overallConfidenceNote)}</span>
+    <div class="camera-confidence-note">
+      <span class="camera-confidence-text">${escapeHtml(overallConfidenceNote)}</span>
     </div>
   `;
 
@@ -794,7 +798,6 @@ function createTimestampLink(frame: number, fps: number): HTMLSpanElement {
   const el = document.createElement('span');
   el.className = 'cue-timestamp';
   el.dataset.frame = String(frame);
-  el.style.cssText = 'font-size: 0.8rem; color: var(--accent); cursor: pointer; margin-left: 0.5rem;';
   el.textContent = `[${formatTimestamp(frame, fps)}]`;
   el.title = 'Click to see this moment in the video';
   el.setAttribute('role', 'button');
@@ -977,9 +980,7 @@ export function renderTierMessage(analysis: SetAnalysis): void {
     msgEl.style.color = 'var(--orange)';
   }
 
-  msgEl.style.fontSize = '0.9rem';
-  msgEl.style.marginTop = '0.75rem';
-  msgEl.style.lineHeight = '1.4';
+  // Styling handled by .tier-message CSS class
 
   container.appendChild(msgEl);
 }
@@ -1001,21 +1002,21 @@ export function renderPositiveFeedback(analysis: SetAnalysis): void {
   const highlights = analysis.positiveHighlights;
   positiveSection.style.display = 'block';
 
-  let html = '<h3 style="font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.75rem;">What You Did Well</h3>';
+  let html = '<h3 class="section-heading-sm" style="margin-bottom: 0.75rem;">What You Did Well</h3>';
 
   if (highlights.length === 0) {
     html += `
-      <div class="positive-item" style="display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.5rem; padding: 0.5rem 0.75rem; background: rgba(74, 222, 128, 0.08); border-radius: 8px; border-left: 3px solid var(--success);">
-        <span style="color: var(--success); font-weight: 700; flex-shrink: 0;" aria-hidden="true">&#10003;</span>
-        <span style="font-size: 0.9rem; color: var(--text);">You completed this set well across all dimensions. Keep it up!</span>
+      <div class="positive-item">
+        <span class="positive-item-icon" aria-hidden="true">&#10003;</span>
+        <span class="positive-item-text">You completed this set well across all dimensions. Keep it up!</span>
       </div>
     `;
   } else {
     for (const item of highlights) {
       html += `
-        <div class="positive-item" style="display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.5rem; padding: 0.5rem 0.75rem; background: rgba(74, 222, 128, 0.08); border-radius: 8px; border-left: 3px solid var(--success);">
-          <span style="color: var(--success); font-weight: 700; flex-shrink: 0;" aria-hidden="true">&#10003;</span>
-          <span style="font-size: 0.9rem; color: var(--text);">${escapeHtml(item)}</span>
+        <div class="positive-item">
+          <span class="positive-item-icon" aria-hidden="true">&#10003;</span>
+          <span class="positive-item-text">${escapeHtml(item)}</span>
         </div>
       `;
     }
@@ -1041,7 +1042,7 @@ function confidenceTier(confidence: number): { label: string; color: string; cla
 function renderConfidenceBadge(confidence: number | undefined): string {
   if (confidence === undefined || confidence === null) return '';
   const tier = confidenceTier(confidence);
-  return `<span class="confidence-badge ${tier.className}" style="display: inline-flex; align-items: center; gap: 3px; font-size: 0.65rem; color: ${tier.color}; opacity: 0.85; margin-top: 0.2rem; white-space: nowrap;" title="Pose detection confidence: ${Math.round(confidence * 100)}%"><span style="font-size: 0.5rem;" aria-hidden="true">&#9679;</span> ${tier.label}</span>`;
+  return `<span class="confidence-badge ${tier.className}" style="color: ${tier.color};" title="Pose detection confidence: ${Math.round(confidence * 100)}%"><span class="confidence-dot" aria-hidden="true">&#9679;</span> ${tier.label}</span>`;
 }
 
 // ─── Per-Rep Narrative ───
@@ -1126,19 +1127,18 @@ function renderRepNarrative(reps: RepScore[]): void {
 
   const narrativeDiv = document.createElement('div');
   narrativeDiv.id = 'rep-narrative';
+  narrativeDiv.className = 'rep-narrative-card';
   narrativeDiv.setAttribute('aria-label', 'Rep-by-rep feedback');
-  narrativeDiv.style.cssText = 'margin-bottom: 1rem; padding: 0.75rem 1rem; background: var(--bg-input, #1e1e1e); border-radius: var(--radius-sm, 8px); border-left: 3px solid var(--accent, #00d4ff);';
 
   const title = document.createElement('h4');
+  title.className = 'rep-narrative-heading';
   title.textContent = 'Rep-by-Rep';
-  title.style.cssText = 'margin: 0 0 0.5rem 0; font-size: 0.85rem; color: var(--accent, #00d4ff); text-transform: uppercase; letter-spacing: 0.5px;';
   narrativeDiv.appendChild(title);
 
   const ul = document.createElement('ul');
-  ul.style.cssText = 'margin: 0; padding: 0 0 0 1.2rem; list-style: disc;';
+  ul.className = 'rep-narrative-list';
   for (const text of narratives) {
     const li = document.createElement('li');
-    li.style.cssText = 'font-size: 0.85rem; color: var(--text-muted, #aaa); line-height: 1.6;';
     li.textContent = text;
     ul.appendChild(li);
   }
@@ -1210,12 +1210,12 @@ function renderRepCards(analysis: SetAnalysis): void {
 
     // Best dimension for this rep
     const bestDim = getBestDimension(rep);
-    const bestDimHtml = `<div style="font-size: 0.65rem; color: var(--success, #4ade80); margin-top: 0.25rem; white-space: nowrap;" title="Strongest dimension this rep">Best: ${escapeHtml(bestDim.label)} (${bestDim.score})</div>`;
+    const bestDimHtml = `<div class="rep-best-dim" title="Strongest dimension this rep">Best: ${escapeHtml(bestDim.label)} (${bestDim.score})</div>`;
 
     // Top positive feedback for this rep (first item if available)
     let positiveLine = '';
     if (rep.positiveFeedback.length > 0) {
-      positiveLine = `<div style="font-size: 0.7rem; color: var(--text-muted, #888); margin-top: 0.2rem; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(rep.positiveFeedback[0])}">${escapeHtml(rep.positiveFeedback[0])}</div>`;
+      positiveLine = `<div class="rep-positive-line" title="${escapeHtml(rep.positiveFeedback[0])}">${escapeHtml(rep.positiveFeedback[0])}</div>`;
     }
 
     card.innerHTML = `
@@ -1424,8 +1424,7 @@ export function renderVelocityChart(analysis: SetAnalysis): void {
 
   const container = document.createElement('div');
   container.id = 'velocity-chart-section';
-  container.className = 'card';
-  container.style.cssText = 'padding: 1rem; margin: 0.75rem 0;';
+  container.className = 'card velocity-chart-card';
 
   const velocities = analysis.reps.map(r => r.velocity?.meanAscentVelocity ?? 0);
   const maxVel = Math.max(...velocities, 1);
@@ -1460,9 +1459,9 @@ export function renderVelocityChart(analysis: SetAnalysis): void {
   });
 
   container.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-      <strong style="font-size: 0.85rem; color: var(--text-primary, #e0e0e0);">Velocity Profile</strong>
-      <span style="font-size: 0.75rem; color: ${lossColor};">
+    <div class="velocity-header">
+      <strong class="velocity-title">Velocity Profile</strong>
+      <span class="velocity-loss" style="color: ${lossColor};">
         ${velocityLoss > 0 ? `${velocityLoss}% velocity loss` : 'Consistent velocity'}
       </span>
     </div>
@@ -1475,15 +1474,64 @@ export function renderVelocityChart(analysis: SetAnalysis): void {
         return `<circle cx="${x}" cy="${y}" r="3" fill="${color}" />`;
       }).join('')}
     </svg>
-    <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted, #808080); margin-top: 0.25rem;">
-      ${velocities.map((v, i) => `<span title="Rep ${i + 1}: ${v} deg/s${rpeLabels[i] ? ', ' + rpeLabels[i] : ''}">R${i + 1}</span>`).join('')}
+    <div style="display: grid; grid-template-columns: repeat(${velocities.length}, 1fr); font-size: 0.65rem; text-align: center; margin-top: 0.35rem; gap: 2px;">
+      ${analysis.reps.map((r, i) => {
+        const v = r.velocity;
+        const rpe = rpeLabels[i] || '';
+        const velColor = i === 0 ? 'var(--success)' : i === velocities.length - 1 ? (velocityLoss > 30 ? 'var(--danger)' : 'var(--accent)') : 'var(--text-secondary)';
+        return `<div>
+          <div style="font-weight: 700; color: var(--text-muted);">R${i + 1}</div>
+          <div style="color: ${velColor};" title="Mean ascent angular velocity">${v?.meanAscentVelocity ?? '-'}</div>
+          <div style="color: var(--text-muted);" title="Ascent/descent ratio">${v ? v.ascentDescentRatio.toFixed(1) + 'x' : '-'}</div>
+          ${rpe ? `<div style="color: var(--accent); font-size: 0.6rem;">${rpe}</div>` : ''}
+        </div>`;
+      }).join('')}
     </div>
-    ${velocityLoss > 20 ? `<div style="font-size: 0.75rem; color: var(--text-secondary, #b0b0b0); margin-top: 0.35rem;">
+    <div style="font-size: 0.6rem; color: var(--text-muted); text-align: right; margin-top: 0.15rem;">deg/s | ratio | est. RPE</div>
+    ${velocityLoss > 20 ? `<div class="velocity-advice">
       ${velocityLoss > 30
         ? 'Significant velocity drop — consider stopping 1-2 reps earlier next set for better quality reps.'
         : 'Moderate velocity drop across the set — form held well but fatigue is accumulating.'}
     </div>` : ''}
   `;
+
+  // Compare user-entered RPE vs velocity-estimated RPE (last rep = most representative)
+  const rpeInput = document.getElementById('rpe-input') as HTMLSelectElement | null;
+  const userRpe = rpeInput ? parseFloat(rpeInput.value) : NaN;
+  const lastRepVelocity = analysis.reps[analysis.reps.length - 1]?.velocity;
+  if (isFinite(userRpe) && lastRepVelocity) {
+    const lastRatio = lastRepVelocity.ascentDescentRatio;
+    let estRpe: number;
+    if (lastRatio < 0.3) estRpe = 10;
+    else if (lastRatio < 0.5) estRpe = 9.5;
+    else if (lastRatio < 0.7) estRpe = 9;
+    else if (lastRatio < 0.9) estRpe = 8;
+    else if (lastRatio < 1.1) estRpe = 7;
+    else estRpe = 6;
+
+    const diff = estRpe - userRpe;
+    const diffAbs = Math.abs(diff);
+    let calibrationNote = '';
+    if (diffAbs <= 0.5) {
+      calibrationNote = 'Your RPE calibration is dialed in.';
+    } else if (diff > 0) {
+      calibrationNote = `You rated this easier than the velocity suggests. You may be underestimating effort by ~${diff.toFixed(1)} RPE.`;
+    } else {
+      calibrationNote = `You rated this harder than the velocity suggests. You may be overestimating effort by ~${diffAbs.toFixed(1)} RPE.`;
+    }
+
+    const rpeCompDiv = document.createElement('div');
+    rpeCompDiv.style.cssText = 'margin-top: 0.5rem; padding: 0.4rem 0.6rem; background: var(--bg-input); border-radius: var(--radius-sm, 6px); font-size: 0.8rem; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;';
+    rpeCompDiv.innerHTML = `
+      <div>
+        <span style="color: var(--text-muted);">Your RPE:</span> <span style="color: var(--accent); font-weight: 700;">${userRpe}</span>
+        <span style="color: var(--text-muted); margin: 0 0.25rem;">|</span>
+        <span style="color: var(--text-muted);">Estimated:</span> <span style="color: var(--accent); font-weight: 700;">${estRpe}</span>
+      </div>
+      <div style="font-size: 0.7rem; color: ${diffAbs <= 0.5 ? 'var(--success)' : 'var(--warning)'};">${calibrationNote}</div>
+    `;
+    container.appendChild(rpeCompDiv);
+  }
 
   // Insert after score breakdown or after focus section
   const breakdown = document.getElementById('score-breakdown');
@@ -1594,16 +1642,19 @@ export function renderCompetitionBadge(analysis: SetAnalysis): void {
 
   if (!analysis.competitionMode) return;
 
-  const container = $('overall-score-card');
+  // Full-width competition banner above the score card for authoritative presence
+  const scoresPanel = document.querySelector('.scores-panel');
+  if (!scoresPanel) return;
+
   const badge = document.createElement('div');
   badge.id = 'competition-badge';
   badge.className = 'competition-badge';
-  badge.setAttribute('aria-label', 'Competition mode active');
-  badge.innerHTML = 'Competition Mode';
-  badge.style.cssText = 'background: #e11d48; color: white; font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.75rem; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; width: fit-content;';
+  badge.setAttribute('aria-label', 'Competition mode active: IPF/USAPL judging standards applied');
+  badge.style.cssText = 'background: linear-gradient(135deg, #e11d48, #be123c); color: white; font-size: 0.85rem; font-weight: 700; padding: 0.65rem 1rem; border-radius: var(--radius-sm, 6px); text-transform: uppercase; letter-spacing: 1px; text-align: center; margin-bottom: 0.75rem; box-shadow: 0 2px 8px rgba(225, 29, 72, 0.3);';
+  badge.innerHTML = 'Competition Mode &mdash; IPF/USAPL Standards';
 
-  // Insert at the top of the score card
-  container.prepend(badge);
+  // Insert at the very top of the scores panel
+  scoresPanel.prepend(badge);
 }
 
 // ─── Competition Depth Judgment ───

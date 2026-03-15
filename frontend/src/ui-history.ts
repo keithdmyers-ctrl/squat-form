@@ -30,6 +30,13 @@ import { getDimensionLabels } from './exercise-core';
 
 type ChartMode = 'score' | 'weight' | 'rpe' | 'bodyweight';
 let currentChartMode: ChartMode = 'score';
+let currentExerciseFilter: string = 'all';
+
+/** Filter sessions by exercise type if a filter is active. */
+function filterByExercise(sessions: SessionRecord[]): SessionRecord[] {
+  if (currentExerciseFilter === 'all') return sessions;
+  return sessions.filter(s => (s.exercise_type ?? 'squat') === currentExerciseFilter);
+}
 
 // ─── Session History View ───
 
@@ -85,23 +92,58 @@ function renderChartWithToggle(container: HTMLElement, sessions: SessionRecord[]
   }
   toggleHtml += '</div>';
 
-  const chartSvg = renderHistoryChart(sessions, currentChartMode);
-  container.innerHTML = toggleHtml + '<div id="history-chart-svg">' + chartSvg + '</div>';
+  // Exercise filter (only show if multiple exercise types exist)
+  const exerciseTypes = new Set(sessions.map(s => s.exercise_type ?? 'squat'));
+  let filterHtml = '';
+  if (exerciseTypes.size > 1) {
+    const filters: { key: string; label: string }[] = [
+      { key: 'all', label: 'All' },
+      ...Array.from(exerciseTypes).map(t => ({
+        key: t,
+        label: t === 'deadlift' ? 'DL' : t === 'bench_press' ? 'BP' : t === 'overhead_press' ? 'OHP' : t === 'barbell_row' ? 'ROW' : t === 'lunge' ? 'LU' : 'SQ',
+      })),
+    ];
+    filterHtml = '<div class="chart-mode-toggle" role="group" aria-label="Exercise filter" style="margin-bottom: 0.25rem;">';
+    for (const f of filters) {
+      const active = f.key === currentExerciseFilter ? ' active' : '';
+      filterHtml += `<button type="button" class="chart-mode-btn exercise-filter-btn${active}" data-exercise-filter="${f.key}" aria-pressed="${f.key === currentExerciseFilter}">${f.label}</button>`;
+    }
+    filterHtml += '</div>';
+  }
+
+  const filtered = filterByExercise(sessions);
+  const chartSvg = renderHistoryChart(filtered, currentChartMode);
+  container.innerHTML = filterHtml + toggleHtml + '<div id="history-chart-svg">' + chartSvg + '</div>';
+
+  function rerenderChart(): void {
+    const svgContainer = document.getElementById('history-chart-svg');
+    if (svgContainer) {
+      svgContainer.innerHTML = renderHistoryChart(filterByExercise(sessions), currentChartMode);
+    }
+  }
 
   // Wire up toggle buttons
-  container.querySelectorAll<HTMLButtonElement>('.chart-mode-btn').forEach((btn) => {
+  container.querySelectorAll<HTMLButtonElement>('.chart-mode-btn:not(.exercise-filter-btn)').forEach((btn) => {
     btn.addEventListener('click', () => {
       currentChartMode = (btn.dataset.chartMode ?? 'score') as ChartMode;
       // Update active states
-      container.querySelectorAll<HTMLButtonElement>('.chart-mode-btn').forEach((b) => {
+      container.querySelectorAll<HTMLButtonElement>('.chart-mode-btn:not(.exercise-filter-btn)').forEach((b) => {
         b.classList.toggle('active', b.dataset.chartMode === currentChartMode);
         b.setAttribute('aria-pressed', String(b.dataset.chartMode === currentChartMode));
       });
-      // Re-render just the chart SVG
-      const svgContainer = document.getElementById('history-chart-svg');
-      if (svgContainer) {
-        svgContainer.innerHTML = renderHistoryChart(sessions, currentChartMode);
-      }
+      rerenderChart();
+    });
+  });
+
+  // Wire up exercise filter buttons
+  container.querySelectorAll<HTMLButtonElement>('.exercise-filter-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      currentExerciseFilter = btn.dataset.exerciseFilter ?? 'all';
+      container.querySelectorAll<HTMLButtonElement>('.exercise-filter-btn').forEach((b) => {
+        b.classList.toggle('active', b.dataset.exerciseFilter === currentExerciseFilter);
+        b.setAttribute('aria-pressed', String(b.dataset.exerciseFilter === currentExerciseFilter));
+      });
+      rerenderChart();
     });
   });
 }
@@ -136,10 +178,10 @@ function renderHistoryChart(sessions: SessionRecord[], mode: ChartMode): string 
     }
   };
 
-  const filtered = sessions.slice(0, 10).filter(s => getData(s) != null);
+  const filtered = sessions.slice(0, 20).filter(s => getData(s) != null);
 
   if (filtered.length < 2) {
-    return `<p style="color: var(--text-muted); font-size: 0.875rem; text-align: center; padding: 1rem;">Need 2+ sessions with ${getLabel().toLowerCase()} data to show this chart.</p>`;
+    return `<p class="chart-empty-message">Need 2+ sessions with ${getLabel().toLowerCase()} data to show this chart.</p>`;
   }
 
   const recent = filtered.reverse(); // oldest first for left-to-right
@@ -152,9 +194,9 @@ function renderHistoryChart(sessions: SessionRecord[], mode: ChartMode): string 
 }
 
 function renderScoreChart(sessions: SessionRecord[]): string {
-  const recent = sessions.slice(0, 10).reverse(); // oldest first for left-to-right
+  const recent = sessions.slice(0, 20).reverse(); // oldest first for left-to-right
   if (recent.length < 2) {
-    return '<p style="color: var(--text-muted); font-size: 0.875rem; text-align: center; padding: 1rem;">Complete 2+ sessions to see your trend chart.</p>';
+    return '<p class="chart-empty-message">Complete 2+ sessions to see your trend chart.</p>';
   }
 
   const svgWidth = 400;
@@ -234,14 +276,14 @@ function renderRpeChart(recent: SessionRecord[]): string {
   let gridHtml = '';
   for (const val of yLines) {
     const y = padT + ((maxY - val) / range) * chartH;
-    gridHtml += `<line x1="${padL}" y1="${y}" x2="${svgWidth - padR}" y2="${y}" stroke="#333" stroke-width="0.5" />`;
-    gridHtml += `<text x="${padL - 5}" y="${y + 4}" text-anchor="end" fill="#888" font-size="9">${val}</text>`;
+    gridHtml += `<line x1="${padL}" y1="${y}" x2="${svgWidth - padR}" y2="${y}" stroke="var(--border, #333)" stroke-width="0.5" />`;
+    gridHtml += `<text x="${padL - 5}" y="${y + 4}" text-anchor="end" fill="var(--text-muted, #888)" font-size="9">${val}</text>`;
   }
 
   let dotsHtml = '';
   for (const p of points) {
     const color = p.value >= 9 ? 'var(--danger)' : p.value >= 8 ? 'var(--warning)' : 'var(--success)';
-    dotsHtml += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${color}" stroke="#0f0f0f" stroke-width="1.5"><title>RPE: ${p.value}</title></circle>`;
+    dotsHtml += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${color}" stroke="var(--bg-primary, #0f0f0f)" stroke-width="1.5"><title>RPE: ${p.value}</title></circle>`;
   }
 
   const firstDate = formatShortDate(recent[0].date);
@@ -252,8 +294,8 @@ function renderRpeChart(recent: SessionRecord[]): string {
       ${gridHtml}
       <path d="${pathD}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
       ${dotsHtml}
-      <text x="${padL}" y="${svgHeight - 5}" fill="#888" font-size="9">${firstDate}</text>
-      <text x="${svgWidth - padR}" y="${svgHeight - 5}" text-anchor="end" fill="#888" font-size="9">${lastDate}</text>
+      <text x="${padL}" y="${svgHeight - 5}" fill="var(--text-muted, #888)" font-size="9">${firstDate}</text>
+      <text x="${svgWidth - padR}" y="${svgHeight - 5}" text-anchor="end" fill="var(--text-muted, #888)" font-size="9">${lastDate}</text>
     </svg>
   `;
 }
@@ -299,15 +341,15 @@ function renderAutoScaleChart(
   let gridHtml = '';
   for (let val = Math.ceil(minY / step) * step; val <= maxY; val += step) {
     const y = padT + ((maxY - val) / range) * chartH;
-    gridHtml += `<line x1="${padL}" y1="${y}" x2="${svgWidth - padR}" y2="${y}" stroke="#333" stroke-width="0.5" />`;
-    gridHtml += `<text x="${padL - 5}" y="${y + 4}" text-anchor="end" fill="#888" font-size="9">${Math.round(val)}</text>`;
+    gridHtml += `<line x1="${padL}" y1="${y}" x2="${svgWidth - padR}" y2="${y}" stroke="var(--border, #333)" stroke-width="0.5" />`;
+    gridHtml += `<text x="${padL - 5}" y="${y + 4}" text-anchor="end" fill="var(--text-muted, #888)" font-size="9">${Math.round(val)}</text>`;
   }
 
   let dotsHtml = '';
   for (const p of points) {
     const color = 'var(--accent)';
     const unitStr = p.unit ? ` ${p.unit}` : '';
-    dotsHtml += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${color}" stroke="#0f0f0f" stroke-width="1.5"><title>${label}: ${p.value}${unitStr}</title></circle>`;
+    dotsHtml += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${color}" stroke="var(--bg-primary, #0f0f0f)" stroke-width="1.5"><title>${label}: ${p.value}${unitStr}</title></circle>`;
   }
 
   const firstDate = formatShortDate(recent[0].date);
@@ -318,8 +360,8 @@ function renderAutoScaleChart(
       ${gridHtml}
       <path d="${pathD}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
       ${dotsHtml}
-      <text x="${padL}" y="${svgHeight - 5}" fill="#888" font-size="9">${firstDate}</text>
-      <text x="${svgWidth - padR}" y="${svgHeight - 5}" text-anchor="end" fill="#888" font-size="9">${lastDate}</text>
+      <text x="${padL}" y="${svgHeight - 5}" fill="var(--text-muted, #888)" font-size="9">${firstDate}</text>
+      <text x="${svgWidth - padR}" y="${svgHeight - 5}" text-anchor="end" fill="var(--text-muted, #888)" font-size="9">${lastDate}</text>
     </svg>
   `;
 }
@@ -335,12 +377,12 @@ function niceStep(range: number, targetLines: number): number {
   return 10 * magnitude;
 }
 
-function renderHistoryList(container: HTMLElement, sessions: SessionRecord[]): void {
-  const displaySessions = sessions.slice(0, 10);
+function renderHistoryList(container: HTMLElement, sessions: SessionRecord[], showCount: number = 20): void {
+  const displaySessions = sessions.slice(0, showCount);
   let html = '';
 
   if (displaySessions.length >= 2) {
-    html += '<div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">Select two sessions to compare</div>';
+    html += '<div class="history-compare-hint">Select two sessions to compare</div>';
   }
 
   html += '<div class="history-list-items">';
@@ -360,17 +402,17 @@ function renderHistoryList(container: HTMLElement, sessions: SessionRecord[]): v
     // Build extra metric info based on current chart mode
     let metricHtml = '';
     if (currentChartMode === 'weight' && s.weight != null) {
-      metricHtml = `<span style="font-size: 0.7rem; color: var(--accent);">${s.weight}${s.weight_unit ?? ''}</span>`;
+      metricHtml = `<span class="history-metric">${s.weight}${s.weight_unit ?? ''}</span>`;
     } else if (currentChartMode === 'rpe' && s.rpe != null) {
-      metricHtml = `<span style="font-size: 0.7rem; color: var(--accent);">RPE ${s.rpe}</span>`;
+      metricHtml = `<span class="history-metric">RPE ${s.rpe}</span>`;
     } else if (currentChartMode === 'bodyweight' && s.bodyweight != null) {
-      metricHtml = `<span style="font-size: 0.7rem; color: var(--accent);">${s.bodyweight}${s.bodyweight_unit ?? ''}</span>`;
+      metricHtml = `<span class="history-metric">${s.bodyweight}${s.bodyweight_unit ?? ''}</span>`;
     }
 
     html += `
-      <div class="history-item" data-compare-idx="${idx}" style="cursor: pointer;" role="button" tabindex="0" aria-label="Session ${dateStr}: ${exerciseLabel}, ${s.grade}, ${s.overall_score} points">
+      <div class="history-item" data-compare-idx="${idx}" style="cursor: pointer;" role="checkbox" aria-checked="false" tabindex="0" aria-label="Session ${dateStr}: ${exerciseLabel}, ${s.grade}, ${s.overall_score} points">
         <span class="history-date">${escapeHtml(dateStr)}</span>
-        <span style="font-size: 0.7rem; color: var(--accent-dim); font-weight: 600;">${exerciseLabel}</span>
+        <span class="history-exercise-label">${exerciseLabel}</span>
         <span class="history-grade" style="color: ${color}; font-weight: 700;">${escapeHtml(s.grade)}</span>
         <span class="history-score">${s.overall_score}</span>
         <span class="history-reps">${s.rep_count} reps${metricHtml ? ' ' : ''}${metricHtml}</span>
@@ -380,7 +422,7 @@ function renderHistoryList(container: HTMLElement, sessions: SessionRecord[]): v
   }
 
   html += '</div>';
-  html += '<div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap;">';
+  html += '<div class="history-actions">';
   html += `<button id="compare-btn" class="btn btn-sm" style="font-size: 0.8rem; background: var(--accent); color: var(--bg-primary);${displaySessions.length < 2 ? ' opacity: 0.4; cursor: not-allowed;' : ''}" aria-label="Compare selected sessions" disabled>Compare (0/2)</button>`;
   html += '<button id="set-goals-btn" class="btn btn-sm" style="font-size: 0.8rem; background: var(--bg-input); border: 1px solid var(--accent); color: var(--accent);" aria-label="Set performance goals">Set Goals</button>';
   html += '<button id="export-csv-btn" class="btn btn-sm" style="font-size: 0.8rem; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary);" aria-label="Export session history as CSV">Export CSV</button>';
@@ -415,9 +457,11 @@ function renderHistoryList(container: HTMLElement, sessions: SessionRecord[]): v
       if (selectedIndices.has(idx)) {
         selectedIndices.delete(idx);
         item.classList.remove('selected');
+        item.setAttribute('aria-checked', 'false');
       } else if (selectedIndices.size < 2) {
         selectedIndices.add(idx);
         item.classList.add('selected');
+        item.setAttribute('aria-checked', 'true');
       }
       updateCompareState();
     };

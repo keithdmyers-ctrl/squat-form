@@ -221,9 +221,27 @@ function updateExperienceHint(): void {
   }
 }
 
-experienceSelect.addEventListener('change', updateExperienceHint);
-// Set initial hint based on current selection
+/** Hide advanced settings (RPE, Training Phase, Bodyweight) for beginners. */
+function updateAdvancedSettingsVisibility(): void {
+  const isBeginner = experienceSelect.value === 'beginner';
+  document.querySelectorAll<HTMLElement>('.advanced-setting').forEach((el) => {
+    el.classList.toggle('beginner-hidden', isBeginner);
+  });
+  // Always show competition mode -- experienced lifters at any level
+  // should be able to toggle IPF/USAPL judging standards
+  const compToggle = document.getElementById('competition-toggle-container');
+  if (compToggle) {
+    compToggle.style.display = '';
+  }
+}
+
+experienceSelect.addEventListener('change', () => {
+  updateExperienceHint();
+  updateAdvancedSettingsVisibility();
+});
+// Set initial state based on current selection
 updateExperienceHint();
+updateAdvancedSettingsVisibility();
 
 // Weight unit toggle buttons (upload panel)
 document.querySelectorAll<HTMLButtonElement>('.weight-unit-btn').forEach((btn) => {
@@ -358,7 +376,7 @@ function initQuickStart(): void {
       (quickStartBtn as HTMLButtonElement).disabled = true;
       // Reset button if user dismisses file picker without selecting
       const resetQuickStart = () => {
-        quickStartBtn.textContent = 'Quick Analyze My Lift';
+        quickStartBtn.textContent = 'Check My Form';
         (quickStartBtn as HTMLButtonElement).disabled = false;
         window.removeEventListener('focus', resetQuickStart);
       };
@@ -369,8 +387,16 @@ function initQuickStart(): void {
   }
 
   if (showSettingsBtn && settingsContent) {
-    // If user has saved settings, show their settings label
-    if (savedSettings) {
+    // Auto-expand settings for returning users (they have saved settings)
+    // or for intermediate/advanced users who need to configure
+    const autoExpand = savedSettings && (
+      savedSettings.experience_level === 'intermediate' ||
+      savedSettings.experience_level === 'advanced'
+    );
+    if (autoExpand) {
+      settingsContent.style.display = 'block';
+      showSettingsBtn.textContent = 'Hide settings';
+    } else if (savedSettings) {
       showSettingsBtn.textContent = 'Customize settings';
     }
 
@@ -455,7 +481,7 @@ videoInput.addEventListener('change', () => {
   // Reset Quick Start button on file selection
   const quickStartBtn = document.getElementById('quick-start-btn');
   if (quickStartBtn) {
-    quickStartBtn.textContent = 'Quick Analyze My Lift';
+    quickStartBtn.textContent = 'Check My Form';
     (quickStartBtn as HTMLButtonElement).disabled = false;
   }
 
@@ -1036,15 +1062,8 @@ if (clearStorageBtn) {
   });
 }
 
-// ─── Gate Competition Mode on Experience Level ───
-
-const expSelect = document.getElementById('experience-level') as HTMLSelectElement;
-const compToggle = document.getElementById('competition-toggle-container');
-if (expSelect && compToggle) {
-  expSelect.addEventListener('change', () => {
-    compToggle.style.display = (expSelect.value === 'advanced' || expSelect.value === 'intermediate') ? '' : 'none';
-  });
-}
+// Competition mode visibility is managed by updateAdvancedSettingsVisibility()
+// which shows it for intermediate/advanced and hides it for beginners.
 
 // ─── Reshow Onboarding ───
 

@@ -37,23 +37,23 @@ function buildSnapshotComparison(sessionA: SessionRecord, sessionB: SessionRecor
     const phaseLabel = PHASE_LABELS[phase] ?? phase;
 
     const imgA = snapA
-      ? `<img src="${snapA.dataUrl}" alt="${escapeHtml(phaseLabel)} - ${escapeHtml(dateA)}" style="width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--border);" loading="lazy" />`
-      : `<div style="width: 100%; aspect-ratio: 16/9; background: var(--bg-input); border-radius: 6px; border: 1px dashed var(--border); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.75rem;">No snapshot</div>`;
+      ? `<img src="${snapA.dataUrl}" alt="${escapeHtml(phaseLabel)} - ${escapeHtml(dateA)}" class="snapshot-img" loading="lazy" />`
+      : `<div class="snapshot-placeholder">No snapshot</div>`;
 
     const imgB = snapB
-      ? `<img src="${snapB.dataUrl}" alt="${escapeHtml(phaseLabel)} - ${escapeHtml(dateB)}" style="width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--border);" loading="lazy" />`
-      : `<div style="width: 100%; aspect-ratio: 16/9; background: var(--bg-input); border-radius: 6px; border: 1px dashed var(--border); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.75rem;">No snapshot</div>`;
+      ? `<img src="${snapB.dataUrl}" alt="${escapeHtml(phaseLabel)} - ${escapeHtml(dateB)}" class="snapshot-img" loading="lazy" />`
+      : `<div class="snapshot-placeholder">No snapshot</div>`;
 
     rows += `
-      <div style="margin-bottom: 0.75rem;">
-        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.35rem; font-weight: 600;">${escapeHtml(phaseLabel)}</div>
-        <div class="snapshot-comparison-pair" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+      <div class="snapshot-phase-row">
+        <div class="snapshot-phase-label">${escapeHtml(phaseLabel)}</div>
+        <div class="snapshot-comparison-pair">
           <div>
-            <div style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 0.2rem; text-align: center;">Before (${escapeHtml(dateA)})</div>
+            <div class="snapshot-date-label">Before (${escapeHtml(dateA)})</div>
             ${imgA}
           </div>
           <div>
-            <div style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 0.2rem; text-align: center;">After (${escapeHtml(dateB)})</div>
+            <div class="snapshot-date-label">After (${escapeHtml(dateB)})</div>
             ${imgB}
           </div>
         </div>
@@ -64,8 +64,8 @@ function buildSnapshotComparison(sessionA: SessionRecord, sessionB: SessionRecor
   if (!rows) return '';
 
   return `
-    <div style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
-      <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; font-weight: 600;">Form Snapshots</div>
+    <div class="comparison-snapshot-section">
+      <div class="comparison-snapshot-title">Form Snapshots</div>
       ${rows}
     </div>
   `;
@@ -117,18 +117,18 @@ export function renderComparisonView(sessionA: SessionRecord, sessionB: SessionR
     const diffSign = diff > 0 ? '+' : '';
 
     dimRows += `
-      <div class="comparison-dim-row" style="display: grid; grid-template-columns: 80px 1fr 40px 1fr 50px; gap: 0.5rem; align-items: center; margin-bottom: 0.35rem; font-size: 0.85rem;">
-        <span style="color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(dim.label)}</span>
-        <div style="background: var(--bg-input); border-radius: 4px; height: 8px; overflow: hidden; min-width: 0;">
-          <div style="width: ${a}%; height: 100%; background: ${scoreColor(a)}; border-radius: 4px;"></div>
+      <div class="comparison-dim-row">
+        <span class="comparison-dim-label">${escapeHtml(dim.label)}</span>
+        <div class="comparison-bar-track">
+          <div class="comparison-bar-fill" style="width: ${a}%; background: ${scoreColor(a)};"></div>
         </div>
-        <span style="text-align: center; color: var(--text-secondary); font-size: 0.8rem;">${a}</span>
-        <div style="background: var(--bg-input); border-radius: 4px; height: 8px; overflow: hidden; min-width: 0;">
-          <div style="width: ${b}%; height: 100%; background: ${scoreColor(b)}; border-radius: 4px;"></div>
+        <span class="comparison-score-val">${a}</span>
+        <div class="comparison-bar-track">
+          <div class="comparison-bar-fill" style="width: ${b}%; background: ${scoreColor(b)};"></div>
         </div>
-        <span style="text-align: right; font-size: 0.8rem;">
+        <span class="comparison-score-delta">
           <span style="color: var(--text-secondary);">${b}</span>
-          <span style="color: ${diffColor}; font-size: 0.7rem;"> ${diffSign}${diff} ${diff > 0 ? '\u2191' : diff < 0 ? '\u2193' : '\u2014'}</span>
+          <span class="comparison-delta-change" style="color: ${diffColor};"> ${diffSign}${diff} ${diff > 0 ? '\u2191' : diff < 0 ? '\u2193' : '\u2014'}</span>
         </span>
       </div>
     `;
@@ -156,17 +156,17 @@ export function renderComparisonView(sessionA: SessionRecord, sessionB: SessionR
       const pathB = pointsB.map((p, i) => `${i === 0 ? 'M' : 'L'}${p}`).join(' ');
 
       repChart = `
-        <div style="margin-top: 1rem;">
-          <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; font-weight: 600;">Rep-by-Rep Scores</div>
+        <div class="comparison-rep-chart">
+          <div class="comparison-rep-chart-title">Rep-by-Rep Scores</div>
           <svg viewBox="0 0 ${svgW} ${svgH}" style="width: 100%; height: auto;" role="img" aria-label="Per-rep score comparison">
             <path d="${pathA}" fill="none" stroke="var(--text-muted)" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7" />
             <path d="${pathB}" fill="none" stroke="var(--accent)" stroke-width="2" />
             ${pointsA.map(p => `<circle cx="${p.split(',')[0]}" cy="${p.split(',')[1]}" r="3" fill="var(--text-muted)" opacity="0.7" />`).join('')}
             ${pointsB.map(p => `<circle cx="${p.split(',')[0]}" cy="${p.split(',')[1]}" r="3" fill="var(--accent)" />`).join('')}
           </svg>
-          <div style="display: flex; gap: 1rem; justify-content: center; font-size: 0.75rem; color: var(--text-muted);">
-            <span><span style="display: inline-block; width: 16px; border-top: 2px dashed var(--text-muted); vertical-align: middle; margin-right: 4px;"></span>${escapeHtml(dateA)}</span>
-            <span><span style="display: inline-block; width: 16px; border-top: 2px solid var(--accent); vertical-align: middle; margin-right: 4px;"></span>${escapeHtml(dateB)}</span>
+          <div class="comparison-legend">
+            <span><span class="comparison-legend-line" style="border-top: 2px dashed var(--text-muted);"></span>${escapeHtml(dateA)}</span>
+            <span><span class="comparison-legend-line" style="border-top: 2px solid var(--accent);"></span>${escapeHtml(dateB)}</span>
           </div>
         </div>
       `;
@@ -176,7 +176,7 @@ export function renderComparisonView(sessionA: SessionRecord, sessionB: SessionR
   // Snapshot comparison section
   const snapshotSection = buildSnapshotComparison(sessionA, sessionB);
 
-  // Inject responsive styles once
+  // Inject responsive styles once (override grid at narrow widths)
   if (!document.getElementById('comparison-responsive-styles')) {
     const style = document.createElement('style');
     style.id = 'comparison-responsive-styles';
@@ -203,25 +203,29 @@ export function renderComparisonView(sessionA: SessionRecord, sessionB: SessionR
   }
 
   container.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-      <h3 style="font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Session Comparison</h3>
+    <div class="comparison-header">
+      <h3 class="comparison-title">Session Comparison</h3>
       <button id="close-comparison" class="btn btn-sm" style="font-size: 0.75rem; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted);">Close</button>
     </div>
-    <div class="comparison-scores-grid" style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 1rem; text-align: center; margin-bottom: 1.5rem;">
+    <div class="comparison-scores-grid">
       <div>
-        <div style="font-size: 0.8rem; color: var(--text-muted);">${escapeHtml(dateA)}</div>
-        <div style="font-size: 2rem; font-weight: 800; color: ${colorA};">${sessionA.grade}</div>
-        <div style="font-size: 1.2rem; color: var(--text-secondary);">${sessionA.overall_score}</div>
-        <div style="font-size: 0.75rem; color: var(--text-muted);">${sessionA.rep_count} reps</div>
+        <div class="comparison-session-date">${escapeHtml(dateA)}</div>
+        <div class="comparison-session-grade" style="color: ${colorA};">${sessionA.grade}</div>
+        <div class="comparison-session-score">${sessionA.overall_score}</div>
+        <div class="comparison-session-reps">${sessionA.rep_count} reps</div>
+        ${sessionA.weight != null ? `<div class="comparison-session-weight">${sessionA.weight}${sessionA.weight_unit ?? ''}</div>` : ''}
+        ${sessionA.rpe != null ? `<div class="comparison-session-rpe">RPE ${sessionA.rpe}</div>` : ''}
       </div>
-      <div class="comparison-delta" style="display: flex; align-items: center; justify-content: center;">
-        <div style="font-size: 1.1rem; font-weight: 700; color: ${deltaColor};">${deltaSign}${scoreDelta}</div>
+      <div class="comparison-delta">
+        <div class="comparison-delta-value" style="color: ${deltaColor};">${deltaSign}${scoreDelta}</div>
       </div>
       <div>
-        <div style="font-size: 0.8rem; color: var(--text-muted);">${escapeHtml(dateB)}</div>
-        <div style="font-size: 2rem; font-weight: 800; color: ${colorB};">${sessionB.grade}</div>
-        <div style="font-size: 1.2rem; color: var(--text-secondary);">${sessionB.overall_score}</div>
-        <div style="font-size: 0.75rem; color: var(--text-muted);">${sessionB.rep_count} reps</div>
+        <div class="comparison-session-date">${escapeHtml(dateB)}</div>
+        <div class="comparison-session-grade" style="color: ${colorB};">${sessionB.grade}</div>
+        <div class="comparison-session-score">${sessionB.overall_score}</div>
+        <div class="comparison-session-reps">${sessionB.rep_count} reps</div>
+        ${sessionB.weight != null ? `<div class="comparison-session-weight">${sessionB.weight}${sessionB.weight_unit ?? ''}</div>` : ''}
+        ${sessionB.rpe != null ? `<div class="comparison-session-rpe">RPE ${sessionB.rpe}</div>` : ''}
       </div>
     </div>
     ${dimRows ? `<div style="margin-bottom: 0.5rem; max-width: 100%; overflow-x: auto;">${dimRows}</div>` : ''}
@@ -232,6 +236,10 @@ export function renderComparisonView(sessionA: SessionRecord, sessionB: SessionR
   section.style.display = 'block';
   section.prepend(container);
   container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Move focus to comparison view for keyboard/screen reader users
+  container.setAttribute('tabindex', '-1');
+  setTimeout(() => container.focus({ preventScroll: true }), 100);
 
   document.getElementById('close-comparison')?.addEventListener('click', () => {
     container.remove();

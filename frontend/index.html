@@ -2186,6 +2186,11 @@
       font-size: 0.8em;
     }
 
+    /* ===== Advanced Settings (hidden for beginners) ===== */
+    .advanced-setting.beginner-hidden {
+      display: none;
+    }
+
     /* ===== Utility ===== */
     .hidden { display: none !important; }
     .w-full { width: 100%; }
@@ -2420,6 +2425,18 @@
     .exercise-tab:focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: -2px;
+    }
+
+    @media (max-width: 500px) {
+      .exercise-toggle {
+        flex-wrap: wrap;
+      }
+      .exercise-tab {
+        font-size: 0.75rem;
+        padding: 0.45rem var(--space-sm);
+        flex: 0 0 auto;
+        min-width: 0;
+      }
     }
 
     /* ===== Variant Group Transitions ===== */
@@ -2868,6 +2885,637 @@
     .warmup-controls .warmup-stop-btn:hover {
       background: rgba(248, 113, 113, 0.1);
     }
+
+    /* ===== Dynamic Component Classes (for JS-generated UI) ===== */
+
+    /* Section headings used in dynamically rendered cards */
+    .section-heading-sm {
+      margin: 0 0 var(--space-sm);
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .section-heading-xs {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+
+    /* Positive feedback items (checkmark + text) */
+    .positive-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-sm);
+      padding: var(--space-sm) 0.75rem;
+      background: rgba(74, 222, 128, 0.08);
+      border-radius: var(--radius-md);
+      border-left: 3px solid var(--success);
+    }
+
+    .positive-item-icon {
+      color: var(--success);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .positive-item-text {
+      font-size: 0.9rem;
+      color: var(--text-primary);
+    }
+
+    /* Progress insights card */
+    .progress-insights-card {
+      border-left: 3px solid var(--accent);
+      padding: var(--space-md);
+      margin-bottom: var(--space-md);
+    }
+
+    .progress-insights-list {
+      margin: 0;
+      padding-left: 1.25rem;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .progress-insights-list li {
+      margin-bottom: 0.35rem;
+    }
+
+    /* Training recommendations card */
+    .training-rec-card {
+      border-left: 3px solid var(--info);
+      padding: var(--space-md) 1.25rem;
+      margin-bottom: var(--space-md);
+    }
+
+    .training-rec-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: var(--space-sm);
+      margin-bottom: 0.75rem;
+    }
+
+    .training-rec-cell {
+      background: var(--bg-input);
+      border-radius: var(--radius-sm);
+      padding: var(--space-sm);
+      text-align: center;
+    }
+
+    .training-rec-cell-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .training-rec-cell-value {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-top: 0.15rem;
+    }
+
+    .training-rec-weight {
+      background: var(--bg-input);
+      border-radius: var(--radius-sm);
+      padding: var(--space-sm) 0.75rem;
+      margin-bottom: 0.75rem;
+      font-size: 0.9rem;
+    }
+
+    .training-rec-focus-list {
+      margin: 0 0 0.75rem;
+      padding-left: 1.25rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .training-rec-suggestion {
+      background: var(--bg-input);
+      border-radius: var(--radius-sm);
+      padding: 0.6rem 0.75rem;
+      font-size: 0.85rem;
+      border-left: 2px solid var(--text-muted);
+    }
+
+    .training-rec-suggestion-label {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.2rem;
+    }
+
+    .phase-badge-inline {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--bg-primary);
+      margin-bottom: var(--space-sm);
+    }
+
+    /* Confidence badge */
+    .confidence-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.65rem;
+      opacity: 0.85;
+      margin-top: 0.2rem;
+      white-space: nowrap;
+    }
+
+    .confidence-dot {
+      font-size: 0.5rem;
+    }
+
+    /* Set confidence indicator */
+    .set-confidence {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.75rem;
+      opacity: 0.8;
+      margin-top: 0.35rem;
+    }
+
+    .set-confidence-dot {
+      font-size: 0.55rem;
+    }
+
+    .set-confidence-label {
+      font-weight: 600;
+    }
+
+    .set-confidence-pct {
+      color: var(--text-muted);
+      font-size: 0.7rem;
+    }
+
+    /* Rep card best dimension */
+    .rep-best-dim {
+      font-size: 0.65rem;
+      color: var(--success);
+      margin-top: 0.25rem;
+      white-space: nowrap;
+    }
+
+    /* Rep card positive line */
+    .rep-positive-line {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+      font-style: italic;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Rep narrative card */
+    .rep-narrative-card {
+      margin-bottom: var(--space-md);
+      padding: 0.75rem var(--space-md);
+      background: var(--bg-input);
+      border-radius: var(--radius-sm);
+      border-left: 3px solid var(--accent);
+    }
+
+    .rep-narrative-heading {
+      margin: 0 0 var(--space-sm) 0;
+      font-size: 0.85rem;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .rep-narrative-list {
+      margin: 0;
+      padding: 0 0 0 1.2rem;
+      list-style: disc;
+    }
+
+    .rep-narrative-list li {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Velocity chart card */
+    .velocity-chart-card {
+      padding: var(--space-md);
+      margin: 0.75rem 0;
+    }
+
+    .velocity-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-sm);
+    }
+
+    .velocity-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .velocity-loss {
+      font-size: 0.75rem;
+    }
+
+    .velocity-svg {
+      width: 100%;
+      background: var(--bg-input);
+      border-radius: var(--radius-sm);
+    }
+
+    .velocity-rep-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .velocity-advice {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-top: 0.35rem;
+    }
+
+    /* Camera confidence note */
+    .camera-confidence-note {
+      margin-top: 0.75rem;
+      padding: var(--space-sm) 0.75rem;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: var(--radius-sm);
+      border-left: 3px solid var(--text-muted);
+    }
+
+    .camera-confidence-text {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    /* Comparison view classes */
+    .comparison-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-md);
+    }
+
+    .comparison-title {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .comparison-scores-grid {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: var(--space-md);
+      text-align: center;
+      margin-bottom: var(--space-lg);
+    }
+
+    .comparison-session-date {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .comparison-session-grade {
+      font-size: 2rem;
+      font-weight: 800;
+    }
+
+    .comparison-session-score {
+      font-size: 1.2rem;
+      color: var(--text-secondary);
+    }
+
+    .comparison-session-reps {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .comparison-session-weight {
+      font-size: 0.75rem;
+      color: var(--accent);
+      margin-top: 0.15rem;
+    }
+
+    .comparison-session-rpe {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .comparison-delta {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .comparison-delta-value {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .comparison-dim-row {
+      display: grid;
+      grid-template-columns: 80px 1fr 40px 1fr 50px;
+      gap: var(--space-sm);
+      align-items: center;
+      margin-bottom: 0.35rem;
+      font-size: 0.85rem;
+    }
+
+    .comparison-dim-label {
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .comparison-bar-track {
+      background: var(--bg-input);
+      border-radius: var(--radius-sm);
+      height: 8px;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .comparison-bar-fill {
+      height: 100%;
+      border-radius: var(--radius-sm);
+    }
+
+    .comparison-score-val {
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+    }
+
+    .comparison-score-delta {
+      text-align: right;
+      font-size: 0.8rem;
+    }
+
+    .comparison-delta-change {
+      font-size: 0.7rem;
+    }
+
+    .comparison-rep-chart {
+      margin-top: var(--space-md);
+    }
+
+    .comparison-rep-chart-title {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: var(--space-sm);
+      font-weight: 600;
+    }
+
+    .comparison-legend {
+      display: flex;
+      gap: var(--space-md);
+      justify-content: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .comparison-legend-line {
+      display: inline-block;
+      width: 16px;
+      vertical-align: middle;
+      margin-right: 4px;
+    }
+
+    .comparison-snapshot-section {
+      margin-top: var(--space-md);
+      border-top: 1px solid var(--border);
+      padding-top: 0.75rem;
+    }
+
+    .comparison-snapshot-title {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: var(--space-sm);
+      font-weight: 600;
+    }
+
+    .snapshot-phase-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+      font-weight: 600;
+    }
+
+    .snapshot-phase-row {
+      margin-bottom: 0.75rem;
+    }
+
+    .snapshot-comparison-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-sm);
+    }
+
+    .snapshot-date-label {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      margin-bottom: 0.2rem;
+      text-align: center;
+    }
+
+    .snapshot-img {
+      width: 100%;
+      height: auto;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+
+    .snapshot-placeholder {
+      width: 100%;
+      aspect-ratio: 16/9;
+      background: var(--bg-input);
+      border-radius: var(--radius-sm);
+      border: 1px dashed var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+
+    /* Coaching cue progression path */
+    .progression-path {
+      margin-top: var(--space-sm);
+      padding-left: var(--space-sm);
+      border-left: 2px solid var(--border);
+    }
+
+    .progression-step {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-sm);
+      position: relative;
+    }
+
+    .progression-step-number {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      color: var(--bg-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.65rem;
+      flex-shrink: 0;
+    }
+
+    .progression-level {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .progression-exercise {
+      font-size: 0.8rem;
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .progression-criteria {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    /* Severity badge (coaching cues) */
+    .severity-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .severity-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .severity-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    /* Cue alternates */
+    .cue-alternates {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    /* Tier message in overall score */
+    .tier-message {
+      font-size: 0.9rem;
+      margin-top: 0.75rem;
+      line-height: 1.4;
+    }
+
+    /* Collapsible section summary */
+    .collapsible-summary {
+      cursor: pointer;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      user-select: none;
+    }
+
+    .collapse-chevron {
+      font-size: 0.6rem;
+      transition: transform 0.2s;
+      display: inline-block;
+    }
+
+    /* Timestamp link */
+    .cue-timestamp {
+      font-size: 0.8rem;
+      color: var(--accent);
+      cursor: pointer;
+      margin-left: var(--space-sm);
+    }
+
+    /* History chart empty state */
+    .chart-empty-message {
+      color: var(--text-muted);
+      font-size: var(--font-sm);
+      text-align: center;
+      padding: var(--space-md);
+    }
+
+    /* History action buttons row */
+    .history-actions {
+      display: flex;
+      gap: var(--space-sm);
+      margin-top: var(--space-md);
+      flex-wrap: wrap;
+    }
+
+    .history-actions .btn-sm {
+      font-size: 0.8rem;
+    }
+
+    /* History metric in list */
+    .history-metric {
+      font-size: 0.7rem;
+      color: var(--accent);
+    }
+
+    .history-exercise-label {
+      font-size: 0.7rem;
+      color: var(--accent-dim);
+      font-weight: 600;
+    }
+
+    /* History compare hint */
+    .history-compare-hint {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: var(--space-sm);
+    }
+
+    /* Theme transition */
+    html {
+      transition: background-color 200ms ease, color 200ms ease;
+    }
+
+    /* Audio toggle touch target fix */
+    .audio-toggle input[type="checkbox"] {
+      width: 44px;
+      height: 44px;
+    }
   </style>
 </head>
 <body>
@@ -2887,66 +3535,40 @@
       <div class="onboarding-steps">
         <div class="onboarding-step">
           <div class="step-number">1</div>
-          <div class="step-text"><strong>Set up your camera</strong>
-            <div style="margin-top: 0.25rem;">Prop your phone at hip height, 2-4 meters away, filming from the side. Make sure your full body is visible from head to feet.</div>
-            <svg viewBox="0 0 200 80" style="width: 160px; height: 64px; margin-top: 0.35rem;" aria-hidden="true">
-              <line x1="5" y1="70" x2="195" y2="70" stroke="#444" stroke-width="1"/>
-              <circle cx="40" cy="20" r="8" fill="none" stroke="#4cc9f0" stroke-width="1.5"/>
-              <line x1="40" y1="28" x2="40" y2="48" stroke="#4cc9f0" stroke-width="2"/>
-              <line x1="40" y1="48" x2="32" y2="62" stroke="#4cc9f0" stroke-width="2"/>
-              <line x1="32" y1="62" x2="30" y2="70" stroke="#4cc9f0" stroke-width="2"/>
-              <line x1="40" y1="48" x2="48" y2="62" stroke="#4cc9f0" stroke-width="2"/>
-              <line x1="48" y1="62" x2="50" y2="70" stroke="#4cc9f0" stroke-width="2"/>
-              <rect x="150" y="38" width="10" height="18" rx="2" fill="none" stroke="#06d6a0" stroke-width="1.5"/>
-              <line x1="60" y1="75" x2="145" y2="75" stroke="#fbbf24" stroke-width="1"/>
-              <text x="103" y="80" text-anchor="middle" fill="#fbbf24" font-size="8">2-4m</text>
-              <text x="155" y="34" text-anchor="middle" fill="#06d6a0" font-size="7">Side View</text>
-            </svg>
+          <div class="step-text"><strong>Film your set</strong>
+            <div style="margin-top: 0.25rem;">Prop your phone at hip height, 2-4 meters away, filming from the side. Full body visible, 3-10 reps.</div>
           </div>
         </div>
         <div class="onboarding-step">
           <div class="step-number">2</div>
-          <div class="step-text"><strong>Film or upload your set</strong>
-            <div style="margin-top: 0.25rem;">Record 3-10 reps of your exercise. Stand up fully between each rep so the AI can count them. Upload the video or use Live Mode for real-time feedback.</div>
+          <div class="step-text"><strong>Upload the video</strong>
+            <div style="margin-top: 0.25rem;">Tap the button on the next screen. The AI will analyze your form in about 30-60 seconds.</div>
           </div>
         </div>
         <div class="onboarding-step">
           <div class="step-number">3</div>
-          <div class="step-text"><strong>Get your score &amp; coaching</strong>
-            <div style="margin-top: 0.25rem;">You'll see a grade (A-D), your #1 thing to focus on, and specific exercises to fix it. The app also tells you what you're already doing well!</div>
-          </div>
-        </div>
-        <div class="onboarding-step">
-          <div class="step-number">4</div>
-          <div class="step-text"><strong>What good form looks like</strong>
-            <div style="margin-top: 0.25rem; line-height: 1.6;">
-              <strong>Squat:</strong> Feet shoulder-width, lower until thighs are parallel, chest stays up<br>
-              <strong>Deadlift:</strong> Hinge at hips, keep back flat, push the floor away to stand<br>
-              <strong>Bench:</strong> Lower bar to chest, pause, then press up with arms straight
-            </div>
-          </div>
-        </div>
-        <div class="onboarding-step">
-          <div class="step-number">5</div>
-          <div class="step-text"><strong>Try Live Mode</strong>
-            <div style="margin-top: 0.25rem;">Want real-time coaching? Switch to Live Mode for per-rep audio feedback while you train. Currently supports squats — deadlift and bench coming soon.</div>
+          <div class="step-text"><strong>Get your grade &amp; what to fix</strong>
+            <div style="margin-top: 0.25rem;">You'll see a grade (A-D), what you did well, and the #1 thing to work on with exercises to help.</div>
           </div>
         </div>
       </div>
 
-      <div class="grade-legend">
-        <h3>What the grades mean</h3>
-        <div class="grade-row"><span class="grade-badge grade-a">A</span> Excellent form -- minor polish only</div>
-        <div class="grade-row"><span class="grade-badge grade-b">B</span> Good form -- one or two things to work on</div>
-        <div class="grade-row"><span class="grade-badge grade-c">C</span> Decent -- a few areas need attention</div>
-        <div class="grade-row"><span class="grade-badge grade-d">D</span> Getting there -- the exercises below will help</div>
-        <div class="grade-row"><span class="grade-badge grade-kw">KW</span> Keep Working -- you're building the foundation</div>
-        <p class="grade-legend-note">
-          Score (0-100) measures technique quality. 80+ = solid form. Grade is the letter equivalent.
-        </p>
-      </div>
-
-      <p class="onboarding-note">First analysis takes about 30-60 seconds while the AI model loads.</p>
+      <details class="feature-discovery" style="margin-bottom: var(--space-md);">
+        <summary>Learn more about grades &amp; features</summary>
+        <div class="grade-legend" style="margin-top: var(--space-sm);">
+          <h3>What the grades mean</h3>
+          <div class="grade-row"><span class="grade-badge grade-a">A</span> Excellent form -- minor polish only</div>
+          <div class="grade-row"><span class="grade-badge grade-b">B</span> Good form -- one or two things to work on</div>
+          <div class="grade-row"><span class="grade-badge grade-c">C</span> Decent -- a few areas need attention</div>
+          <div class="grade-row"><span class="grade-badge grade-d">D</span> Getting there -- the exercises below will help</div>
+          <div class="grade-row"><span class="grade-badge grade-kw">KW</span> Keep Working -- you're building the foundation</div>
+        </div>
+        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: var(--space-sm); line-height: 1.6;">
+          <strong style="color: var(--accent);">Camera tip:</strong> Side view gives the best depth and trunk analysis. Front view improves knee tracking.<br>
+          <strong style="color: var(--accent);">Live Mode:</strong> Real-time voice coaching while you train (squats only for now).<br>
+          <strong style="color: var(--accent);">Good form basics:</strong> Squat -- thighs parallel, chest up. Deadlift -- flat back, hinge at hips. Bench -- bar to chest, pause, press up.
+        </div>
+      </details>
 
       <p class="onboarding-disclaimer">This tool provides general form feedback, not medical advice. If you have pain, injuries, or medical conditions, consult a healthcare professional before following any exercise recommendations.</p>
 
@@ -2987,28 +3609,23 @@
 
       <!-- Quick Start -->
       <div class="quick-start">
-        <button id="quick-start-btn" class="btn btn-primary btn-large" aria-label="Quick analyze with default settings">
-          Quick Analyze My Lift
+        <button id="quick-start-btn" class="btn btn-primary btn-large" aria-label="Check your form by uploading a video">
+          Check My Form
         </button>
         <p class="quick-tip" aria-label="Camera positioning tip">
-          <strong>Tip:</strong> Film from the side, at hip height, 2-4m away. Full body in frame.
+          Film your set, we'll tell you what to fix. Side view, full body in frame.
         </p>
-        <p class="quick-start-note">Uses recommended settings for beginners. <button class="btn-link" id="show-settings-btn">Customize settings</button></p>
-        <button id="try-example-btn" class="btn btn-secondary" aria-label="Try with an example squat video">
+        <button id="try-example-btn" class="btn btn-secondary" style="margin-top: var(--space-sm);" aria-label="Try with an example squat video">
           Try Example Video
         </button>
+        <p class="quick-start-note"><button class="btn-link" id="show-settings-btn">Customize settings</button></p>
 
         <details class="feature-discovery">
           <summary>What else can this app do?</summary>
           <ul>
-            <li><strong>Live Mode:</strong> Real-time coaching with voice cues while you train</li>
+            <li><strong>Live Mode:</strong> Real-time voice coaching while you train</li>
             <li><strong>Session History:</strong> Track your progress over time</li>
-            <li><strong>1RM Estimate:</strong> Enter your weight to estimate your one-rep max</li>
-            <li><strong>Flexibility Check:</strong> Get personalized stretches based on your form issues</li>
-            <li><strong>RPE Estimation:</strong> See how hard each rep was based on movement speed</li>
-            <li><strong>Share Results:</strong> Share your score with friends or a coach</li>
-            <li><strong>Export Data:</strong> Download CSV or JSON for your training log</li>
-            <li><strong>Competition Mode:</strong> IPF/USAPL judging standards (intermediate+ level)</li>
+            <li><strong>Flexibility Check:</strong> Get personalized stretches based on your form</li>
           </ul>
         </details>
       </div>
@@ -3135,7 +3752,7 @@
               </div>
             </div>
 
-            <div class="form-group">
+            <div class="form-group advanced-setting" id="bodyweight-group">
               <label for="bodyweight-input">Bodyweight <span class="weight-optional-label">(optional)</span></label>
               <div class="weight-input-row">
                 <input type="number" id="bodyweight-input" min="20" max="300" step="0.1" placeholder="--" aria-label="Your bodyweight">
@@ -3145,7 +3762,7 @@
                 </select>
               </div>
             </div>
-            <div class="form-group">
+            <div class="form-group advanced-setting" id="rpe-group">
               <label for="rpe-input">RPE <span class="weight-optional-label">(Rate of Perceived Exertion)</span></label>
               <select id="rpe-input" aria-label="Rate of perceived exertion">
                 <option value="">Not set</option>
@@ -3171,7 +3788,7 @@
             </div>
 
             <!-- Training Phase Selector -->
-            <div class="form-group">
+            <div class="form-group advanced-setting" id="training-phase-group">
               <label for="training-phase">Training Phase</label>
               <select id="training-phase" aria-label="Select training phase for programming recommendations">
                 <option value="">Auto-detect</option>
