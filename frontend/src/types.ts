@@ -31,6 +31,7 @@ export const ExerciseType = {
   SQUAT: 'squat',
   DEADLIFT: 'deadlift',
   BENCH_PRESS: 'bench_press',
+  OVERHEAD_PRESS: 'overhead_press',
 } as const;
 export type ExerciseType = (typeof ExerciseType)[keyof typeof ExerciseType];
 
@@ -47,6 +48,13 @@ export const BenchType = {
   WIDE_GRIP: 'wide_grip',
 } as const;
 export type BenchType = (typeof BenchType)[keyof typeof BenchType];
+
+export const OverheadPressType = {
+  STRICT: 'strict',
+  PUSH_PRESS: 'push_press',
+  BEHIND_NECK: 'behind_neck',
+} as const;
+export type OverheadPressType = (typeof OverheadPressType)[keyof typeof OverheadPressType];
 
 export const SquatType = {
   BODYWEIGHT: 'bodyweight',

@@ -22,7 +22,7 @@ import {
   drawSkeleton,
 } from './ui';
 import { showValidationWarning, hideValidationWarnings } from './ui-progress';
-import type { SquatConfig, SquatType, ExperienceLevel, ExerciseType, DeadliftType, BenchType, FrameData } from './types';
+import type { SquatConfig, SquatType, ExperienceLevel, ExerciseType, DeadliftType, BenchType, OverheadPressType, FrameData } from './types';
 import {
   ONBOARDED_KEY,
   PRESCREEN_KEY,
@@ -42,6 +42,7 @@ const exerciseTypeSelect = document.getElementById('exercise-type') as HTMLSelec
 const squatTypeSelect = document.getElementById('squat-type') as HTMLSelectElement;
 const deadliftTypeSelect = document.getElementById('deadlift-type') as HTMLSelectElement | null;
 const benchTypeSelect = document.getElementById('bench-type') as HTMLSelectElement | null;
+const ohpTypeSelect = document.getElementById('ohp-type') as HTMLSelectElement | null;
 const experienceSelect = document.getElementById('experience-level') as HTMLSelectElement;
 const resultVideo = document.getElementById('result-video') as HTMLVideoElement;
 const overlayCanvas = document.getElementById('overlay-canvas') as HTMLCanvasElement;
@@ -74,6 +75,7 @@ if (savedSettings) {
   if (savedSettings.squat_type) squatTypeSelect.value = savedSettings.squat_type;
   if (savedSettings.deadlift_type && deadliftTypeSelect) deadliftTypeSelect.value = savedSettings.deadlift_type;
   if (savedSettings.bench_type && benchTypeSelect) benchTypeSelect.value = savedSettings.bench_type;
+  if (savedSettings.ohp_type && ohpTypeSelect) ohpTypeSelect.value = savedSettings.ohp_type;
   if (savedSettings.experience_level) experienceSelect.value = savedSettings.experience_level;
   if (savedSettings.weight) {
     weightInput.value = savedSettings.weight;
@@ -115,6 +117,7 @@ function persistSettings(): void {
     squatTypeSelect.value, experienceSelect.value, weightInput.value, getWeightUnit(),
     exerciseTypeSelect?.value, deadliftTypeSelect?.value, benchTypeSelect?.value,
     bodyweightInput?.value, bodyweightUnitSelect?.value, rpeInput?.value,
+    ohpTypeSelect?.value,
   );
 }
 
@@ -129,10 +132,12 @@ function updateExerciseVariantVisibility(): void {
   const sqGroup = document.getElementById('squat-type-group');
   const dlGroup = document.getElementById('deadlift-type-group');
   const bpGroup = document.getElementById('bench-type-group');
+  const ohpGroup = document.getElementById('ohp-type-group');
 
   if (sqGroup) sqGroup.classList.toggle('visible', exercise === 'squat');
   if (dlGroup) dlGroup.classList.toggle('visible', exercise === 'deadlift');
   if (bpGroup) bpGroup.classList.toggle('visible', exercise === 'bench_press');
+  if (ohpGroup) ohpGroup.classList.toggle('visible', exercise === 'overhead_press');
 }
 
 if (exerciseTypeSelect) {
@@ -169,6 +174,7 @@ document.querySelectorAll<HTMLButtonElement>('.exercise-tab').forEach((tab) => {
 squatTypeSelect.addEventListener('change', persistSettings);
 if (deadliftTypeSelect) deadliftTypeSelect.addEventListener('change', persistSettings);
 if (benchTypeSelect) benchTypeSelect.addEventListener('change', persistSettings);
+if (ohpTypeSelect) ohpTypeSelect.addEventListener('change', persistSettings);
 experienceSelect.addEventListener('change', persistSettings);
 weightInput.addEventListener('input', persistSettings);
 if (bodyweightInput) bodyweightInput.addEventListener('input', persistSettings);
@@ -593,6 +599,7 @@ async function runAnalysis(file: File): Promise<void> {
       squatType: squatTypeSelect.value as SquatType,
       deadliftType: (deadliftTypeSelect?.value ?? 'conventional') as DeadliftType,
       benchType: (benchTypeSelect?.value ?? 'flat') as BenchType,
+      ohpType: (ohpTypeSelect?.value ?? 'strict') as OverheadPressType,
     };
 
     const fps = poseProcessor.getProcessingFps();
@@ -621,6 +628,7 @@ async function runAnalysis(file: File): Promise<void> {
     const previousSessions = getSessions();
     const variantName = exerciseType === 'deadlift' ? (deadliftTypeSelect?.value ?? 'conventional')
       : exerciseType === 'bench_press' ? (benchTypeSelect?.value ?? 'flat')
+      : exerciseType === 'overhead_press' ? (ohpTypeSelect?.value ?? 'strict')
       : squatTypeSelect.value;
     const rawBodyweight = bodyweightInput ? parseFloat(bodyweightInput.value) : 0;
     const bodyweight = isFinite(rawBodyweight) ? rawBodyweight : 0;

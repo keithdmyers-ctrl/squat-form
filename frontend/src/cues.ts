@@ -152,6 +152,39 @@ const CORRECTIVE_EXERCISES: Record<string, CorrectiveExercise[]> = {
     { name: 'Pin Press', description: 'Set safety pins at your sticking point height. Start each rep from the pins (dead stop) and press to lockout.', sets: '3x5', videoUrl: 'https://www.youtube.com/watch?v=Wo0oWVNJHXc' },
     { name: 'Close-Grip Bench', description: 'Bench with a narrower grip (hands just inside shoulder width). Builds tricep strength needed to push through the mid-range sticking point.', sets: '3x8', videoUrl: 'https://www.youtube.com/watch?v=nEF0bv2FW94' },
   ],
+
+  // ─── Overhead Press Corrective Exercises ───
+
+  excessive_lean_back: [
+    { name: 'Z-Press', description: 'Sit on the floor with legs extended and press overhead. Eliminates all leg drive and forces core bracing — any lean-back becomes immediately obvious.', sets: '3x8' },
+    { name: 'Seated Overhead Press', description: 'Press overhead while seated on a bench with back support. Removes the temptation to lean back and isolates the pressing muscles.', sets: '3x8' },
+    { name: 'Dead Bugs', description: 'Lie on your back with arms and legs raised. Slowly extend opposite arm and leg while keeping your lower back pressed flat. Builds the core stability needed to resist lean-back.', sets: '3x10 each side' },
+  ],
+  partial_rom: [
+    { name: 'Behind-the-Neck Press (light)', description: 'Press a light bar from behind your neck. Builds shoulder mobility and strength through a longer range of motion. Use very light weight and stop if painful.', sets: '3x10' },
+    { name: 'Bradford Press', description: 'Alternate pressing the bar from front to behind your neck without fully locking out. Builds pressing strength through the full ROM around your head.', sets: '3x8' },
+    { name: 'Shoulder Dislocates', description: 'Hold a PVC pipe or band with a wide grip and rotate it slowly from your thighs all the way overhead and behind you. Builds shoulder mobility needed for full ROM pressing.', sets: '2x10' },
+  ],
+  forward_press: [
+    { name: 'Landmine Press', description: 'Press a barbell anchored at one end in a landmine attachment. The fixed arc teaches a vertical press path and builds unilateral pressing strength.', sets: '3x10 each side' },
+    { name: 'Z-Press', description: 'Press overhead while seated on the floor with legs extended. The lack of back support forces you to maintain a vertical bar path or you\'ll fall backward.', sets: '3x8' },
+    { name: 'Wall Facing Press', description: 'Stand facing a wall with toes 6 inches away. Press a light weight overhead — the wall prevents forward drift and teaches a straight bar path.', sets: '3x10' },
+  ],
+  asymmetric_press: [
+    { name: 'Single-Arm Dumbbell Press', description: 'Press a dumbbell with one arm at a time while standing. Focus on the weaker side first, then match reps with the stronger side.', sets: '3x8 each side' },
+    { name: 'Kettlebell Press', description: 'Press a kettlebell overhead one arm at a time. The offset center of gravity challenges stability and builds balanced pressing strength.', sets: '3x8 each side' },
+    { name: 'Arnold Press', description: 'Start with dumbbells at shoulder height with palms facing you. Rotate palms out as you press overhead. Builds balanced shoulder strength through rotation.', sets: '3x10' },
+  ],
+  incomplete_lockout_ohp: [
+    { name: 'Push Press', description: 'Use a slight leg drive to help press the bar overhead, then hold the lockout for 2 seconds. The leg assistance lets you practice with heavier weight at the top.', sets: '3x5, 2 sec hold' },
+    { name: 'Overhead Holds', description: 'Press or jerk a weight overhead and simply hold it for time. Builds overhead stability, shoulder endurance, and lockout confidence.', sets: '3x20 sec' },
+    { name: 'Snatch-Grip Behind-Neck Press', description: 'Press from behind the neck with a wide (snatch) grip. The wider grip and behind-neck position trains a stronger, more stable lockout position.', sets: '3x8' },
+  ],
+  fast_descent_ohp: [
+    { name: 'Tempo Overhead Press', description: 'Press with a deliberate 3-second lowering phase. Count "one-thousand-one, two, three" on the way down.', sets: '3x5, 3 sec down' },
+    { name: 'Pause at Shoulders', description: 'Lower the bar to your shoulders and hold for 2 seconds before pressing again. Builds control and eliminates momentum from the eccentric.', sets: '3x5, 2 sec pause' },
+    { name: 'Eccentric-Only Overhead Press', description: 'Push press the bar up, then lower it as slowly as possible (5 seconds) back to your shoulders. Builds eccentric control with heavier weight.', sets: '3x3, 5 sec down' },
+  ],
 };
 
 /** Get corrective exercises for a given issue name. */
@@ -257,6 +290,39 @@ export const PROGRESSION_DATABASE: Record<string, ExerciseProgression[]> = {
     { level: 'Start here', exercise: 'Pin Press from sticking point (3x5)', criteria: 'Can press from pins without getting stuck' },
     { level: 'Progress to', exercise: 'Spoto Press (3x5) — building off-chest power', criteria: 'Smooth press through previous sticking point' },
     { level: 'Goal', exercise: 'Full bench press with no stall', criteria: 'Continuous press from chest to lockout at working weight' },
+  ],
+
+  // ─── Overhead Press Progressions ───
+
+  excessive_lean_back: [
+    { level: 'Start here', exercise: 'Z-Press (3x8) with light weight', criteria: 'Can press without any lean-back while seated' },
+    { level: 'Progress to', exercise: 'Seated OHP (3x8) with back support', criteria: 'Strict vertical press with moderate weight' },
+    { level: 'Goal', exercise: 'Standing OHP with no lean-back', criteria: 'Trunk stays within 10 degrees of vertical throughout the press' },
+  ],
+  partial_rom: [
+    { level: 'Start here', exercise: 'Shoulder Dislocates (2x10)', criteria: 'Full ROM without pain or restriction' },
+    { level: 'Progress to', exercise: 'Bradford Press (3x8) with light weight', criteria: 'Smooth transition front to back with no discomfort' },
+    { level: 'Goal', exercise: 'Full ROM overhead press', criteria: 'Bar touches shoulders at bottom and arms fully lock out at top every rep' },
+  ],
+  forward_press: [
+    { level: 'Start here', exercise: 'Wall Facing Press (3x10) with light weight', criteria: 'Can press without bar touching wall' },
+    { level: 'Progress to', exercise: 'Z-Press (3x8)', criteria: 'Vertical bar path with no forward drift' },
+    { level: 'Goal', exercise: 'Standing OHP with straight bar path', criteria: 'Bar travels in a vertical line over midfoot consistently' },
+  ],
+  asymmetric_press: [
+    { level: 'Start here', exercise: 'Single-Arm DB Press (3x8 each side)', criteria: 'Equal reps and control on both sides' },
+    { level: 'Progress to', exercise: 'Kettlebell Press (3x8 each side)', criteria: 'Stable lockout with equal effort both sides' },
+    { level: 'Goal', exercise: 'Even barbell overhead press', criteria: 'Bar stays level throughout every rep' },
+  ],
+  incomplete_lockout_ohp: [
+    { level: 'Start here', exercise: 'Overhead Holds (3x20 sec)', criteria: 'Can hold weight overhead with fully locked elbows' },
+    { level: 'Progress to', exercise: 'Push Press (3x5) with 2-sec lockout hold', criteria: 'Full lockout and stable hold at top' },
+    { level: 'Goal', exercise: 'Full lockout on every strict press rep', criteria: 'Arms fully extended, head through, bar over midfoot' },
+  ],
+  fast_descent_ohp: [
+    { level: 'Start here', exercise: 'Tempo OHP (3x5) with 3-sec lowering', criteria: 'Can control bar for full 3 seconds on the way down' },
+    { level: 'Progress to', exercise: 'Pause at Shoulders (3x5) with 2-sec pause', criteria: 'Smooth controlled lowering with clean pause' },
+    { level: 'Goal', exercise: 'Full OHP with controlled descent', criteria: 'Bar lowered under control (1-2 sec) every rep' },
   ],
 };
 

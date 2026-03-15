@@ -198,6 +198,15 @@ export const BENCH_LABELS: ScoreDimensionLabels = {
   lockout: 'Lockout',
 };
 
+export const OHP_LABELS: ScoreDimensionLabels = {
+  depth: 'Range of Motion',
+  kneeTracking: 'Press Path',
+  trunk: 'Overhead Stability',
+  symmetry: 'Symmetry',
+  tempo: 'Tempo',
+  lockout: 'Lockout',
+};
+
 /**
  * Get the appropriate dimension labels for an exercise type.
  */
@@ -205,6 +214,7 @@ export function getDimensionLabels(exerciseType: ExerciseType | string): ScoreDi
   switch (exerciseType) {
     case 'deadlift': return DEADLIFT_LABELS;
     case 'bench_press': return BENCH_LABELS;
+    case 'overhead_press': return OHP_LABELS;
     default: return SQUAT_LABELS;
   }
 }

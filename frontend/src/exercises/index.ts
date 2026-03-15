@@ -6,6 +6,7 @@ import type {
   ExerciseType,
   DeadliftType,
   BenchType,
+  OverheadPressType,
   SquatType,
   ExperienceLevel,
   FrameData,
@@ -16,6 +17,8 @@ import { analyzeDeadliftSequence } from './deadlift';
 import type { DeadliftConfig } from './deadlift';
 import { analyzeBenchSequence } from './bench';
 import type { BenchConfig } from './bench';
+import { analyzeOHPSequence } from './overhead-press';
+import type { OverheadPressConfig } from './overhead-press';
 
 export interface ExerciseConfig {
   exerciseType: ExerciseType;
@@ -25,6 +28,7 @@ export interface ExerciseConfig {
   squatType?: SquatType;
   deadliftType?: DeadliftType;
   benchType?: BenchType;
+  ohpType?: OverheadPressType;
 }
 
 /**
@@ -55,6 +59,15 @@ export function analyzeExercise(
       return analyzeBenchSequence(frames, fps, benchConfig);
     }
 
+    case 'overhead_press': {
+      const ohpConfig: OverheadPressConfig = {
+        ohpType: config.ohpType ?? 'strict',
+        experienceLevel: config.experienceLevel,
+        competitionMode: config.competitionMode,
+      };
+      return analyzeOHPSequence(frames, fps, ohpConfig);
+    }
+
     case 'squat':
     default: {
       return analyzeSequence(frames, fps, {
@@ -71,6 +84,7 @@ export const EXERCISE_LABELS: Record<ExerciseType, string> = {
   squat: 'Squat',
   deadlift: 'Deadlift',
   bench_press: 'Bench Press',
+  overhead_press: 'Overhead Press',
 };
 
 /** Display labels for deadlift variants. */
@@ -85,4 +99,11 @@ export const BENCH_LABELS: Record<BenchType, string> = {
   flat: 'Flat Bench',
   close_grip: 'Close Grip',
   wide_grip: 'Wide Grip',
+};
+
+/** Display labels for overhead press variants. */
+export const OHP_LABELS: Record<OverheadPressType, string> = {
+  strict: 'Strict Press',
+  push_press: 'Push Press',
+  behind_neck: 'Behind the Neck',
 };

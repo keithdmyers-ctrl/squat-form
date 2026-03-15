@@ -9,7 +9,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
   <link rel="apple-touch-icon" href="icon.svg" />
-  <title>Lift Form Analyzer — Squat, Deadlift, Bench</title>
+  <title>Lift Form Analyzer — Squat, Deadlift, Bench, OHP</title>
   <script>
     (function() {
       var theme = localStorage.getItem('squat_form_theme');
@@ -2627,6 +2627,7 @@
           <button type="button" class="exercise-tab active" data-exercise="squat" role="radio" aria-checked="true">Squat</button>
           <button type="button" class="exercise-tab" data-exercise="deadlift" role="radio" aria-checked="false">Deadlift</button>
           <button type="button" class="exercise-tab" data-exercise="bench_press" role="radio" aria-checked="false">Bench Press</button>
+          <button type="button" class="exercise-tab" data-exercise="overhead_press" role="radio" aria-checked="false">OHP</button>
         </div>
 
         <!-- Hidden select for JS compatibility -->
@@ -2634,6 +2635,7 @@
           <option value="squat">Squat</option>
           <option value="deadlift">Deadlift</option>
           <option value="bench_press">Bench Press</option>
+          <option value="overhead_press">Overhead Press</option>
         </select>
 
         <div id="settings-content" style="display: none;">
@@ -2677,6 +2679,15 @@
                 <option value="wide_grip">Wide Grip (more chest)</option>
               </select>
               <p class="form-hint">Not sure? Pick "Flat Bench" — it's the standard bench press.</p>
+            </div>
+            <div class="form-group variant-group" id="ohp-type-group">
+              <label for="ohp-type">Press Type</label>
+              <select id="ohp-type" aria-label="Select overhead press type">
+                <option value="strict">Strict Press (no leg drive)</option>
+                <option value="push_press">Push Press (leg drive allowed)</option>
+                <option value="behind_neck">Behind the Neck (advanced)</option>
+              </select>
+              <p class="form-hint">Not sure? Pick "Strict Press" — it's the standard overhead press with no leg drive.</p>
             </div>
             <div class="form-group">
               <label for="experience-level">Experience Level</label>
@@ -2813,6 +2824,7 @@
                 <option value="squat">Squat</option>
                 <option value="deadlift">Deadlift</option>
                 <option value="bench_press">Bench Press</option>
+                <option value="overhead_press">Overhead Press</option>
               </select>
             </div>
             <div class="form-group" id="live-squat-type-group">
@@ -2840,6 +2852,14 @@
                 <option value="flat">Flat Bench</option>
                 <option value="close_grip">Close Grip</option>
                 <option value="wide_grip">Wide Grip</option>
+              </select>
+            </div>
+            <div class="form-group" id="live-ohp-type-group" style="display: none;">
+              <label for="live-ohp-type">Press Type</label>
+              <select id="live-ohp-type" aria-label="Select overhead press type for live session">
+                <option value="strict">Strict Press</option>
+                <option value="push_press">Push Press</option>
+                <option value="behind_neck">Behind the Neck</option>
               </select>
             </div>
             <p class="live-panel-note live-bench-warning" id="live-bench-warning" style="display: none;">
