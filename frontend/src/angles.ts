@@ -205,6 +205,10 @@ export function computeFrameAngles(
     }
   }
 
+  // Average visibility of core landmarks used for angle computations
+  const coreVisibilities = [shoulder.visibility, hip.visibility, knee.visibility, ankle.visibility];
+  const landmarkConfidence = coreVisibilities.reduce((sum, v) => sum + v, 0) / coreVisibilities.length;
+
   return {
     kneeAngle,
     hipAngle,
@@ -216,5 +220,6 @@ export function computeFrameAngles(
     fppa,
     elbowAngle,
     shoulderAngle,
+    landmarkConfidence,
   };
 }

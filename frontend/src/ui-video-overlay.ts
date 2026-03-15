@@ -1,9 +1,10 @@
 /**
  * Video playback with skeleton overlay: play/pause, speed controls,
- * frame-by-frame navigation, rep selector, keyboard shortcuts.
+ * frame-by-frame navigation, rep selector, keyboard shortcuts,
+ * and optional frame-by-frame angle data viewer with sparkline.
  */
 
-import type { SetAnalysis, FrameData, FormIssue } from './types';
+import type { SetAnalysis, FrameData, FormIssue, FrameAngles } from './types';
 import { computeFrameAngles } from './angles';
 import { getPhases } from './phases';
 import { drawSkeleton, drawPhaseOverlay, drawAngleLabels } from './ui-skeleton';
@@ -24,6 +25,235 @@ let _activeAnimFrameId: number | null = null;
 
 // AbortController to clean up video event listeners between calls
 let _videoListenerController: AbortController | null = null;
+
+// ─── Angle Data Panel Helpers ───
+
+/** Inject CSS for the angle data panel (idempotent). */
+function injectAngleDataStyles(): void {
+  if (document.getElementById('angle-data-panel-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'angle-data-panel-styles';
+  style.textContent = `
+    .angle-data-wrapper {
+      display: none;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .angle-data-wrapper.visible {
+      display: flex;
+    }
+
+    .angle-data-readout {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--bg-card, #121212);
+      border: 1px solid var(--border, #333333);
+      border-radius: 6px;
+      font: 0.75rem / 1.4 monospace;
+      color: var(--text-primary, #e0e0e0);
+    }
+    .angle-data-readout .angle-label {
+      color: var(--text-muted, #808080);
+      margin-right: 0.25rem;
+    }
+    .angle-data-readout .angle-value {
+      color: var(--accent, #00d4ff);
+      font-weight: 600;
+    }
+
+    .angle-sparkline-container {
+      position: relative;
+      width: 100%;
+      height: 60px;
+      background: rgba(18, 18, 18, 0.85);
+      border: 1px solid var(--border, #333333);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .angle-sparkline-container canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .angle-data-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.8rem;
+      color: var(--text-muted, #808080);
+      cursor: pointer;
+      user-select: none;
+      margin-top: 0.25rem;
+    }
+    .angle-data-toggle input {
+      accent-color: var(--accent, #00d4ff);
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+/** Create (or find existing) angle data DOM elements under the video panel. */
+function ensureAngleDataPanel(videoContainer: Element): {
+  wrapper: HTMLElement;
+  readout: HTMLElement;
+  sparkCanvas: HTMLCanvasElement;
+  toggle: HTMLInputElement;
+} {
+  let wrapper = videoContainer.parentElement?.querySelector('.angle-data-wrapper') as HTMLElement | null;
+  if (wrapper) {
+    // Re-use existing DOM from a prior analysis
+    const readout = wrapper.querySelector('.angle-data-readout') as HTMLElement;
+    const sparkCanvas = wrapper.querySelector('.angle-sparkline-container canvas') as HTMLCanvasElement;
+    const toggle = videoContainer.parentElement!.querySelector<HTMLInputElement>('.angle-data-toggle input')!;
+    return { wrapper, readout, sparkCanvas, toggle };
+  }
+
+  const parent = videoContainer.parentElement!;
+
+  // Toggle checkbox
+  const toggleLabel = document.createElement('label');
+  toggleLabel.className = 'angle-data-toggle';
+  const toggleInput = document.createElement('input');
+  toggleInput.type = 'checkbox';
+  toggleInput.setAttribute('aria-label', 'Show frame-by-frame angle data');
+  toggleLabel.appendChild(toggleInput);
+  toggleLabel.appendChild(document.createTextNode('Show Angle Data'));
+
+  // Wrapper (hidden by default)
+  wrapper = document.createElement('div');
+  wrapper.className = 'angle-data-wrapper';
+
+  // Readout panel
+  const readout = document.createElement('div');
+  readout.className = 'angle-data-readout';
+  readout.setAttribute('aria-live', 'polite');
+  wrapper.appendChild(readout);
+
+  // Sparkline container + canvas
+  const sparkContainer = document.createElement('div');
+  sparkContainer.className = 'angle-sparkline-container';
+  const sparkCanvas = document.createElement('canvas');
+  sparkCanvas.setAttribute('aria-hidden', 'true');
+  sparkContainer.appendChild(sparkCanvas);
+  wrapper.appendChild(sparkContainer);
+
+  // Insert after the video container
+  parent.appendChild(toggleLabel);
+  parent.appendChild(wrapper);
+
+  // Toggle visibility
+  toggleInput.addEventListener('change', () => {
+    wrapper!.classList.toggle('visible', toggleInput.checked);
+  });
+
+  return { wrapper, readout, sparkCanvas, toggle: toggleInput };
+}
+
+/** Update the text readout with angles for the given frame. */
+function updateAngleReadout(readout: HTMLElement, angles: FrameAngles): void {
+  const entries: { label: string; value: string }[] = [
+    { label: 'Knee', value: `${Math.round(angles.kneeAngle)}\u00B0` },
+    { label: 'Hip', value: `${Math.round(angles.hipAngle)}\u00B0` },
+    { label: 'Trunk', value: `${Math.round(angles.trunkAngle)}\u00B0` },
+  ];
+  if (angles.elbowAngle !== undefined) {
+    entries.push({ label: 'Elbow', value: `${Math.round(angles.elbowAngle)}\u00B0` });
+  }
+
+  readout.innerHTML = entries
+    .map((e) => `<span><span class="angle-label">${e.label}:</span><span class="angle-value">${e.value}</span></span>`)
+    .join('');
+}
+
+/** Draw the knee-angle sparkline and a vertical cursor at the current position. */
+function drawSparkline(
+  canvas: HTMLCanvasElement,
+  kneeAngles: number[],
+  currentIndex: number,
+): void {
+  const rect = canvas.getBoundingClientRect();
+  const w = Math.round(rect.width * devicePixelRatio);
+  const h = Math.round(rect.height * devicePixelRatio);
+  if (w === 0 || h === 0) return;
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+  }
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, w, h);
+
+  const n = kneeAngles.length;
+  if (n < 2) return;
+
+  // Determine Y range with padding
+  let minA = Infinity, maxA = -Infinity;
+  for (const a of kneeAngles) {
+    if (a < minA) minA = a;
+    if (a > maxA) maxA = a;
+  }
+  const range = maxA - minA || 1;
+  const pad = 6 * devicePixelRatio;
+
+  const toX = (i: number) => (i / (n - 1)) * w;
+  const toY = (a: number) => pad + ((maxA - a) / range) * (h - 2 * pad);
+
+  // Draw guide lines at min/max
+  ctx.strokeStyle = 'rgba(128,128,128,0.3)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(0, toY(minA));
+  ctx.lineTo(w, toY(minA));
+  ctx.moveTo(0, toY(maxA));
+  ctx.lineTo(w, toY(maxA));
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Draw min/max labels
+  ctx.font = `${10 * devicePixelRatio}px monospace`;
+  ctx.fillStyle = 'rgba(128,128,128,0.6)';
+  ctx.textAlign = 'right';
+  ctx.fillText(`${Math.round(maxA)}\u00B0`, w - 4 * devicePixelRatio, toY(maxA) + 12 * devicePixelRatio);
+  ctx.fillText(`${Math.round(minA)}\u00B0`, w - 4 * devicePixelRatio, toY(minA) - 4 * devicePixelRatio);
+
+  // Draw knee angle trace
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 1.5 * devicePixelRatio;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const x = toX(i);
+    const y = toY(kneeAngles[i]);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Draw vertical cursor at current frame
+  if (currentIndex >= 0 && currentIndex < n) {
+    const cx = toX(currentIndex);
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 1.5 * devicePixelRatio;
+    ctx.beginPath();
+    ctx.moveTo(cx, 0);
+    ctx.lineTo(cx, h);
+    ctx.stroke();
+
+    // Draw dot at current angle value
+    const cy = toY(kneeAngles[currentIndex]);
+    ctx.fillStyle = '#00d4ff';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3 * devicePixelRatio, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
 
 /**
  * Set up annotated video playback with skeleton overlay.
@@ -62,6 +292,13 @@ export function setupVideoPlayback(
   });
   const phases = getPhases(kneeAngles);
 
+  // Pre-compute full angles for each frame (used by angle data panel)
+  const frameAnglesMap = new Map<number, FrameAngles>();
+  for (const fi of sortedFrameIndices) {
+    const lm = frameData.get(fi)!;
+    frameAnglesMap.set(fi, computeFrameAngles(lm));
+  }
+
   // Build issue map: frame -> issues
   const frameIssues = new Map<number, FormIssue[]>();
   for (const rep of analysis.reps) {
@@ -70,6 +307,14 @@ export function setupVideoPlayback(
       existing.push(issue);
       frameIssues.set(issue.frame, existing);
     }
+  }
+
+  // ─── Angle Data Panel Setup ───
+  injectAngleDataStyles();
+  const videoContainerEl = canvasEl.closest('.video-container');
+  let anglePanel: ReturnType<typeof ensureAngleDataPanel> | null = null;
+  if (videoContainerEl) {
+    anglePanel = ensureAngleDataPanel(videoContainerEl);
   }
 
   /** Find the closest processed frame index for a given video time (binary search). */
@@ -121,6 +366,15 @@ export function setupVideoPlayback(
     drawSkeleton(ctx, landmarks, issues, canvasEl.width, canvasEl.height);
     drawPhaseOverlay(ctx, phase, repIdx, canvasEl.width);
     drawAngleLabels(ctx, landmarks, canvasEl.width, canvasEl.height);
+
+    // Update angle data panel if visible
+    if (anglePanel && anglePanel.toggle.checked) {
+      const angles = frameAnglesMap.get(frameNum);
+      if (angles) {
+        updateAngleReadout(anglePanel.readout, angles);
+        drawSparkline(anglePanel.sparkCanvas, kneeAngles, arrIdx);
+      }
+    }
   }
 
   /** Animation loop for playback. */

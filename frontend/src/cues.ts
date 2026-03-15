@@ -11,22 +11,37 @@ export interface CorrectiveExercise {
   name: string;
   description: string;
   sets: string;
+  /** Optional inline SVG illustration (stick figure). */
+  svg?: string;
 }
+
+// ─── Stick-Figure SVG Illustrations ───
+// Simple 80x50 viewBox stick figures for common corrective exercises.
+
+const SVG_CLAMSHELL = `<svg viewBox="0 0 80 50" xmlns="http://www.w3.org/2000/svg" style="width:80px;height:50px"><line x1="10" y1="40" x2="40" y2="40" stroke="#4cc9f0" stroke-width="2"/><line x1="40" y1="40" x2="55" y2="30" stroke="#4cc9f0" stroke-width="2"/><line x1="55" y1="30" x2="40" y2="20" stroke="#4cc9f0" stroke-width="2" stroke-dasharray="3,2"/><circle cx="10" cy="38" r="4" fill="none" stroke="#4cc9f0" stroke-width="1.5"/><path d="M55 30 L70 18" stroke="#4ade80" stroke-width="2" stroke-dasharray="4,2"/><text x="62" y="15" fill="#4ade80" font-size="7">open</text></svg>`;
+
+const SVG_GOBLET_SQUAT = `<svg viewBox="0 0 80 50" xmlns="http://www.w3.org/2000/svg" style="width:80px;height:50px"><circle cx="40" cy="8" r="5" fill="none" stroke="#4cc9f0" stroke-width="1.5"/><line x1="40" y1="13" x2="40" y2="28" stroke="#4cc9f0" stroke-width="2"/><line x1="40" y1="28" x2="30" y2="42" stroke="#4cc9f0" stroke-width="2"/><line x1="30" y1="42" x2="28" y2="48" stroke="#4cc9f0" stroke-width="2"/><line x1="40" y1="28" x2="50" y2="42" stroke="#4cc9f0" stroke-width="2"/><line x1="50" y1="42" x2="52" y2="48" stroke="#4cc9f0" stroke-width="2"/><rect x="35" y="18" width="10" height="6" rx="1" fill="none" stroke="#fbbf24" stroke-width="1.5"/></svg>`;
+
+const SVG_WALL_ANKLE = `<svg viewBox="0 0 80 50" xmlns="http://www.w3.org/2000/svg" style="width:80px;height:50px"><line x1="10" y1="5" x2="10" y2="48" stroke="#666" stroke-width="3"/><circle cx="30" cy="10" r="5" fill="none" stroke="#4cc9f0" stroke-width="1.5"/><line x1="30" y1="15" x2="28" y2="28" stroke="#4cc9f0" stroke-width="2"/><line x1="28" y1="28" x2="15" y2="38" stroke="#4cc9f0" stroke-width="2"/><line x1="15" y1="38" x2="20" y2="48" stroke="#4cc9f0" stroke-width="2"/><line x1="28" y1="28" x2="40" y2="40" stroke="#4cc9f0" stroke-width="2"/><line x1="40" y1="40" x2="42" y2="48" stroke="#4cc9f0" stroke-width="2"/><path d="M15 38 L10 30" stroke="#4ade80" stroke-width="1.5" stroke-dasharray="3,2"/><text x="45" y="35" fill="#4ade80" font-size="6">knee→wall</text></svg>`;
+
+const SVG_GLUTE_BRIDGE = `<svg viewBox="0 0 80 50" xmlns="http://www.w3.org/2000/svg" style="width:80px;height:50px"><line x1="5" y1="48" x2="75" y2="48" stroke="#666" stroke-width="1"/><circle cx="15" cy="35" r="4" fill="none" stroke="#4cc9f0" stroke-width="1.5"/><line x1="15" y1="39" x2="40" y2="30" stroke="#4cc9f0" stroke-width="2"/><line x1="40" y1="30" x2="55" y2="38" stroke="#4cc9f0" stroke-width="2"/><line x1="55" y1="38" x2="55" y2="48" stroke="#4cc9f0" stroke-width="2"/><path d="M35 30 L35 20" stroke="#4ade80" stroke-width="1.5" stroke-dasharray="3,2"/><text x="38" y="18" fill="#4ade80" font-size="6">drive up</text></svg>`;
+
+const SVG_PAUSE_SQUAT = `<svg viewBox="0 0 80 50" xmlns="http://www.w3.org/2000/svg" style="width:80px;height:50px"><circle cx="40" cy="10" r="5" fill="none" stroke="#4cc9f0" stroke-width="1.5"/><line x1="40" y1="15" x2="40" y2="26" stroke="#4cc9f0" stroke-width="2"/><line x1="40" y1="26" x2="30" y2="38" stroke="#4cc9f0" stroke-width="2"/><line x1="30" y1="38" x2="28" y2="48" stroke="#4cc9f0" stroke-width="2"/><line x1="40" y1="26" x2="50" y2="38" stroke="#4cc9f0" stroke-width="2"/><line x1="50" y1="38" x2="52" y2="48" stroke="#4cc9f0" stroke-width="2"/><text x="55" y="32" fill="#fbbf24" font-size="7">PAUSE</text><rect x="55" y="26" width="20" height="10" rx="2" fill="none" stroke="#fbbf24" stroke-width="1" stroke-dasharray="2,1"/></svg>`;
 
 const CORRECTIVE_EXERCISES: Record<string, CorrectiveExercise[]> = {
   knee_valgus: [
     { name: 'Banded Squats', description: 'Loop a resistance band above your knees. Squat while actively pushing your knees into the band.', sets: '3x10' },
-    { name: 'Clamshells', description: 'Lie on your side with knees bent. Open your top knee like a clamshell while keeping feet together.', sets: '3x15 each side' },
+    { name: 'Clamshells', description: 'Lie on your side with knees bent. Open your top knee like a clamshell while keeping feet together.', sets: '3x15 each side', svg: SVG_CLAMSHELL },
     { name: 'Monster Walks', description: 'With a band above your knees, take wide steps sideways keeping tension on the band.', sets: '3x10 each direction' },
   ],
   butt_wink: [
-    { name: 'Box Squats', description: 'Squat to a box set at the depth where your lower back stays flat. Pause, then stand.', sets: '3x8' },
+    { name: 'Box Squats', description: 'Squat to a box set at the depth where your lower back stays flat. Pause, then stand.', sets: '3x8', svg: SVG_PAUSE_SQUAT },
     { name: '90/90 Hip Stretch', description: 'Sit with one leg bent 90 degrees in front and one behind. Lean forward gently to stretch the hip.', sets: '30 sec each side' },
     { name: 'Goblet Squat Holds', description: 'Hold a goblet squat at the bottom position, using the weight to push your knees out and keep your torso upright.', sets: '3x10 sec at bottom' },
   ],
   excessive_forward_lean: [
-    { name: 'Goblet Squats', description: 'Hold a weight at your chest and squat, focusing on keeping your torso as upright as possible.', sets: '3x10' },
-    { name: 'Wall Ankle Stretches', description: 'Face a wall with one foot forward. Drive your knee toward the wall while keeping your heel down.', sets: '3x30 sec each' },
+    { name: 'Goblet Squats', description: 'Hold a weight at your chest and squat, focusing on keeping your torso as upright as possible.', sets: '3x10', svg: SVG_GOBLET_SQUAT },
+    { name: 'Wall Ankle Stretches', description: 'Face a wall with one foot forward. Drive your knee toward the wall while keeping your heel down.', sets: '3x30 sec each', svg: SVG_WALL_ANKLE },
     { name: 'Front Foot Elevated Split Squats', description: 'Place your front foot on a small platform. Lower into a split squat, focusing on an upright torso.', sets: '3x8' },
   ],
   good_morning: [
@@ -35,7 +50,7 @@ const CORRECTIVE_EXERCISES: Record<string, CorrectiveExercise[]> = {
     { name: 'Leg Press', description: 'Use a leg press machine to build quad strength so your legs can keep up with your back.', sets: '3x10' },
   ],
   heel_rise: [
-    { name: 'Wall Ankle Stretches', description: 'Face a wall with one foot forward. Drive your knee toward the wall while keeping your heel down.', sets: '3x30 sec' },
+    { name: 'Wall Ankle Stretches', description: 'Face a wall with one foot forward. Drive your knee toward the wall while keeping your heel down.', sets: '3x30 sec', svg: SVG_WALL_ANKLE },
     { name: 'Heel-Elevated Squats', description: 'Place small plates or a wedge under your heels and squat. This temporarily bypasses ankle limitations.', sets: '3x10' },
     { name: 'Calf Foam Rolling', description: 'Roll a foam roller slowly up and down each calf, pausing on tight spots.', sets: '2 min each' },
   ],
@@ -60,7 +75,7 @@ const CORRECTIVE_EXERCISES: Record<string, CorrectiveExercise[]> = {
     { name: 'Drop Squats', description: 'From standing, quickly drop into a quarter-squat catching position. Builds comfort with a faster descent under load.', sets: '3x8' },
   ],
   bouncing: [
-    { name: 'Pause Squats', description: 'Squat down and hold the bottom for 2 seconds before pushing back up. No bouncing allowed.', sets: '3x5, 2 sec pause' },
+    { name: 'Pause Squats', description: 'Squat down and hold the bottom for 2 seconds before pushing back up. No bouncing allowed.', sets: '3x5, 2 sec pause', svg: SVG_PAUSE_SQUAT },
     { name: 'Dead-Stop Squats', description: 'Squat to a box, sit down completely, pause for a full second, then stand. Removes all momentum.', sets: '3x5' },
     { name: 'Isometric Bottom Hold', description: 'Hold the bottom of a squat without moving. Build strength in the weakest position.', sets: '3x10 sec' },
   ],
@@ -75,7 +90,7 @@ const CORRECTIVE_EXERCISES: Record<string, CorrectiveExercise[]> = {
     { name: 'Side-Lying Hip Abduction', description: 'Lie on your side and raise your top leg slowly. Strengthens hip stabilizers.', sets: '3x15 each side' },
   ],
   incomplete_lockout: [
-    { name: 'Glute Bridges', description: 'Lie on your back with knees bent. Drive hips up and squeeze glutes hard at the top.', sets: '3x12' },
+    { name: 'Glute Bridges', description: 'Lie on your back with knees bent. Drive hips up and squeeze glutes hard at the top.', sets: '3x12', svg: SVG_GLUTE_BRIDGE },
     { name: 'Hip Thrusts', description: 'With your upper back on a bench, drive hips up and hold the top position for a second.', sets: '3x10' },
     { name: 'Standing Hip Extensions', description: 'Stand on one leg and extend the other leg behind you, squeezing your glute.', sets: '3x12 each side' },
   ],

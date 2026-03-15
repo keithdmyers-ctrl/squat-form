@@ -382,50 +382,59 @@ function detectBenchIssues(
 
 // ─── Bench Coaching Cues ───
 
-const BENCH_CUE_DATABASE: Record<string, { cue: string; priority: number; explanation: string }> = {
+const BENCH_CUE_DATABASE: Record<string, { cue: string; priority: number; explanation: string; explanationBeginner?: string }> = {
   insufficient_rom: {
     cue: 'Lower the bar to your chest — touch and press',
     priority: 3,
     explanation: 'Full range of motion builds more strength and muscle. Lower the bar until it touches your chest (or gets very close). If mobility limits your range, work on shoulder stretches and start with lighter weight.',
+    explanationBeginner: 'You\'re not lowering the bar far enough — try to bring it all the way down to touch your chest (or get really close). Going through the full range of motion builds more strength. Start with a lighter weight if the bar feels hard to control near your chest.',
   },
   incomplete_lockout: {
     cue: 'Press all the way up — lock your elbows at the top',
     priority: 3,
     explanation: 'Finish each rep with arms fully extended. In competition, the press command isn\'t given until lockout is complete. Practice with lighter weight to build the habit.',
+    explanationBeginner: 'You\'re not pushing the bar all the way up. Make sure your arms are fully straight at the top of each rep before lowering again. This ensures you get the full benefit of the exercise.',
   },
   bouncing: {
     cue: 'Control the bar to your chest — no bouncing',
     priority: 2,
     explanation: 'Bouncing the bar off your chest uses momentum instead of muscle strength and can injure your sternum. Lower under control and pause briefly before pressing.',
+    explanationBeginner: 'You\'re bouncing the bar off your chest, which can hurt and doesn\'t build as much strength. Lower the bar gently to your chest, let it touch, and then press it back up using your muscles, not momentum.',
   },
   no_pause: {
     cue: 'Pause on the chest — wait for the press command',
     priority: 1,
     explanation: 'In competition, you must hold the bar motionless on your chest until the head judge gives the "press" command. Practice paused reps in training.',
+    explanationBeginner: 'Try pausing the bar on your chest for a quick count of "one" before pressing it back up. This builds much more strength than bouncing it, and it\'s how the exercise is done in competitions.',
   },
   uneven_press: {
     cue: 'Press evenly — both arms should lock out together',
     priority: 4,
     explanation: 'One arm is pressing faster than the other, which can cause the bar to tilt. This often indicates a strength imbalance. Add dumbbell pressing to build equal strength on both sides.',
+    explanationBeginner: 'One arm is pushing faster than the other, making the bar tilt. This is really common! Try using dumbbells sometimes instead of a barbell — each arm has to work equally, which helps your weaker side catch up.',
   },
   fast_descent: {
     cue: 'Control the bar on the way down — 1-2 seconds',
     priority: 5,
     explanation: 'Lowering the bar too fast reduces muscle tension and makes it harder to be precise with your touch point. Aim for a 1-2 second controlled descent.',
+    explanationBeginner: 'You\'re lowering the bar too fast. Take about 1-2 seconds to bring it down to your chest — nice and controlled. This helps you stay precise and actually builds more strength.',
   },
   press_stall: {
     cue: 'Drive through the sticking point — push your feet into the floor',
     priority: 4,
     explanation: 'The bar stalled during the press, which usually happens about 2-3 inches off the chest. Build strength at this point with pause reps, Spoto press, or board press.',
+    explanationBeginner: 'The bar got stuck partway up. This is the hardest point in the bench press and totally normal! Try to push as fast as you can right from the start — the extra speed helps carry you through. If it keeps happening, use a slightly lighter weight.',
   },
 };
 
-function getBenchCues(issues: FormIssue[]): CoachingCue[] {
+function getBenchCues(issues: FormIssue[], experienceLevel?: string): CoachingCue[] {
   const cueMap = new Map<string, CoachingCue>();
   for (const issue of issues) {
     const entry = BENCH_CUE_DATABASE[issue.name];
     if (!entry || cueMap.has(issue.name)) continue;
-    cueMap.set(issue.name, { issue: issue.name, cue: entry.cue, priority: entry.priority, explanation: entry.explanation });
+    const explanation = (experienceLevel === 'beginner' && entry.explanationBeginner)
+      ? entry.explanationBeginner : entry.explanation;
+    cueMap.set(issue.name, { issue: issue.name, cue: entry.cue, priority: entry.priority, explanation });
   }
   return Array.from(cueMap.values()).sort((a, b) => a.priority - b.priority);
 }
@@ -533,7 +542,7 @@ function scoreBenchRep(
   );
 
   const issues = detectBenchIssues(rep, config);
-  const cues = getBenchCues(issues);
+  const cues = getBenchCues(issues, config.experienceLevel);
   const positiveFeedback = getBenchPositiveFeedback({
     rom, lockout, control, symmetry, tempo, pause,
   });
@@ -541,6 +550,14 @@ function scoreBenchRep(
   let totalScore = overall;
   const highCount = issues.filter(i => i.severity === 'high').length;
   if (highCount > 0) totalScore = Math.max(0, totalScore - highCount * 5);
+
+  // Aggregate landmark confidence across all frames in this rep
+  const confidenceValues = rep.frameAngles
+    .map(fa => fa.landmarkConfidence)
+    .filter((v): v is number => v !== undefined);
+  const avgConfidence = confidenceValues.length > 0
+    ? confidenceValues.reduce((s, v) => s + v, 0) / confidenceValues.length
+    : undefined;
 
   return {
     depthScore: rom,
@@ -556,6 +573,7 @@ function scoreBenchRep(
     positiveFeedback,
     stickingPoints: [],
     velocity: rep.velocity,
+    avgConfidence,
     minKneeAngle: rep.minKneeAngle,
     maxTrunkAngle: rep.maxTrunkAngle,
     minHipAngle: rep.minHipAngle,
@@ -628,7 +646,7 @@ export function analyzeBenchSequence(
   const overallScore = computeSetScore(repScores);
   const fatigueDetected = detectFatigue(repScores);
   const topIssues = aggregateTopIssues(repScores);
-  const topCues = getBenchCues(topIssues);
+  const topCues = getBenchCues(topIssues, config.experienceLevel);
   const positiveHighlights = aggregatePositiveFeedback(repScores);
   const { repFrameMap: rfm, repStartFrames: rsf } = buildRepFrameMap(repRanges, frameIndices);
 

@@ -3,6 +3,7 @@
  */
 
 import type { SessionRecord, SetAnalysis } from './types';
+import { estimateRPE } from './competition';
 
 /** Escape a value for CSV (handle commas, quotes, newlines). */
 function csvEscape(value: string | number | undefined | null): string {
@@ -41,6 +42,7 @@ export function exportAnalysisCSV(analysis: SetAnalysis): string {
     'Descent Duration (s)', 'Ascent Duration (s)', 'Bottom Duration (s)',
     'Peak Ascent Velocity (deg/s)', 'Mean Ascent Velocity (deg/s)',
     'Ascent/Descent Ratio', 'Sticking Points',
+    'Confidence',
     'Issues',
   ];
   const rows = analysis.reps.map((rep, i) => [
@@ -64,6 +66,7 @@ export function exportAnalysisCSV(analysis: SetAnalysis): string {
     csvEscape(rep.velocity?.meanAscentVelocity ?? ''),
     csvEscape(rep.velocity?.ascentDescentRatio ?? ''),
     csvEscape((rep.stickingPoints ?? []).map(sp => `${sp.depthPercentage}%`).join('; ')),
+    csvEscape(rep.avgConfidence != null ? (rep.avgConfidence * 100).toFixed(0) + '%' : ''),
     csvEscape(rep.issues.map(iss => iss.name).join('; ')),
   ].join(','));
 
@@ -109,4 +112,128 @@ export function downloadCSV(csv: string, filename: string): void {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+// ─── Training Log Clipboard Export ───
+
+/** Map exercise variant strings to compact abbreviations. */
+const VARIANT_ABBREVIATIONS: Record<string, string> = {
+  // Squat variants
+  high_bar: 'HB',
+  low_bar: 'LB',
+  front: 'Front',
+  goblet: 'Goblet',
+  bodyweight: 'BW',
+  overhead: 'OH',
+  // Deadlift variants
+  conventional: 'Conv',
+  sumo: 'Sumo',
+  romanian: 'RDL',
+  // Bench variants
+  flat: 'Flat',
+  close_grip: 'CG',
+  wide_grip: 'WG',
+};
+
+/** Map exercise type strings to display names. */
+const EXERCISE_NAMES: Record<string, string> = {
+  squat: 'Squat',
+  deadlift: 'Deadlift',
+  bench_press: 'Bench',
+};
+
+/** Map internal issue names to plain-English labels. */
+function humanizeIssueName(name: string): string {
+  return name
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .replace(/^(.)/,  c => c.toLowerCase());
+}
+
+/**
+ * Generate a compact training log entry for clipboard.
+ * Format: "03/14 Squat HB 315x5 RPE 8 Score 82 Focus: knee valgus"
+ */
+export function generateTrainingLogEntry(
+  analysis: SetAnalysis,
+  weight?: number,
+  unit?: string,
+  exerciseType?: string,
+  variant?: string,
+): string {
+  const parts: string[] = [];
+
+  // Date in MM/DD format
+  const now = new Date();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  parts.push(`${mm}/${dd}`);
+
+  // Exercise name
+  const exerciseName = exerciseType
+    ? (EXERCISE_NAMES[exerciseType] ?? exerciseType)
+    : 'Squat';
+  parts.push(exerciseName);
+
+  // Variant abbreviation
+  if (variant) {
+    const abbrev = VARIANT_ABBREVIATIONS[variant] ?? variant;
+    parts.push(abbrev);
+  }
+
+  // Weight x reps
+  if (weight != null && weight > 0) {
+    const weightStr = unit ? `${weight}${unit}` : `${weight}`;
+    parts.push(`${weightStr}x${analysis.repCount}`);
+  } else {
+    parts.push(`x${analysis.repCount}`);
+  }
+
+  // RPE from velocity metrics (average across reps that have velocity data)
+  const rpeValues: number[] = [];
+  for (const rep of analysis.reps) {
+    if (rep.velocity) {
+      const rpeEst = estimateRPE(rep.velocity);
+      if (rpeEst) rpeValues.push(rpeEst.rpe);
+    }
+  }
+  if (rpeValues.length > 0) {
+    const avgRPE = rpeValues.reduce((s, v) => s + v, 0) / rpeValues.length;
+    // Round to nearest 0.5
+    const roundedRPE = Math.round(avgRPE * 2) / 2;
+    parts.push(`RPE ${roundedRPE}`);
+  }
+
+  // Score
+  parts.push(`Score ${Math.round(analysis.overallScore)}`);
+
+  // Focus: top issue
+  const topIssue = analysis.topIssues.length > 0
+    ? humanizeIssueName(analysis.topIssues[0].name)
+    : 'none';
+  parts.push(`Focus: ${topIssue}`);
+
+  return parts.join(' ');
+}
+
+/** Copy text to the clipboard. Returns true on success, false on failure. */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Fallback for older browsers or non-secure contexts
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
 }

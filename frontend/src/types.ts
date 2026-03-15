@@ -21,6 +21,8 @@ export interface FrameAngles {
   elbowAngle?: number;
   /** Shoulder flexion angle for bench press analysis. */
   shoulderAngle?: number;
+  /** Average landmark visibility/confidence for this frame's angle computations (0-1). */
+  landmarkConfidence?: number;
 }
 
 // ─── Exercise Type ───
@@ -211,6 +213,8 @@ export interface RepScore {
   velocity?: VelocityMetrics;
   competitionDepthPass?: boolean;
   competitionDepthMargin?: number;
+  /** Average landmark confidence across all frames in this rep (0-1). */
+  avgConfidence?: number;
   /** Raw angle summaries for data export. */
   minKneeAngle?: number;
   maxTrunkAngle?: number;

@@ -223,33 +223,47 @@ export function showResults(analysis: SetAnalysis, frameData: FrameData, session
     section.classList.remove('competition-mode');
   }
 
+  const isBeginner = analysis.config.experienceLevel === 'beginner';
+
   // --- Tier 1: Primary (always visible, prominent) ---
   renderOverallScore(analysis);
   renderCompetitionBadge(analysis);
   renderTierMessage(analysis);
-  renderScoreLegend(analysis);
+  if (!isBeginner) renderScoreLegend(analysis);
   renderFatigueWarning(analysis); // Safety-critical: show right after score
-  // Note: renderPositiveFeedback and renderMilestones both use insertBefore(overallCard.nextSibling),
-  // so we call them in reverse visual order (last-called ends up directly after overallCard).
+  renderGamification(analysis.overallScore, sessions);
   renderMilestones(analysis.overallScore, sessions);
   renderPositiveFeedback(analysis);
 
   // --- Tier 2: Action Items (what to do next) ---
   renderFocusSection(analysis, fps);
-  renderCoachingCues(analysis, fps);
+  if (!isBeginner) renderCoachingCues(analysis, fps);
   renderProgressInsights(analysis, sessions);
 
-  // --- Tier 3: Details (collapsed by default) ---
-  renderScoreBreakdown(analysis);
-  wrapInCollapsible('breakdown-collapse', 'Score Breakdown', 'score-breakdown');
+  // --- Tier 3: Details (collapsed by default, hidden for beginners unless expanded) ---
+  if (!isBeginner) {
+    renderScoreBreakdown(analysis);
+    wrapInCollapsible('breakdown-collapse', 'Score Breakdown', 'score-breakdown');
+  }
   if (oneRMEstimate) {
     renderOneRMEstimate(oneRMEstimate);
+    if (isBeginner) wrapInCollapsible('onerm-collapse', 'Max Lift Estimate', 'one-rm-section');
   }
-  renderRepCards(analysis);
-  wrapInCollapsible('rep-detail-collapse', 'Per-Rep Detail', 'rep-cards-section');
+  if (!isBeginner) {
+    renderRepCards(analysis);
+    wrapInCollapsible('rep-detail-collapse', 'Per-Rep Detail', 'rep-cards-section');
+  }
+  if (!isBeginner) {
+    renderVelocityChart(analysis);
+  }
   renderMobilityAssessment(analysis);
-  wrapInCollapsible('mobility-collapse', 'Mobility Assessment', 'mobility-section');
+  wrapInCollapsible('mobility-collapse', isBeginner ? 'Stretches & Flexibility Check' : 'Mobility Assessment', 'mobility-section');
   renderWarmUpProtocol(analysis);
+
+  // Show full report toggle for beginners
+  if (isBeginner) {
+    renderBeginnerFullReportToggle(analysis, fps, sessions);
+  }
 
   // --- Tier 4: Actions ---
   renderShareButtons(analysis);
@@ -578,9 +592,12 @@ export function renderFocusSection(analysis: SetAnalysis, fps: number = 0): void
         <div class="focus-exercises">
           <h4>Try These Exercises</h4>
           ${exercises.map((ex: CorrectiveExercise) => `
-            <div class="exercise-card">
-              <strong>${escapeHtml(ex.name)}</strong> <span class="exercise-sets">${escapeHtml(ex.sets)}</span>
-              <p>${escapeHtml(ex.description)}</p>
+            <div class="exercise-card" style="display: flex; gap: 0.5rem; align-items: flex-start;">
+              ${ex.svg ? `<div style="flex-shrink: 0;">${ex.svg}</div>` : ''}
+              <div>
+                <strong>${escapeHtml(ex.name)}</strong> <span class="exercise-sets">${escapeHtml(ex.sets)}</span>
+                <p>${escapeHtml(ex.description)}</p>
+              </div>
             </div>
           `).join('')}
         </div>
@@ -1032,6 +1049,91 @@ export function renderVelocityMini(vel: VelocityMetrics, competitionMode: boolea
   `;
 }
 
+// ─── Velocity Profile Chart (per-rep velocity decay visualization) ───
+
+export function renderVelocityChart(analysis: SetAnalysis): void {
+  const section = $('results-section');
+  const existing = document.getElementById('velocity-chart-section');
+  if (existing) existing.remove();
+
+  // Only show if we have velocity data for at least 3 reps
+  const repsWithVelocity = analysis.reps.filter(r => r.velocity);
+  if (repsWithVelocity.length < 3) return;
+
+  const container = document.createElement('div');
+  container.id = 'velocity-chart-section';
+  container.className = 'card';
+  container.style.cssText = 'padding: 1rem; margin: 0.75rem 0;';
+
+  const velocities = analysis.reps.map(r => r.velocity?.meanAscentVelocity ?? 0);
+  const maxVel = Math.max(...velocities, 1);
+  const minVel = Math.min(...velocities);
+
+  // Calculate velocity loss
+  const firstRepVel = velocities[0] ?? 0;
+  const lastRepVel = velocities[velocities.length - 1] ?? 0;
+  const velocityLoss = firstRepVel > 0 ? Math.round((1 - lastRepVel / firstRepVel) * 100) : 0;
+  const lossColor = velocityLoss > 30 ? 'var(--danger)' : velocityLoss > 15 ? 'var(--warning)' : 'var(--success)';
+
+  // SVG sparkline
+  const chartWidth = 280;
+  const chartHeight = 60;
+  const padding = 4;
+  const points = velocities.map((v, i) => {
+    const x = padding + (i / (velocities.length - 1)) * (chartWidth - padding * 2);
+    const y = padding + (1 - (v - minVel * 0.8) / (maxVel - minVel * 0.8 + 1)) * (chartHeight - padding * 2);
+    return `${x},${y}`;
+  }).join(' ');
+
+  // RPE estimation for each rep
+  const rpeLabels = analysis.reps.map(r => {
+    if (!r.velocity) return '';
+    const ratio = r.velocity.ascentDescentRatio;
+    if (ratio < 0.3) return 'RPE 10';
+    if (ratio < 0.5) return '9.5';
+    if (ratio < 0.7) return '9';
+    if (ratio < 0.9) return '8';
+    if (ratio < 1.1) return '7';
+    return '6';
+  });
+
+  container.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+      <strong style="font-size: 0.85rem; color: var(--text-primary, #e0e0e0);">Velocity Profile</strong>
+      <span style="font-size: 0.75rem; color: ${lossColor};">
+        ${velocityLoss > 0 ? `${velocityLoss}% velocity loss` : 'Consistent velocity'}
+      </span>
+    </div>
+    <svg viewBox="0 0 ${chartWidth} ${chartHeight}" style="width: 100%; height: ${chartHeight}px; background: var(--bg-input, #1e1e1e); border-radius: var(--radius-sm, 6px);">
+      <polyline points="${points}" fill="none" stroke="var(--accent, #00d4ff)" stroke-width="2" stroke-linejoin="round" />
+      ${velocities.map((v, i) => {
+        const x = padding + (i / (velocities.length - 1)) * (chartWidth - padding * 2);
+        const y = padding + (1 - (v - minVel * 0.8) / (maxVel - minVel * 0.8 + 1)) * (chartHeight - padding * 2);
+        const color = i === 0 ? 'var(--success)' : i === velocities.length - 1 ? (velocityLoss > 30 ? 'var(--danger)' : 'var(--accent)') : 'var(--accent)';
+        return `<circle cx="${x}" cy="${y}" r="3" fill="${color}" />`;
+      }).join('')}
+    </svg>
+    <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted, #808080); margin-top: 0.25rem;">
+      ${velocities.map((v, i) => `<span title="Rep ${i + 1}: ${v} deg/s${rpeLabels[i] ? ', ' + rpeLabels[i] : ''}">R${i + 1}</span>`).join('')}
+    </div>
+    ${velocityLoss > 20 ? `<div style="font-size: 0.75rem; color: var(--text-secondary, #b0b0b0); margin-top: 0.35rem;">
+      ${velocityLoss > 30
+        ? 'Significant velocity drop — consider stopping 1-2 reps earlier next set for better quality reps.'
+        : 'Moderate velocity drop across the set — form held well but fatigue is accumulating.'}
+    </div>` : ''}
+  `;
+
+  // Insert after score breakdown or after focus section
+  const breakdown = document.getElementById('score-breakdown');
+  const focus = document.getElementById('focus-section');
+  const insertAfter = breakdown ?? focus;
+  if (insertAfter?.nextSibling) {
+    section.insertBefore(container, insertAfter.nextSibling);
+  } else {
+    section.appendChild(container);
+  }
+}
+
 export function renderCoachingCues(analysis: SetAnalysis, fps: number = 0): void {
   const container = $('coaching-cues');
   container.innerHTML = '';
@@ -1433,4 +1535,139 @@ export function generateTextReport(analysis: SetAnalysis): string {
 
   report += '\nGenerated by Squat Form Analyzer\n';
   return report;
+}
+
+// ─── Beginner Full Report Toggle ───
+
+function renderBeginnerFullReportToggle(analysis: SetAnalysis, fps: number, sessions: SessionRecord[]): void {
+  const section = $('results-section');
+  const existing = document.getElementById('beginner-full-report');
+  if (existing) existing.remove();
+
+  const container = document.createElement('div');
+  container.id = 'beginner-full-report';
+  container.style.cssText = 'text-align: center; margin: 1rem 0;';
+
+  const btn = document.createElement('button');
+  btn.className = 'btn btn-secondary';
+  btn.textContent = 'Show Full Detailed Report';
+  btn.style.cssText = 'font-size: 0.85rem;';
+
+  btn.addEventListener('click', () => {
+    // Render the hidden sections
+    renderScoreLegend(analysis);
+    renderCoachingCues(analysis, fps);
+    renderScoreBreakdown(analysis);
+    wrapInCollapsible('breakdown-collapse', 'Score Breakdown', 'score-breakdown');
+    renderRepCards(analysis);
+    wrapInCollapsible('rep-detail-collapse', 'Per-Rep Detail', 'rep-cards-section');
+    container.remove();
+  });
+
+  container.appendChild(btn);
+
+  // Insert before share buttons
+  const shareSection = document.getElementById('share-section');
+  if (shareSection) {
+    section.insertBefore(container, shareSection);
+  } else {
+    section.appendChild(container);
+  }
+}
+
+// ─── Gamification: Streaks, Issue Resolution, Progress Path ───
+
+const GAMIFICATION_KEY = 'squat_form_gamification';
+
+interface GamificationState {
+  totalSessions: number;
+  currentStreak: number;
+  lastSessionDate: string;
+  resolvedIssues: string[];
+  bestGrade: string;
+  bestScore: number;
+}
+
+function loadGamificationState(): GamificationState {
+  try {
+    const stored = localStorage.getItem(GAMIFICATION_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  return { totalSessions: 0, currentStreak: 0, lastSessionDate: '', resolvedIssues: [], bestGrade: '', bestScore: 0 };
+}
+
+function saveGamificationState(state: GamificationState): void {
+  try { localStorage.setItem(GAMIFICATION_KEY, JSON.stringify(state)); } catch { /* ignore */ }
+}
+
+function renderGamification(score: number, sessions: SessionRecord[]): void {
+  const section = $('results-section');
+  const existing = document.getElementById('gamification-section');
+  if (existing) existing.remove();
+
+  const state = loadGamificationState();
+  const badges: string[] = [];
+
+  // Update state
+  state.totalSessions++;
+  if (score > state.bestScore) state.bestScore = score;
+
+  const gradeOrder = ['F', 'Keep Working', 'D', 'C', 'B', 'A'];
+  const currentGradeIdx = gradeOrder.indexOf(sessions.length > 0 ? sessions[0]?.grade ?? '' : '');
+  const bestGradeIdx = gradeOrder.indexOf(state.bestGrade);
+  if (currentGradeIdx > bestGradeIdx) state.bestGrade = gradeOrder[currentGradeIdx] ?? state.bestGrade;
+
+  // Streak calculation
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  if (state.lastSessionDate === today) {
+    // Same day, streak unchanged
+  } else if (state.lastSessionDate === yesterday || state.lastSessionDate === '') {
+    state.currentStreak++;
+  } else {
+    state.currentStreak = 1;
+  }
+  state.lastSessionDate = today;
+
+  // Issue resolution detection
+  if (sessions.length >= 2) {
+    const prevIssues = new Set(sessions.slice(1, 4).flatMap(s => s.top_issue ? [s.top_issue] : []));
+    const currentIssue = sessions[0]?.top_issue;
+    for (const prev of prevIssues) {
+      if (prev !== currentIssue && !state.resolvedIssues.includes(prev)) {
+        state.resolvedIssues.push(prev);
+        badges.push(`You fixed "${prev.replace(/_/g, ' ')}"!`);
+      }
+    }
+  }
+
+  // Generate badges
+  if (state.totalSessions === 1) badges.unshift('First analysis complete!');
+  if (state.currentStreak >= 3) badges.push(`${state.currentStreak}-day streak!`);
+  if (state.currentStreak >= 7) badges.push('One week consistent!');
+  if (score >= 90 && state.bestScore >= 90) badges.push('First A grade achieved!');
+  if (state.totalSessions === 5) badges.push('5 sessions and counting!');
+  if (state.totalSessions === 10) badges.push('10 sessions — you\'re committed!');
+  if (state.totalSessions === 25) badges.push('25 sessions — true dedication!');
+
+  saveGamificationState(state);
+
+  if (badges.length === 0) return;
+
+  const container = document.createElement('div');
+  container.id = 'gamification-section';
+  container.className = 'milestone-banner';
+  container.style.cssText = 'background: rgba(74, 222, 128, 0.06); border: 1px solid rgba(74, 222, 128, 0.2); border-radius: var(--radius-md, 10px); padding: 0.75rem 1rem; margin: 0.5rem 0; text-align: center;';
+
+  container.innerHTML = badges.map(b =>
+    `<div style="color: var(--success, #4ade80); font-size: 0.85rem; font-weight: 600; margin: 0.15rem 0;">&#127942; ${escapeHtml(b)}</div>`
+  ).join('');
+
+  // Insert after overall score
+  const overallCard = document.getElementById('overall-score-card');
+  if (overallCard?.nextSibling) {
+    section.insertBefore(container, overallCard.nextSibling);
+  } else {
+    section.appendChild(container);
+  }
 }

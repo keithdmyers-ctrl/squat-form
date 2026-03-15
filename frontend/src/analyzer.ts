@@ -335,6 +335,14 @@ function scoreRep(
     bottomDuration: rep.bottomDuration,
   };
 
+  // Aggregate landmark confidence across all frames in this rep
+  const confidenceValues = rep.frameAngles
+    .map(fa => fa.landmarkConfidence)
+    .filter((v): v is number => v !== undefined);
+  if (confidenceValues.length > 0) {
+    result.avgConfidence = confidenceValues.reduce((s, v) => s + v, 0) / confidenceValues.length;
+  }
+
   // Add competition-specific cues
   if (config.competitionMode) {
     const compCues = getCompetitionCues(rep, result);

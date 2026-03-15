@@ -32,6 +32,7 @@ export interface CueEntry {
   explanation: string;           // default (moderate)
   explanationLow?: string;       // mild version
   explanationHigh?: string;      // urgent version
+  explanationBeginner?: string;  // Zero-jargon version for complete beginners
 }
 
 export const CUE_DATABASE: Record<string, CueEntry> = {
@@ -45,6 +46,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Minor inward knee movement detected. This is worth monitoring but not urgent — add some glute activation to your warm-up.',
     explanationHigh:
       'Significant knee collapse detected. Research shows this level of valgus substantially increases injury risk (Hewett et al. 2005). Reduce the weight and focus on glute strengthening before progressing.',
+    explanationBeginner:
+      'Your knees are caving inward instead of staying in line with your toes. This is really common and easy to fix! Try imagining you\'re spreading the floor apart with your feet, and consider putting a light resistance band around your knees during warm-up to train them to stay out.',
   },
   butt_wink: {
     cue: 'Squat to the box and reverse',
@@ -56,6 +59,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Slight pelvic tuck at the bottom. At this level it\'s mostly cosmetic — keep an eye on it.',
     explanationHigh:
       'Pronounced lower back rounding at the bottom. Under heavier loads this becomes a concern for disc health. Limit your depth to where your back stays neutral.',
+    explanationBeginner:
+      'At the very bottom of your squat, your lower back is rounding and your hips are tucking under. This is super common! Try not squatting quite as deep — stop just above the point where your back starts to round. Using a box or bench as a target can really help.',
   },
   excessive_forward_lean: {
     cue: 'Drive the bar straight up toward the ceiling',
@@ -67,6 +72,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Slightly more forward lean than ideal, but within a workable range. Focus on ankle mobility over time.',
     explanationHigh:
       'Your torso is tipping very far forward, shifting most of the load to your lower back. Reduce weight or switch to a more upright squat variation.',
+    explanationBeginner:
+      'Your upper body is tipping too far forward as you squat down. This puts extra work on your lower back instead of your legs. Try keeping your chest up and proud — imagine someone is reading the front of your shirt. Shoes with a small heel lift can also help a lot.',
   },
   good_morning: {
     cue: 'Push the ground away as you stand',
@@ -78,6 +85,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Your hips rose slightly faster than your shoulders. Minor, but worth cueing.',
     explanationHigh:
       'Your squat is turning into a good morning — hips shoot up while the bar stays low. This is a strong signal to reduce the weight.',
+    explanationBeginner:
+      'On the way up, your butt is rising faster than your chest, which makes your back do too much work. This usually means the weight is a bit heavy or your front thigh muscles need more strength. Try using a lighter weight and focus on keeping your chest and hips rising at the same speed.',
   },
   heel_rise: {
     cue: 'Push your whole foot into the floor -- feel even pressure from heel to toe',
@@ -89,6 +98,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Slight heel lift detected. Try ankle mobility stretches before your next session.',
     explanationHigh:
       'Heels are coming up significantly. Use heel-elevated shoes or plates under your heels until ankle mobility improves.',
+    explanationBeginner:
+      'Your heels are coming off the ground as you squat down. This usually means your ankles aren\'t flexible enough yet — totally normal for beginners! A quick fix is to put small weight plates under your heels, or try shoes with a raised heel. Stretching your calves before you squat also helps.',
   },
   insufficient_depth: {
     cue: 'Aim for your hip crease to reach knee level',
@@ -100,6 +111,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'You\'re close to target depth — just a couple more inches.',
     explanationHigh:
       'Depth is well above target. Focus on hip and ankle mobility to improve your range of motion gradually.',
+    explanationBeginner:
+      'You\'re not going down low enough yet. The goal is to get your thighs roughly parallel to the floor — like sitting into a low chair. Don\'t worry if you can\'t get there right away! Practice with just your body weight or hold a light weight in front of your chest, and it will come with time.',
   },
   fast_descent: {
     cue: 'Slow down -- aim for a 2-3 second descent',
@@ -111,6 +124,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Descent was a bit quick. Try counting to two on the way down.',
     explanationHigh:
       'Very fast, uncontrolled descent. This makes it hard to maintain form and increases injury risk. Slow down deliberately.',
+    explanationBeginner:
+      'You\'re going down too fast! Slow it down so you feel in control the whole way. Try counting "one-Mississippi, two-Mississippi" as you lower yourself. Going slower helps you keep good form and actually builds more strength.',
   },
   slow_descent: {
     cue: 'Your descent is very slow -- a bit more speed is fine',
@@ -122,6 +137,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Descent was a touch slow. Not a big deal, but a slightly faster tempo may feel more natural.',
     explanationHigh:
       'Very slow descent — you\'re burning energy before the hard part of the lift. Speed up to 2-3 seconds down.',
+    explanationBeginner:
+      'You\'re going down really slowly, which is tiring you out before your muscles get the best workout. It\'s great that you\'re being careful, but try to go a bit faster — aim for about 2-3 seconds on the way down. Smooth and steady, not super slow-motion.',
   },
   bouncing: {
     cue: 'Pause for a half-second at the bottom before standing',
@@ -133,6 +150,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Brief pause at the bottom. Try holding for a half-second to build bottom-position strength.',
     explanationHigh:
       'Hard bounce out of the bottom. This puts significant stress on your knees. Practice pause squats to build control.',
+    explanationBeginner:
+      'You\'re bouncing at the bottom of the squat instead of using your muscles to stand back up. Try pausing for a quick half-second at the bottom — this builds strength where you need it most and is much easier on your knees.',
   },
   incomplete_lockout: {
     cue: 'Stand tall at the top of each rep',
@@ -144,6 +163,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Almost fully locked out — squeeze your glutes a bit harder at the top.',
     explanationHigh:
       'Not standing up fully between reps. This shortchanges your range of motion and can become a habit.',
+    explanationBeginner:
+      'You\'re not standing all the way up at the top of each rep. Make sure you fully straighten up and squeeze your butt muscles at the top before going into the next rep. This helps you build strength through the full movement.',
   },
   asymmetric_hips: {
     cue: 'Push the ground away evenly on both sides',
@@ -155,6 +176,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Slight side-to-side imbalance detected. Single-leg work can help even this out over time.',
     explanationHigh:
       'Noticeable weight shift to one side. This can lead to overuse injuries. Prioritize single-leg exercises.',
+    explanationBeginner:
+      'You\'re leaning more to one side than the other. This is really common — most people have one leg that\'s a bit stronger! Try to feel equal weight on both feet. Doing single-leg exercises like lunges can help balance out your sides.',
   },
   asymmetric_shift: {
     cue: 'Push the ground away evenly on both sides',
@@ -166,6 +189,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Slight side-to-side imbalance detected. Single-leg work can help even this out over time.',
     explanationHigh:
       'Noticeable weight shift to one side. This can lead to overuse injuries. Prioritize single-leg exercises.',
+    explanationBeginner:
+      'You\'re shifting your weight to one side during the squat. This is normal — everyone has a stronger side! Try to feel equal pressure on both feet the whole time. Adding lunges and single-leg squats to your routine will help even things out.',
   },
   trunk_angle_increase_on_ascent: {
     cue: 'Push the ground away as you stand',
@@ -177,6 +202,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Slight forward tip on the way up. Focus on keeping your chest angle constant as you stand.',
     explanationHigh:
       'Your torso is pitching forward significantly on the ascent. Reduce the weight and focus on keeping your chest up throughout the lift.',
+    explanationBeginner:
+      'As you stand up, your chest is dropping forward and your back is doing too much work. Think about pushing the floor away with your feet while keeping your chest pointing straight ahead. If this keeps happening, try a lighter weight until you get the feel for it.',
   },
   excessive_forward_knee_travel: {
     cue: 'Sit your hips back toward the wall behind you',
@@ -188,6 +215,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Knees drifted a bit far forward. Try initiating the descent by pushing your hips back first.',
     explanationHigh:
       'Knees are well past your toes, shifting load away from your hips and onto your knees. Sit back more and consider a wider stance.',
+    explanationBeginner:
+      'Your knees are going really far forward past your toes. For this squat style, try sitting your hips back more — like you\'re reaching for a chair behind you. This takes pressure off your knees and lets your hips do more of the work.',
   },
 
   // ─── Deadlift Issues ───
@@ -202,6 +231,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Slight upper back rounding detected. Focus on pulling your chest up before you start the pull.',
     explanationHigh:
       'Significant spinal rounding under load. This is a serious injury risk. Reduce the weight until you can maintain a flat back throughout the pull.',
+    explanationBeginner:
+      'Your back is rounding during the lift, which means your back is doing work it shouldn\'t be. Before you pull, take a big breath, tighten your belly, and stick your chest out proud. If you can\'t keep your back flat, the weight is probably too heavy — drop it down and work your way back up.',
   },
   hip_shoot: {
     cue: 'Push the floor away — hips and shoulders rise together',
@@ -213,6 +244,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Hips rose slightly ahead of your shoulders. Focus on driving with your legs off the floor.',
     explanationHigh:
       'Hips shot up well before your shoulders, turning this into a stiff-leg pull. Reduce the weight and practice keeping your chest up off the floor.',
+    explanationBeginner:
+      'Your butt is shooting up before your chest, which makes your back do all the heavy lifting. Think of it like pushing the floor away with your legs instead of pulling the bar with your back. Your butt and chest should rise at the same speed.',
   },
   hitching: {
     cue: 'One smooth pull from floor to lockout',
@@ -224,6 +257,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Brief stall near lockout. Practice driving your hips through to finish the pull in one motion.',
     explanationHigh:
       'The bar stopped and you had to re-pull or hitch it up your thighs. This is a red card in competition and a sign the weight is too heavy.',
+    explanationBeginner:
+      'The bar stopped moving partway up and you had to jerk it the rest of the way. The lift should be one smooth pull from the floor to standing. If the bar keeps stalling, the weight is probably too heavy — go lighter and practice smooth, continuous pulls.',
   },
   insufficient_rom_deadlift: {
     cue: 'Hinge deeper — push your hips back further',
@@ -235,6 +270,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Slightly short range of motion. Try pushing your hips back a bit further each set.',
     explanationHigh:
       'Very limited range of motion — you\'re missing most of the benefit of the exercise. Work on hamstring flexibility and practice hinging with a light weight.',
+    explanationBeginner:
+      'You\'re not bending forward far enough to get the full benefit of this exercise. Try pushing your hips back like you\'re closing a car door with your butt. You should feel a stretch in the back of your thighs as you go down. It\'s okay to start with lighter weight while you build flexibility!',
   },
   asymmetric_pull: {
     cue: 'Drive evenly through both feet',
@@ -246,6 +283,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Slight imbalance between sides during the pull. Add single-leg Romanian deadlifts to your routine.',
     explanationHigh:
       'Significant asymmetry in your pull — one side is doing much more work. Check hand spacing and add single-leg work to correct the imbalance.',
+    explanationBeginner:
+      'One side of your body is doing more work than the other during the pull. Make sure your hands are spaced evenly on the bar and you\'re pushing through both feet equally. Adding single-leg exercises like lunges will help balance out your strength on both sides.',
   },
   fast_descent_deadlift: {
     cue: 'Control the bar down — don\'t just drop it',
@@ -257,6 +296,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'The bar came down a bit fast. Try a controlled 1-2 second lowering phase.',
     explanationHigh:
       'The bar was essentially dropped. You\'re missing half the strength benefit and risking injury. Lower under control every rep.',
+    explanationBeginner:
+      'You\'re dropping the bar down too fast after each rep. Lowering it slowly actually builds just as much strength as pulling it up! Try to take 1-2 seconds to bring it back down. Think of it like setting it on a glass table — nice and controlled.',
   },
 
   // ─── Bench Press Issues ───
@@ -271,6 +312,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Very brief chest contact. Try holding for a full one-count before pressing.',
     explanationHigh:
       'The bar bounced off your chest with no pause. This would be a red light in competition and reduces strength development off the chest.',
+    explanationBeginner:
+      'In competition, you need to hold the bar still on your chest before pressing it back up. Even in training, pausing on your chest for a second builds much more strength than bouncing it. Try counting "one" in your head while the bar sits on your chest before pushing.',
   },
   uneven_press: {
     cue: 'Press both hands at the same speed',
@@ -282,6 +325,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Slight bar tilt during the press. Add some dumbbell work to balance out the sides.',
     explanationHigh:
       'The bar is tilting significantly — one arm is doing much more work. Switch to dumbbells for a training cycle to fix the imbalance before it causes a shoulder issue.',
+    explanationBeginner:
+      'One arm is pushing faster than the other, making the bar tilt. This is really common — almost everyone has a stronger side! Try using dumbbells instead of a barbell sometimes, which forces each arm to do equal work and helps you catch up on your weaker side.',
   },
   press_stall: {
     cue: 'Drive through the sticking point — don\'t let the bar stop',
@@ -293,6 +338,8 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
       'Brief slowdown at the mid-range. Add some Spoto press work to build speed through this zone.',
     explanationHigh:
       'The bar stalled hard at the sticking point. This is a strength gap between your pecs and triceps. Add pin press and Spoto press as accessories.',
+    explanationBeginner:
+      'The bar got stuck partway up during the press. This is the hardest point in the bench press and is totally normal! Try to push as fast as you can right from the start — the extra speed helps carry you through that tough spot. If it keeps stalling, use a slightly lighter weight.',
   },
 };
 
@@ -529,12 +576,18 @@ export function getCuesForIssues(issues: FormIssue[], experienceLevel?: string):
 
     // Only keep one cue per issue name, prioritize higher severity
     if (!cueMap.has(issue.name)) {
-      // Pick severity-specific explanation
-      let explanation = entry.explanation;
-      if (issue.severity === 'low' && entry.explanationLow) {
-        explanation = entry.explanationLow;
-      } else if (issue.severity === 'high' && entry.explanationHigh) {
-        explanation = entry.explanationHigh;
+      // For beginners, prefer the zero-jargon explanation if available
+      let explanation: string;
+      if (isBeginnerLevel && entry.explanationBeginner) {
+        explanation = entry.explanationBeginner;
+      } else {
+        // Pick severity-specific explanation
+        explanation = entry.explanation;
+        if (issue.severity === 'low' && entry.explanationLow) {
+          explanation = entry.explanationLow;
+        } else if (issue.severity === 'high' && entry.explanationHigh) {
+          explanation = entry.explanationHigh;
+        }
       }
 
       // Strip academic citations for beginners to reduce visual noise

@@ -426,50 +426,59 @@ function detectDeadliftIssues(
 
 // ─── Deadlift Coaching Cues ───
 
-const DEADLIFT_CUE_DATABASE: Record<string, { cue: string; priority: number; explanation: string }> = {
+const DEADLIFT_CUE_DATABASE: Record<string, { cue: string; priority: number; explanation: string; explanationBeginner?: string }> = {
   rounded_back: {
     cue: 'Pack your lats — pull the bar into your body',
     priority: 1,
     explanation: 'Your back is rounding during the pull, which puts your spine at risk under load. Before pulling, brace your core, pull your shoulders back and down, and think about "bending the bar" around your legs. If you can\'t maintain a neutral spine, the weight is likely too heavy.',
+    explanationBeginner: 'Your back is rounding during the lift, which means your back is doing work it shouldn\'t be. Before you pull, take a big breath, tighten your belly, and stick your chest out proud. If you can\'t keep your back flat, the weight is probably too heavy — go lighter and build up.',
   },
   hip_shoot: {
     cue: 'Push the floor away — don\'t lift the bar, push your feet through the floor',
     priority: 2,
     explanation: 'Your hips rose faster than your shoulders, turning the deadlift into a stiff-leg pull. Think about pushing the floor away from you rather than pulling the bar up. Your hips and shoulders should rise at the same rate.',
+    explanationBeginner: 'Your butt is shooting up before your chest, which makes your back do all the heavy lifting. Think of it like pushing the floor away with your legs instead of pulling the bar with your back. Your butt and chest should rise at the same speed.',
   },
   hitching: {
     cue: 'Drive your hips through in one smooth motion',
     priority: 1,
     explanation: 'The bar stopped or reversed during the pull. In competition, hitching is a disqualification. Practice lighter weights focusing on a smooth, continuous pull from floor to lockout.',
+    explanationBeginner: 'The bar stopped moving partway up and you had to jerk it the rest of the way. The lift should be one smooth pull from the floor to standing. If the bar keeps stalling, the weight is probably too heavy — go lighter and practice smooth pulls.',
   },
   incomplete_lockout: {
     cue: 'Squeeze your glutes and stand tall at the top',
     priority: 3,
     explanation: 'You didn\'t fully extend your hips at the top. A complete lockout means your hips are fully forward, shoulders are back, and knees are straight. Squeeze your glutes hard at the top.',
+    explanationBeginner: 'You\'re not standing all the way up at the top. Make sure you fully straighten up and squeeze your butt muscles hard at the top of each rep. You should be standing tall with your hips pushed forward.',
   },
   insufficient_rom: {
     cue: 'Hinge deeper — push your hips back further',
     priority: 4,
     explanation: 'You\'re not hinging deep enough to get the full benefit. For conventional deadlifts, the bar should start on the floor. For RDLs, lower until you feel a strong hamstring stretch.',
+    explanationBeginner: 'You\'re not bending forward far enough to get the full benefit. Try pushing your hips back like you\'re closing a car door with your butt. You should feel a stretch in the back of your thighs as you go down.',
   },
   asymmetric_pull: {
     cue: 'Pull evenly on both sides — check your grip width',
     priority: 4,
     explanation: 'One side is working harder than the other. This can develop into injury over time. Check that your hands are evenly spaced on the bar, and try single-leg RDLs to build balanced strength.',
+    explanationBeginner: 'One side of your body is doing more work than the other. Make sure your hands are spaced evenly on the bar and you\'re pushing through both feet equally. Adding single-leg exercises like lunges will help balance things out.',
   },
   fast_descent: {
     cue: 'Control the weight on the way down',
     priority: 6,
     explanation: 'Dropping the bar quickly skips the eccentric portion and can be dangerous. Lower under control in 1-2 seconds.',
+    explanationBeginner: 'You\'re dropping the bar down too fast. Lowering it slowly actually builds just as much strength as pulling it up! Try taking 1-2 seconds to bring it back down — nice and controlled.',
   },
 };
 
-function getDeadliftCues(issues: FormIssue[]): CoachingCue[] {
+function getDeadliftCues(issues: FormIssue[], experienceLevel?: string): CoachingCue[] {
   const cueMap = new Map<string, CoachingCue>();
   for (const issue of issues) {
     const entry = DEADLIFT_CUE_DATABASE[issue.name];
     if (!entry || cueMap.has(issue.name)) continue;
-    cueMap.set(issue.name, { issue: issue.name, cue: entry.cue, priority: entry.priority, explanation: entry.explanation });
+    const explanation = (experienceLevel === 'beginner' && entry.explanationBeginner)
+      ? entry.explanationBeginner : entry.explanation;
+    cueMap.set(issue.name, { issue: issue.name, cue: entry.cue, priority: entry.priority, explanation });
   }
   return Array.from(cueMap.values()).sort((a, b) => a.priority - b.priority);
 }
@@ -586,7 +595,7 @@ function scoreDeadliftRep(
   );
 
   const issues = detectDeadliftIssues(rep, config, calibration);
-  const cues = getDeadliftCues(issues);
+  const cues = getDeadliftCues(issues, config.experienceLevel);
   const positiveFeedback = getDeadliftPositiveFeedback({
     backPosition, hipHinge, lockout, symmetry, tempo, control,
   });
@@ -595,6 +604,14 @@ function scoreDeadliftRep(
   let totalScore = overall;
   const highCount = issues.filter(i => i.severity === 'high').length;
   if (highCount > 0) totalScore = Math.max(0, totalScore - highCount * 5);
+
+  // Aggregate landmark confidence across all frames in this rep
+  const confidenceValues = rep.frameAngles
+    .map(fa => fa.landmarkConfidence)
+    .filter((v): v is number => v !== undefined);
+  const avgConfidence = confidenceValues.length > 0
+    ? confidenceValues.reduce((s, v) => s + v, 0) / confidenceValues.length
+    : undefined;
 
   return {
     depthScore: hipHinge,
@@ -610,6 +627,7 @@ function scoreDeadliftRep(
     positiveFeedback,
     stickingPoints: rep.stickingPoints,
     velocity: rep.velocity,
+    avgConfidence,
     minKneeAngle: rep.minKneeAngle,
     maxTrunkAngle: rep.maxTrunkAngle,
     minHipAngle: rep.minHipAngle,
@@ -688,7 +706,7 @@ export function analyzeDeadliftSequence(
   const overallScore = computeSetScore(repScores);
   const fatigueDetected = detectFatigue(repScores);
   const topIssues = aggregateTopIssues(repScores);
-  const topCues = getDeadliftCues(topIssues);
+  const topCues = getDeadliftCues(topIssues, config.experienceLevel);
 
   const positiveHighlights = aggregatePositiveFeedback(repScores);
   const mobilityFindings = assessMobility(topIssues, config.experienceLevel);
