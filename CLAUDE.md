@@ -10,7 +10,7 @@ AI-powered multi-exercise form analysis using MediaPipe BlazePose. Browser-based
 cd frontend && npx vite dev          # Dev server
 cd frontend && npx vite build        # Production build
 cd frontend && npx tsc --noEmit      # Type check
-cd frontend && npx vitest run        # Run tests (1842+)
+cd frontend && npx vitest run        # Run tests (1973+)
 
 # iOS (Capacitor)
 cd frontend && npm run ios:build    # Build web + sync to iOS
@@ -87,6 +87,12 @@ cd frontend && npx tsc --noEmit && npx vitest run && cd ../tests && python -m py
 - **progression-charts.ts** — SVG line charts for e1RM, volume, bodyweight trends over time
 - **workout-flexibility.ts** — Mid-workout exercise reorder, skip, add, substitute
 - **form-programming-bridge.ts** — Form weakness analysis → accessory exercise recommendations
+- **meet-day.ts** — Meet-day mode with live attempt tracking, warm-up timer, checklist
+- **data-import.ts** — CSV import from Strong, Hevy, and generic formats with exercise name mapping
+- **ui-workout-setup.ts** — Program setup wizard (extracted from ui-workout.ts)
+- **ui-workout-session.ts** — Daily workout display and set logging (extracted)
+- **ui-workout-analytics.ts** — Calendar, volume, progression analytics (extracted)
+- **ui-workout-completion.ts** — Post-workout feedback and completion flow (extracted)
 - **exercise-demos.ts** — Exercise demonstration content and video references
 - **form-bridge.ts** — Bridge between form analysis scores and workout autoregulation
 - **progression-engine.ts** — Progression logic (linear, percentage wave, RPE-based, AMRAP-driven)
@@ -136,7 +142,7 @@ cd frontend && npx tsc --noEmit && npx vitest run && cd ../tests && python -m py
 
 ## After Changes
 - Type check with `npx tsc --noEmit`
-- Run both frontend (1842+) and backend (260) tests
+- Run both frontend (1973+) and backend (260) tests
 - Test all exercises (squat, deadlift, bench, OHP, row, lunge) — not just the one changed
 - Verify live mode still works if pose/phase code was touched
 - Check mobile responsiveness for any UI changes

@@ -25,7 +25,9 @@ interface PoseLandmarkerWithLiveStream extends PoseLandmarker {
 
 /** Map of MediaPipe landmark indices to named keys (same as Python backend). */
 const LANDMARK_NAMES: Record<number, string> = {
-  // Face landmarks (0-10) intentionally excluded — not used in squat analysis
+  // Ear landmarks needed for cervical hyperextension detection (computeNeckAngle)
+  7: 'left_ear',
+  8: 'right_ear',
   11: 'left_shoulder',
   12: 'right_shoulder',
   13: 'left_elbow',

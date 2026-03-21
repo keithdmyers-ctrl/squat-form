@@ -18,3 +18,9 @@ annotated_videos/
 .DS_Store
 *.swp
 *.swo
+
+# Reference PDFs (not source code)
+*.pdf
+
+# Playwright test results
+frontend/test-results/
