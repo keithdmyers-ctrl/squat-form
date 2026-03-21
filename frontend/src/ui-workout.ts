@@ -32,6 +32,12 @@ import { calculateE1RMFromRPE, calculateWeightForTarget, getRPEDescription, gene
 import { buildCalendarMonth, calculateStreak } from './workout-calendar';
 import { calculateWeeklyVolume, getUndertrainedMuscles, getOvertrainedMuscles } from './volume-tracker';
 import { getExerciseDemo } from './exercise-demos';
+import { getBeginnerGuide } from './beginner-guide';
+import { renderStrengthCard } from './strength-standards';
+import { renderCompTotalCard, calculateCompTotal, saveCompTotal, loadCompTotals, renderCommandsReference } from './competition';
+import { calculateWilks2, calculateGLPoints, computeDOTS } from './one-rm';
+import { renderPainPrompt, handlePainReport, shouldShowPainPrompt, savePainReport, checkPainRedFlags, CONDITIONS_DATABASE, savePreExistingConditions, loadPreExistingConditions } from './safety-screening';
+import type { WeightRecommendation, AdaptationResult } from './program-generator';
 
 // ─── Terminology Glossary ───
 
@@ -76,6 +82,44 @@ const PROGRESSION_LABELS: Record<string, string> = {
   amrap_driven: 'AMRAP-driven progression',
   block: 'Block periodization',
 };
+
+// ─── Pre-Existing Conditions Checkbox Renderer ───
+
+function renderConditionCheckboxes(): string {
+  const existingConditions = loadPreExistingConditions();
+  const categoryLabels: Record<string, string> = {
+    joint: 'Joint',
+    spine: 'Spine',
+    shoulder: 'Shoulder',
+    cardiovascular: 'Cardiovascular',
+    neurological: 'Neurological',
+    other: 'Other',
+  };
+
+  const grouped = new Map<string, typeof CONDITIONS_DATABASE>();
+  for (const condition of CONDITIONS_DATABASE) {
+    const group = grouped.get(condition.category) || [];
+    group.push(condition);
+    grouped.set(condition.category, group);
+  }
+
+  let html = '';
+  for (const [category, conditions] of grouped) {
+    const label = categoryLabels[category] || category;
+    html += `<div class="wp-condition-group"><span class="wp-condition-group-label">${escapeHtml(label)}</span>`;
+    for (const condition of conditions) {
+      const isChecked = existingConditions.includes(condition.id) ? 'checked' : '';
+      html += `
+        <label class="wp-condition-checkbox-label">
+          <input type="checkbox" name="wp-condition" value="${escapeHtml(condition.id)}" ${isChecked} class="wp-condition-cb" />
+          <span>${escapeHtml(condition.name)}</span>
+        </label>
+      `;
+    }
+    html += `</div>`;
+  }
+  return html;
+}
 
 // ─── Readiness Helpers ───
 
@@ -174,6 +218,14 @@ function renderProgramSetup(container: HTMLElement, existingProfile: UserProfile
     <h3 class="section-heading-sm wp-setup-heading">Get Your Training Program</h3>
     <p class="training-rec-desc wp-setup-desc">
       Answer 3 questions and we'll match you with a proven strength program.
+    </p>
+
+    <details class="wp-beginner-guide-toggle">
+      <summary class="wp-guide-link">New to lifting? Read the 80/20 beginner guide first</summary>
+      <div class="wp-beginner-guide" id="wp-beginner-guide"></div>
+    </details>
+
+    <p class="training-rec-desc wp-setup-desc" style="margin-top: var(--space-md);">&nbsp;
       Includes automatic progression, deload scheduling, and adjustments based on your feedback.
     </p>
 
@@ -279,6 +331,14 @@ function renderProgramSetup(container: HTMLElement, existingProfile: UserProfile
             <p class="wp-help-text">Enables automatic peaking. Leave blank if not competing.</p>
           </div>
 
+          <div class="form-group" id="wp-conditions-group">
+            <label class="form-label">Pre-existing conditions (optional)</label>
+            <p class="wp-help-text">Select any that apply — we'll modify exercise recommendations accordingly.</p>
+            <div class="wp-conditions-list" id="wp-conditions-list">
+              ${renderConditionCheckboxes()}
+            </div>
+          </div>
+
           <div class="form-group" id="wp-maxes-group">
             <label class="form-label">Current Maxes (optional)</label>
             <p class="wp-help-text" style="margin-bottom: var(--space-xs);">The heaviest weight you've lifted for 1 rep with good form. Leave blank if unsure.</p>
@@ -356,6 +416,26 @@ OHP 3x5 @ RPE 7, 1x/week, start 95 lbs, increase 2.5 lbs/week"></textarea>
 
   container.appendChild(card);
 
+  // Render beginner guide content
+  const guideContainer = card.querySelector('#wp-beginner-guide') as HTMLElement;
+  if (guideContainer) {
+    const guide = getBeginnerGuide();
+    let guideHtml = '';
+    for (const section of guide) {
+      guideHtml += `
+        <div class="wp-guide-section">
+          <h4 class="wp-guide-section-title">${section.icon} ${escapeHtml(section.title)}</h4>
+          <div class="wp-guide-section-content">${section.content}</div>
+          <div class="wp-guide-takeaway">
+            <strong>Key takeaway:</strong> ${escapeHtml(section.takeaway)}
+          </div>
+          ${section.source ? `<div class="wp-guide-source">Source: ${escapeHtml(section.source)}</div>` : ''}
+        </div>
+      `;
+    }
+    guideContainer.innerHTML = guideHtml;
+  }
+
   // Auto-expand advanced options for returning users who have saved profiles
   if (existingProfile && (existingProfile.maxes || existingProfile.bodyweight || existingProfile.meetDate)) {
     const advancedDetails = card.querySelector('#wp-advanced-options') as HTMLDetailsElement;
@@ -376,6 +456,12 @@ OHP 3x5 @ RPE 7, 1x/week, start 95 lbs, increase 2.5 lbs/week"></textarea>
   findBtn.addEventListener('click', () => {
     const profile = gatherProfile(card);
     saveUserProfile(profile);
+    // Save pre-existing conditions
+    const selectedConditions: string[] = [];
+    card.querySelectorAll<HTMLInputElement>('.wp-condition-cb:checked').forEach(cb => {
+      selectedConditions.push(cb.value);
+    });
+    savePreExistingConditions(selectedConditions);
     const recsContainer = card.querySelector('#wp-recommendations') as HTMLElement;
     renderProgramRecommendations(recsContainer, profile, container);
   });
@@ -451,6 +537,13 @@ OHP 3x5 @ RPE 7, 1x/week, start 95 lbs, increase 2.5 lbs/week"></textarea>
 
         const profile = gatherProfile(card);
         const unit = (card.querySelector('input[name="wp-unit"]:checked') as HTMLInputElement)?.value ?? 'lbs';
+
+        // Save pre-existing conditions
+        const customSelectedConditions: string[] = [];
+        card.querySelectorAll<HTMLInputElement>('.wp-condition-cb:checked').forEach(cb => {
+          customSelectedConditions.push(cb.value);
+        });
+        savePreExistingConditions(customSelectedConditions);
 
         // Override maxes with custom exercise starting weights
         const maxes: Partial<Record<string, number>> = { ...(profile.maxes ?? {}) };
@@ -661,9 +754,9 @@ function renderActiveProgram(container: HTMLElement, state: ProgramState): void 
         </div>
       </div>
       <div class="wp-header-details">
-        <span>Progression: ${escapeHtml(progressionLabel)}</span>
+        <span>${profile?.experienceLevel === 'beginner' ? 'How you progress' : 'Progression'}: ${escapeHtml(progressionLabel)}</span>
         <span>&middot;</span>
-        <span>Deload: ${escapeHtml(program.deload.frequency)}</span>
+        <span>${profile?.experienceLevel === 'beginner' ? 'Recovery week' : 'Deload'}: ${escapeHtml(program.deload.frequency)}</span>
       </div>
     </div>
   `;
@@ -688,8 +781,12 @@ function renderActiveProgram(container: HTMLElement, state: ProgramState): void 
 
   // Autoregulation alerts
   if (autoregMessages.length > 0) {
+    const isBeginner = profile?.experienceLevel === 'beginner';
+    const autoregHeading = isBeginner
+      ? 'We adjusted your weights based on your recent performance'
+      : 'Autoregulation Adjustments';
     html += `<div class="card card--static wp-alert-card wp-alert-warning" role="alert">`;
-    html += `<h4 class="section-heading-sm wp-alert-heading">Autoregulation Adjustments</h4>`;
+    html += `<h4 class="section-heading-sm wp-alert-heading">${escapeHtml(autoregHeading)}</h4>`;
     for (const msg of autoregMessages) {
       html += `<p class="wp-note-text">${escapeHtml(msg)}</p>`;
     }
@@ -788,6 +885,30 @@ function renderActiveProgram(container: HTMLElement, state: ProgramState): void 
     const overtrained = getOvertrainedMuscles(volumes);
     html += renderVolumeCard(volumes, undertrained, overtrained);
   }
+
+  // Strength Standards card (show if bodyweight known)
+  const strengthProfile = loadUserProfile();
+  if (strengthProfile?.bodyweight && strengthProfile.bodyweight > 0) {
+    const sex = (strengthProfile.sex ?? 'male') as 'male' | 'female';
+    const lifts: Record<string, number> = {};
+    for (const lift of ['squat', 'bench', 'deadlift', 'ohp']) {
+      const tm = state.trainingMaxes?.[lift];
+      if (tm && tm > 0) {
+        lifts[lift] = Math.round(tm / 0.9); // Convert TM back to estimated 1RM
+      }
+    }
+    if (Object.keys(lifts).length > 0) {
+      html += renderStrengthCard(lifts, strengthProfile.bodyweight, sex);
+    }
+  }
+
+  // Competition Commands reference (collapsible)
+  html += `
+    <details class="card card--static wp-science-card">
+      <summary class="wp-science-summary">Competition Commands Reference</summary>
+      <div style="padding: var(--space-sm) 0;">${renderCommandsReference()}</div>
+    </details>
+  `;
 
   // RPE Calculator tool
   html += `
@@ -931,6 +1052,18 @@ function renderActiveProgram(container: HTMLElement, state: ProgramState): void 
 
   // Wire up set completion
   wireUpSetLogging(container, state, workout);
+
+  // Wire up "?" demo info buttons to toggle the corresponding <details>
+  container.querySelectorAll<HTMLButtonElement>('.wp-demo-info-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.dataset.demoTarget;
+      if (!targetId) return;
+      const details = container.querySelector(`#${targetId}`) as HTMLDetailsElement | null;
+      if (details) {
+        details.open = !details.open;
+      }
+    });
+  });
 
   // Restore in-progress workout data (if any)
   restoreInProgressWorkout(container);
@@ -1564,13 +1697,13 @@ function renderFeedbackForm(
       safeSaveWorkoutLogs(recentLogs, container);
     }
 
-    // Process adaptations
+    // Process adaptations (use returnResult overload to get recommendations)
     const formScores = getRecentFormScores();
-    const adaptations = processAdaptations(state, feedback, state.liftProgress ? recentLogs[0]?.readiness : undefined, recentLogs, Object.keys(formScores).length > 0 ? formScores : undefined);
+    const adaptationResult = processAdaptations(state, feedback, state.liftProgress ? recentLogs[0]?.readiness : undefined, recentLogs, Object.keys(formScores).length > 0 ? formScores : undefined, true);
     safeSaveProgramState(state, container);
 
-    // Show completion with adaptations
-    renderWorkoutComplete(container, state, workout, progressMessages, adaptations);
+    // Show completion with adaptations and weight recommendations
+    renderWorkoutComplete(container, state, workout, progressMessages, adaptationResult.decisions, adaptationResult.recommendations);
   });
 }
 
@@ -1709,19 +1842,24 @@ function renderWorkoutCard(workout: GeneratedWorkout, state: ProgramState): stri
     const isAccessory = !EXERCISE_SLOTS[exercise.exerciseSlot]?.isMainLift;
     const prevExData = prevData[exercise.exerciseSlot];
 
+    // Exercise demo lookup
+    const demo = getExerciseDemo(exercise.exerciseSlot);
+
     html += `
       <div class="wp-exercise-block">
         <div class="wp-exercise-header">
           <strong class="wp-exercise-name">${escapeHtml(exercise.name)}</strong>
-          ${isAccessory ? '<span class="wp-accessory-badge">ACCESSORY</span>' : ''}
+          <span class="wp-exercise-header-right">
+            ${isAccessory ? '<span class="wp-accessory-badge">ACCESSORY</span>' : ''}
+            ${demo ? `<button class="wp-demo-info-btn" aria-label="How to: ${escapeHtml(exercise.name)}" data-demo-target="demo-${escapeHtml(exercise.exerciseSlot)}" type="button">?</button>` : ''}
+          </span>
         </div>
     `;
 
-    // Exercise demo (expandable)
-    const demo = getExerciseDemo(exercise.exerciseSlot);
+    // Exercise demo (expandable, toggled by ? button)
     if (demo) {
       html += `
-        <details class="wp-exercise-demo">
+        <details class="wp-exercise-demo" id="demo-${escapeHtml(exercise.exerciseSlot)}">
           <summary class="wp-demo-toggle">How to do this exercise</summary>
           <div class="wp-demo-content">
             ${demo.gifUrl ? `<img src="${escapeHtml(demo.gifUrl)}" alt="${escapeHtml(demo.name)} demonstration" class="wp-demo-gif" loading="lazy" />` : ''}
@@ -1730,6 +1868,12 @@ function renderWorkoutCard(workout: GeneratedWorkout, state: ProgramState): stri
               <ol class="wp-demo-steps-list">
                 ${demo.steps.slice(0, 4).map(s => `<li>${escapeHtml(s)}</li>`).join('')}
               </ol>
+            </div>
+            <div class="wp-demo-mistakes">
+              <strong>Common Mistakes:</strong>
+              <ul class="wp-demo-mistakes-list">
+                ${demo.commonMistakes.slice(0, 3).map(m => `<li>${escapeHtml(m)}</li>`).join('')}
+              </ul>
             </div>
             <div class="wp-demo-cues">
               <strong>Key Cues:</strong>
@@ -2317,6 +2461,7 @@ function renderWorkoutComplete(
   workout: GeneratedWorkout,
   progressMessages: string[],
   adaptations?: AdaptationDecision[],
+  weightRecommendations?: WeightRecommendation[],
 ): void {
   let html = `
     <div class="card card--static wp-complete-card" role="status" aria-live="polite">
@@ -2354,20 +2499,47 @@ function renderWorkoutComplete(
 
   // Adaptation decisions
   if (adaptations && adaptations.length > 0) {
+    const userProfile = loadUserProfile();
+    const isBeginnerUser = userProfile?.experienceLevel === 'beginner';
+    const adaptationHeading = isBeginnerUser ? 'How your next workout will change' : 'Training Adaptations';
     html += `<div class="card card--static wp-adaptation-card">`;
-    html += `<h4 class="section-heading-sm">Training Adaptations</h4>`;
+    html += `<h4 class="section-heading-sm">${escapeHtml(adaptationHeading)}</h4>`;
     html += `<p class="wp-note-text">Based on your feedback, here's how your next workout will change:</p>`;
 
     for (const decision of adaptations) {
       const colorClass = getAdaptationColorClass(decision.type);
       html += `
         <div class="wp-adaptation-item ${colorClass}">
-          <span class="wp-adaptation-badge">${escapeHtml(formatAdaptationType(decision.type))}</span>
+          <span class="wp-adaptation-badge">${escapeHtml(formatAdaptationType(decision.type, isBeginnerUser))}</span>
           <p class="wp-adaptation-msg">${escapeHtml(decision.description)}</p>
           <details class="wp-adaptation-citation">
             <summary class="wp-science-summary">Evidence</summary>
             <p class="wp-science-text">${escapeHtml(decision.citation)}</p>
           </details>
+        </div>
+      `;
+    }
+    html += `</div>`;
+  }
+
+  // Weight recommendations (form-score-based, not auto-applied)
+  if (weightRecommendations && weightRecommendations.length > 0) {
+    html += `<div class="card card--static wp-adaptation-card" style="border-color: var(--warning);">`;
+    html += `<h4 class="section-heading-sm" style="color: var(--warning);">Form-Based Weight Suggestions</h4>`;
+    html += `<p class="wp-note-text">Your form analysis suggests these weight adjustments. These are recommendations, not automatic changes.</p>`;
+    for (const rec of weightRecommendations) {
+      const liftName = rec.lift.charAt(0).toUpperCase() + rec.lift.slice(1);
+      const severityColor = rec.severity === 'urgent' ? 'var(--danger)' : rec.severity === 'warning' ? 'var(--warning)' : 'var(--text-secondary)';
+      html += `
+        <div class="wp-adaptation-item wp-adapt-decrease" data-rec-lift="${escapeHtml(rec.lift)}" data-rec-weight="${rec.recommendedWeight}">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <span class="wp-adaptation-badge" style="color: ${severityColor};">${escapeHtml(liftName)}</span>
+              <p class="wp-adaptation-msg">${escapeHtml(rec.reason)}</p>
+              <p class="wp-adaptation-msg" style="font-size: var(--font-sm); color: var(--text-muted);">${rec.currentWeight} → ${rec.recommendedWeight} ${escapeHtml(state.weightUnit ?? 'lbs')}</p>
+            </div>
+            <button class="btn wp-ghost-btn wp-accept-rec-btn" style="white-space: nowrap;">Accept</button>
+          </div>
         </div>
       `;
     }
@@ -2396,6 +2568,37 @@ function renderWorkoutComplete(
     html += `</div>`;
   }
 
+  // Gym total tracking (S+B+D)
+  if (Object.keys(e1rms).length >= 2) {
+    const squat1RM = e1rms['squat'] ?? 0;
+    const bench1RM = e1rms['bench'] ?? 0;
+    const deadlift1RM = e1rms['deadlift'] ?? 0;
+    if (squat1RM > 0 && bench1RM > 0 && deadlift1RM > 0) {
+      const total = calculateCompTotal(squat1RM, bench1RM, deadlift1RM);
+      const userProfile = loadUserProfile();
+      const bw = userProfile?.bodyweight ?? 0;
+      const sex = (userProfile?.sex ?? 'male') as 'male' | 'female';
+      const unit = state.weightUnit ?? 'lbs';
+      const bwKg = unit === 'lbs' ? bw * 0.453592 : bw;
+      const totalKg = unit === 'lbs' ? total * 0.453592 : total;
+
+      const compTotal = {
+        squat: Math.round(squat1RM),
+        bench: Math.round(bench1RM),
+        deadlift: Math.round(deadlift1RM),
+        total: Math.round(total),
+        bodyweight: bw,
+        date: new Date().toISOString(),
+        dots: bw > 0 ? (computeDOTS(totalKg, bwKg, sex === 'male')?.score ?? undefined) : undefined,
+        wilks2: bw > 0 ? (calculateWilks2(totalKg, bwKg, sex) ?? undefined) : undefined,
+        glPoints: bw > 0 ? (calculateGLPoints(totalKg, bwKg, sex) ?? undefined) : undefined,
+        isCompetition: false,
+      };
+      saveCompTotal(compTotal);
+      html += renderCompTotalCard(compTotal);
+    }
+  }
+
   html += `
     <button id="wp-next-workout" class="btn btn-primary wp-full-width-btn">
       See Next Workout
@@ -2410,6 +2613,21 @@ function renderWorkoutComplete(
       renderActiveProgram(container, state);
     });
   }
+
+  // Wire up weight recommendation accept buttons
+  container.querySelectorAll('.wp-accept-rec-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = btn.closest('.wp-adaptation-item') as HTMLElement;
+      if (!item) return;
+      const lift = item.dataset.recLift;
+      const recWeight = parseFloat(item.dataset.recWeight ?? '0');
+      if (lift && recWeight > 0 && state.liftProgress[lift]) {
+        state.liftProgress[lift].currentWeight = recWeight;
+        safeSaveProgramState(state, container);
+        item.innerHTML = `<p class="wp-adaptation-msg" style="color: var(--success);">Applied: ${lift.charAt(0).toUpperCase() + lift.slice(1)} weight set to ${recWeight} ${escapeHtml(state.weightUnit ?? 'lbs')}</p>`;
+      }
+    });
+  });
 }
 
 function getAdaptationColorClass(type: AdaptationDecision['type']): string {
@@ -2427,16 +2645,16 @@ function getAdaptationColorClass(type: AdaptationDecision['type']): string {
   }
 }
 
-function formatAdaptationType(type: AdaptationDecision['type']): string {
+function formatAdaptationType(type: AdaptationDecision['type'], isBeginner = false): string {
   switch (type) {
-    case 'weight_increase': return 'Weight Increase';
-    case 'weight_decrease': return 'Weight Decrease';
-    case 'volume_decrease': return 'Volume Decrease';
-    case 'force_deload': return 'Deload';
-    case 'program_transition': return 'Program Transition';
-    case 'exercise_substitution': return 'Exercise Substitution';
-    case 'increment_change': return 'Increment Change';
-    case 'phase_advance': return 'Phase Advance';
+    case 'weight_increase': return isBeginner ? 'Adding Weight' : 'Weight Increase';
+    case 'weight_decrease': return isBeginner ? 'Reducing Weight' : 'Weight Decrease';
+    case 'volume_decrease': return isBeginner ? 'Fewer Sets' : 'Volume Decrease';
+    case 'force_deload': return isBeginner ? 'Recovery Week Recommended' : 'Deload';
+    case 'program_transition': return isBeginner ? 'Program Change' : 'Program Transition';
+    case 'exercise_substitution': return isBeginner ? 'Exercise Swap' : 'Exercise Substitution';
+    case 'increment_change': return isBeginner ? 'Step Size Change' : 'Increment Change';
+    case 'phase_advance': return isBeginner ? 'Moving to Next Phase' : 'Phase Advance';
     case 'info': return 'Info';
     default: return type;
   }
@@ -2932,6 +3150,77 @@ export function injectWorkoutPlannerStyles(): void {
     }
     .wp-demo-video-link:hover { text-decoration: underline; }
     .wp-demo-video-link::before { content: '\\25B6 '; }
+    .wp-demo-mistakes-list {
+      padding-left: 1.2rem;
+      line-height: 1.6;
+      color: var(--text-secondary);
+      margin: var(--space-xs) 0;
+      list-style: disc;
+    }
+    .wp-demo-mistakes-list li {
+      margin-bottom: 2px;
+    }
+    .wp-demo-mistakes {
+      margin: var(--space-sm) 0;
+    }
+    .wp-exercise-header-right {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+    .wp-demo-info-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1px solid var(--accent-dim);
+      background: var(--accent-glow);
+      color: var(--accent);
+      font-size: var(--font-2xs);
+      font-weight: 700;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .wp-demo-info-btn:hover {
+      background: var(--accent);
+      color: var(--bg-primary);
+    }
+    .wp-condition-group {
+      margin-bottom: var(--space-xs);
+    }
+    .wp-condition-group-label {
+      font-size: var(--font-2xs);
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: block;
+      margin-bottom: 2px;
+    }
+    .wp-condition-checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      font-size: var(--font-xs);
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 2px 0;
+    }
+    .wp-condition-cb {
+      accent-color: var(--accent);
+    }
+    .wp-conditions-list {
+      max-height: 200px;
+      overflow-y: auto;
+      padding: var(--space-xs);
+      background: var(--bg-input);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
     .wp-sets-list {
       display: grid;
       gap: 2px;
@@ -4179,6 +4468,57 @@ export function injectWorkoutPlannerStyles(): void {
       font-size: var(--font-sm);
     }
     .wp-override-remaining { color: var(--text-muted); font-size: var(--font-xs); }
+
+    /* ===== Beginner Guide ===== */
+    .wp-beginner-guide-toggle {
+      margin: var(--space-sm) 0;
+    }
+    .wp-guide-link {
+      cursor: pointer;
+      color: var(--accent);
+      font-size: var(--font-sm);
+      font-weight: 500;
+    }
+    .wp-guide-link:hover { text-decoration: underline; }
+    .wp-beginner-guide {
+      margin-top: var(--space-md);
+      display: grid;
+      gap: var(--space-md);
+    }
+    .wp-guide-section {
+      padding: var(--space-md);
+      background: var(--bg-input);
+      border-radius: var(--radius-md);
+      border-left: 3px solid var(--accent);
+    }
+    .wp-guide-section-title {
+      font-size: var(--font-lg);
+      color: var(--text-primary);
+      margin-bottom: var(--space-sm);
+    }
+    .wp-guide-section-content {
+      font-size: var(--font-sm);
+      color: var(--text-secondary);
+      line-height: 1.8;
+    }
+    .wp-guide-section-content strong {
+      color: var(--text-primary);
+    }
+    .wp-guide-takeaway {
+      margin-top: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--accent-glow);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-sm);
+      color: var(--accent);
+      font-weight: 500;
+    }
+    .wp-guide-source {
+      margin-top: var(--space-xs);
+      font-size: var(--font-2xs);
+      color: var(--text-muted);
+      font-style: italic;
+    }
 
     /* ===== RPE Calculator ===== */
     .wp-rpe-calc-summary {
