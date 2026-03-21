@@ -9,4 +9,8 @@ export default defineConfig({
   server: {
     open: true,
   },
+  test: {
+    include: ['src/**/*.test.ts'],
+    exclude: ['**/node_modules/**'],
+  },
 });

@@ -8,6 +8,7 @@ import {
   buildCoachContext, getOfflineResponse, sendToClaudeAPI,
   getApiKey, saveApiKey, clearApiKey,
   loadChatHistory, saveChatHistory, clearChatHistory,
+  extractMemoryFromMessage, loadCoachMemory,
 } from './ai-coach';
 import type { CoachMessage } from './ai-coach';
 
@@ -27,6 +28,7 @@ function renderChat(container: HTMLElement, messages: CoachMessage[]): void {
     <div class="coach-header">
       <h3 class="section-heading" style="margin:0;">AI Coach</h3>
       <p class="coach-subtitle">Ask anything about your training, form, program, or nutrition.</p>
+      ${(() => { const mem = loadCoachMemory(); return mem.conversationCount > 0 ? `<div class="coach-memory-badge">${mem.facts.length} things remembered &middot; ${mem.conversationCount} sessions</div>` : ''; })()}
       ${!hasKey ? `
         <details class="coach-api-setup">
           <summary style="cursor:pointer;color:var(--accent);font-size:var(--font-xs);">Enable AI mode (optional)</summary>
@@ -107,8 +109,9 @@ function renderChat(container: HTMLElement, messages: CoachMessage[]): void {
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
-    // Get response
+    // Build context and extract memory
     const context = buildCoachContext();
+    extractMemoryFromMessage(text, context);
     const key = getApiKey();
 
     let response: CoachMessage;
@@ -307,6 +310,11 @@ export function injectCoachStyles(): void {
     .coach-suggestion:hover {
       border-color: var(--accent);
       color: var(--accent);
+    }
+    .coach-memory-badge {
+      font-size: var(--font-2xs);
+      color: var(--text-muted);
+      margin-top: 2px;
     }
     .coach-api-setup {
       margin-top: var(--space-sm);

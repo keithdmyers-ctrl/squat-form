@@ -53,6 +53,107 @@ export interface CoachContext {
   recentRPE: number[];
 }
 
+// --- Persistent Coaching Memory ---
+
+export interface CoachMemory {
+  /** Key facts the coach has learned about the user */
+  facts: Array<{
+    fact: string;
+    source: string; // 'user_told', 'observed', 'inferred'
+    date: string;
+    category: 'goal' | 'preference' | 'limitation' | 'achievement' | 'concern';
+  }>;
+  /** Number of total conversations */
+  conversationCount: number;
+  /** First conversation date */
+  firstConversation: string;
+  /** Last conversation date */
+  lastConversation: string;
+}
+
+const COACH_MEMORY_KEY = 'squat_form_coach_memory';
+
+export function loadCoachMemory(): CoachMemory {
+  try {
+    return JSON.parse(localStorage.getItem(COACH_MEMORY_KEY) ?? 'null') ?? {
+      facts: [],
+      conversationCount: 0,
+      firstConversation: new Date().toISOString(),
+      lastConversation: new Date().toISOString(),
+    };
+  } catch {
+    return { facts: [], conversationCount: 0, firstConversation: new Date().toISOString(), lastConversation: new Date().toISOString() };
+  }
+}
+
+export function saveCoachMemory(memory: CoachMemory): void {
+  try {
+    // Cap facts at 50
+    if (memory.facts.length > 50) memory.facts = memory.facts.slice(-50);
+    localStorage.setItem(COACH_MEMORY_KEY, JSON.stringify(memory));
+  } catch { /* storage full */ }
+}
+
+/**
+ * Extract memorable facts from a conversation.
+ * Called after each user message to build persistent memory.
+ */
+export function extractMemoryFromMessage(userMessage: string, context: CoachContext): void {
+  const memory = loadCoachMemory();
+  const q = userMessage.toLowerCase();
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Update conversation tracking
+  memory.conversationCount++;
+  memory.lastConversation = new Date().toISOString();
+
+  // Extract facts from common patterns
+  const extractions: Array<{ pattern: RegExp; category: CoachMemory['facts'][0]['category']; extract: (match: RegExpMatchArray) => string }> = [
+    // Goals
+    { pattern: /(?:i want to|my goal is|i'm trying to|i need to)\s+(.+?)(?:\.|$)/i, category: 'goal', extract: (m) => `User's goal: ${m[1].trim()}` },
+    { pattern: /(?:training for|preparing for|competing in)\s+(.+?)(?:\.|$)/i, category: 'goal', extract: (m) => `Training for: ${m[1].trim()}` },
+    // Limitations
+    { pattern: /(?:i can't|i have trouble with|my .+ hurts|i injured my)\s+(.+?)(?:\.|$)/i, category: 'limitation', extract: (m) => `Limitation: ${m[1].trim()}` },
+    { pattern: /(?:only have|can only train|limited to)\s+(.+?)(?:\.|$)/i, category: 'limitation', extract: (m) => `Constraint: ${m[1].trim()}` },
+    // Preferences
+    { pattern: /(?:i prefer|i like|i enjoy)\s+(.+?)(?:\.|$)/i, category: 'preference', extract: (m) => `Prefers: ${m[1].trim()}` },
+    { pattern: /(?:i don't like|i hate|i avoid)\s+(.+?)(?:\.|$)/i, category: 'preference', extract: (m) => `Dislikes: ${m[1].trim()}` },
+  ];
+
+  for (const { pattern, category, extract } of extractions) {
+    const match = q.match(pattern);
+    if (match) {
+      const fact = extract(match);
+      // Don't add duplicate facts
+      if (!memory.facts.some(f => f.fact === fact)) {
+        memory.facts.push({ fact, source: 'user_told', date: today, category });
+      }
+    }
+  }
+
+  // Auto-observe achievements from context
+  if (context.workoutsCompleted > 0 && context.workoutsCompleted % 25 === 0) {
+    const milestone = `Completed ${context.workoutsCompleted} workouts`;
+    if (!memory.facts.some(f => f.fact === milestone)) {
+      memory.facts.push({ fact: milestone, source: 'observed', date: today, category: 'achievement' });
+    }
+  }
+
+  // Track PR achievements
+  for (const [lift, e1rm] of Object.entries(context.e1rms)) {
+    const prFact = `Best ${lift} e1RM: ${e1rm} lbs`;
+    const existingPR = memory.facts.find(f => f.fact.startsWith(`Best ${lift} e1RM:`));
+    if (existingPR) {
+      existingPR.fact = prFact;
+      existingPR.date = today;
+    } else {
+      memory.facts.push({ fact: prFact, source: 'observed', date: today, category: 'achievement' });
+    }
+  }
+
+  saveCoachMemory(memory);
+}
+
 // --- Context Builder ---
 
 /**
@@ -193,6 +294,20 @@ export function buildSystemPrompt(context: CoachContext): string {
     lines.push(`Average recent RPE: ${avgRPE.toFixed(1)}`);
   }
 
+  // Persistent coaching memory
+  const memory = loadCoachMemory();
+  if (memory.facts.length > 0) {
+    lines.push('');
+    lines.push('=== COACHING MEMORY (persistent across sessions) ===');
+    lines.push(`Sessions: ${memory.conversationCount} conversations since ${memory.firstConversation.slice(0, 10)}`);
+    lines.push('');
+    for (const fact of memory.facts) {
+      lines.push(`- [${fact.category}] ${fact.fact} (${fact.source}, ${fact.date})`);
+    }
+    lines.push('');
+    lines.push('Use this memory to personalize responses. Reference past conversations and achievements when relevant.');
+  }
+
   lines.push('');
   lines.push('=== COACHING GUIDELINES ===');
   lines.push('- Reference the user\'s actual form scores when discussing technique');
@@ -220,8 +335,25 @@ export function getOfflineResponse(
   let content: string;
   let dataSources: string[] = [];
 
+  // Memory/history questions
+  const memory = loadCoachMemory();
+  if (q.includes('history') || q.includes('journey') || q.includes('how long') || q.includes('remember')) {
+    content = `I've been coaching you for ${memory.conversationCount} sessions since ${memory.firstConversation.slice(0, 10)}.\n\n`;
+    if (memory.facts.length > 0) {
+      content += 'Here\'s what I know about you:\n\n';
+      const goals = memory.facts.filter(f => f.category === 'goal');
+      const achievements = memory.facts.filter(f => f.category === 'achievement');
+      const limitations = memory.facts.filter(f => f.category === 'limitation');
+      if (goals.length) { content += '**Goals:**\n'; goals.forEach(f => { content += `\u2022 ${f.fact}\n`; }); content += '\n'; }
+      if (achievements.length) { content += '**Achievements:**\n'; achievements.forEach(f => { content += `\u2022 ${f.fact}\n`; }); content += '\n'; }
+      if (limitations.length) { content += '**Things to watch:**\n'; limitations.forEach(f => { content += `\u2022 ${f.fact}\n`; }); content += '\n'; }
+    }
+    content += `Current program: ${context.currentProgram} (${context.currentPhase})\nWorkouts completed: ${context.workoutsCompleted}`;
+    dataSources = ['coaching memory', 'training history'];
+  }
+
   // Form/technique questions
-  if (q.includes('form') || q.includes('technique') || q.includes('score')) {
+  else if (q.includes('form') || q.includes('technique') || q.includes('score')) {
     const scores = context.formScores;
     if (Object.keys(scores).length === 0) {
       content = 'I don\'t have any form analysis data yet. Use the "Form Check" tab to upload a video of your lift -- I\'ll analyze your technique across 6 dimensions and give you specific feedback. This is something no other coaching app can do.';

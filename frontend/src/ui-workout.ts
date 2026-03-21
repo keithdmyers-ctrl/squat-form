@@ -31,6 +31,7 @@ import { calculatePlates, formatPlateResult } from './plate-calculator';
 import { calculateE1RMFromRPE, calculateWeightForTarget, getRPEDescription, generatePrescriptionTable } from './rpe-calculator';
 import { buildCalendarMonth, calculateStreak } from './workout-calendar';
 import { calculateWeeklyVolume, getUndertrainedMuscles, getOvertrainedMuscles } from './volume-tracker';
+import { getExerciseDemo } from './exercise-demos';
 
 // ─── Terminology Glossary ───
 
@@ -1716,6 +1717,30 @@ function renderWorkoutCard(workout: GeneratedWorkout, state: ProgramState): stri
         </div>
     `;
 
+    // Exercise demo (expandable)
+    const demo = getExerciseDemo(exercise.exerciseSlot);
+    if (demo) {
+      html += `
+        <details class="wp-exercise-demo">
+          <summary class="wp-demo-toggle">How to do this exercise</summary>
+          <div class="wp-demo-content">
+            ${demo.gifUrl ? `<img src="${escapeHtml(demo.gifUrl)}" alt="${escapeHtml(demo.name)} demonstration" class="wp-demo-gif" loading="lazy" />` : ''}
+            <div class="wp-demo-steps">
+              <strong>Setup &amp; Execution:</strong>
+              <ol class="wp-demo-steps-list">
+                ${demo.steps.slice(0, 4).map(s => `<li>${escapeHtml(s)}</li>`).join('')}
+              </ol>
+            </div>
+            <div class="wp-demo-cues">
+              <strong>Key Cues:</strong>
+              ${demo.cues.slice(0, 3).map(c => `<span class="wp-demo-cue">${escapeHtml(c)}</span>`).join('')}
+            </div>
+            ${demo.youtubeUrl ? `<a href="${escapeHtml(demo.youtubeUrl)}" target="_blank" rel="noopener" class="wp-demo-video-link">${escapeHtml(demo.youtubeTitle ?? 'Watch full tutorial')}</a>` : ''}
+          </div>
+        </details>
+      `;
+    }
+
     if (exercise.notes) {
       html += `<p class="wp-exercise-notes">${addTermTooltips(exercise.notes)}</p>`;
     }
@@ -2853,6 +2878,60 @@ export function injectWorkoutPlannerStyles(): void {
       color: var(--text-muted);
       margin-bottom: var(--space-xs);
     }
+    .wp-exercise-demo {
+      margin: var(--space-xs) 0;
+    }
+    .wp-demo-toggle {
+      cursor: pointer;
+      color: var(--accent);
+      font-size: var(--font-xs);
+      padding: 2px 0;
+    }
+    .wp-demo-toggle:hover { text-decoration: underline; }
+    .wp-demo-content {
+      padding: var(--space-sm);
+      background: var(--bg-input);
+      border-radius: var(--radius-sm);
+      margin-top: var(--space-xs);
+      font-size: var(--font-xs);
+    }
+    .wp-demo-gif {
+      width: 100%;
+      max-width: 300px;
+      border-radius: var(--radius-sm);
+      margin-bottom: var(--space-sm);
+      display: block;
+    }
+    .wp-demo-steps-list {
+      padding-left: 1.2rem;
+      line-height: 1.6;
+      color: var(--text-secondary);
+      margin: var(--space-xs) 0;
+    }
+    .wp-demo-cues {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+      margin: var(--space-sm) 0;
+    }
+    .wp-demo-cue {
+      padding: 2px 8px;
+      background: var(--accent-glow);
+      border: 1px solid var(--accent-dim);
+      border-radius: 999px;
+      color: var(--accent);
+      font-size: var(--font-2xs);
+      white-space: nowrap;
+    }
+    .wp-demo-video-link {
+      display: inline-block;
+      margin-top: var(--space-xs);
+      color: var(--accent);
+      font-size: var(--font-xs);
+      text-decoration: none;
+    }
+    .wp-demo-video-link:hover { text-decoration: underline; }
+    .wp-demo-video-link::before { content: '\\25B6 '; }
     .wp-sets-list {
       display: grid;
       gap: 2px;

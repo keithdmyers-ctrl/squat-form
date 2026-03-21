@@ -71,6 +71,7 @@ export const EXERCISE_DEMOS: Record<string, ExerciseDemo> = {
     muscles: ['Quads', 'Glutes', 'Hamstrings', 'Core', 'Erectors'],
     youtubeUrl: 'https://www.youtube.com/watch?v=vmNPOjaGrVE',
     youtubeTitle: 'How to Squat — Alan Thrall',
+    gifUrl: 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Full_Squat/0.jpg',
   },
 
   bench: {
@@ -107,6 +108,7 @@ export const EXERCISE_DEMOS: Record<string, ExerciseDemo> = {
     muscles: ['Chest', 'Triceps', 'Front Delts', 'Lats (stabilizers)'],
     youtubeUrl: 'https://www.youtube.com/watch?v=BYKScL2sgCs',
     youtubeTitle: 'How to Bench Press — Alan Thrall',
+    gifUrl: 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Bench_Press_-_Medium_Grip/0.jpg',
   },
 
   deadlift: {
@@ -143,6 +145,7 @@ export const EXERCISE_DEMOS: Record<string, ExerciseDemo> = {
     muscles: ['Hamstrings', 'Glutes', 'Erectors', 'Lats', 'Traps', 'Grip'],
     youtubeUrl: 'https://www.youtube.com/watch?v=wYREQkVtvEc',
     youtubeTitle: '5 Step Deadlift Setup — Alan Thrall',
+    gifUrl: 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Deadlift/0.jpg',
   },
 
   ohp: {
@@ -176,6 +179,7 @@ export const EXERCISE_DEMOS: Record<string, ExerciseDemo> = {
     muscles: ['Shoulders', 'Triceps', 'Upper Chest', 'Core'],
     youtubeUrl: 'https://www.youtube.com/watch?v=eNFXEEdfQp4',
     youtubeTitle: 'How to Overhead Press — Alan Thrall',
+    gifUrl: 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Shoulder_Press/0.jpg',
   },
 
   row: {
@@ -208,6 +212,7 @@ export const EXERCISE_DEMOS: Record<string, ExerciseDemo> = {
     muscles: ['Lats', 'Rhomboids', 'Traps', 'Rear Delts', 'Biceps'],
     youtubeUrl: 'https://www.youtube.com/watch?v=G8l_8chR5BE',
     youtubeTitle: 'How to Barbell Row — Alan Thrall',
+    gifUrl: 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Reverse_Grip_Bent-Over_Rows/0.jpg',
   },
 
   pullup: {
@@ -236,6 +241,7 @@ export const EXERCISE_DEMOS: Record<string, ExerciseDemo> = {
     muscles: ['Lats', 'Biceps', 'Rear Delts', 'Core'],
     youtubeUrl: 'https://www.youtube.com/watch?v=eGo4IYlbE5g',
     youtubeTitle: 'Pull-up Progression — Jeff Nippard',
+    gifUrl: 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pullups/0.jpg',
   },
 
   rdl: {
@@ -264,6 +270,7 @@ export const EXERCISE_DEMOS: Record<string, ExerciseDemo> = {
     muscles: ['Hamstrings', 'Glutes', 'Erectors'],
     youtubeUrl: 'https://www.youtube.com/watch?v=JCXUYuzwNrM',
     youtubeTitle: 'Romanian Deadlift — Jeff Nippard',
+    gifUrl: 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Romanian_Deadlift_With_Dumbbells/0.jpg',
   },
 
   hip_thrust: {
@@ -289,6 +296,7 @@ export const EXERCISE_DEMOS: Record<string, ExerciseDemo> = {
       'Squeeze like you\'re cracking a walnut between your cheeks',
     ],
     muscles: ['Glutes', 'Hamstrings'],
+    gifUrl: 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Hip_Thrust/0.jpg',
   },
 
   close_grip_bench: {
