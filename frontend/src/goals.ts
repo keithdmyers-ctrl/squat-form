@@ -59,7 +59,7 @@ export function saveGoals(goals: GoalRecord[]): void {
   try {
     localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(goals));
   } catch {
-    // localStorage full — silently continue
+    document.dispatchEvent(new CustomEvent('storage-warning', { detail: 'Storage is full. Some data may not be saved.' }));
   }
 }
 

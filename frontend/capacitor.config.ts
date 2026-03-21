@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.liftform.analyzer',
-  appName: 'Lift Form Analyzer',
+  appName: 'Lift Coach',
   webDir: 'dist',
   server: {
     // Allow inline MediaPipe WASM loading

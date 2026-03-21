@@ -372,7 +372,6 @@ async function runAnalysis(file: File): Promise<void> {
     }
 
     if (resultVideo.duration > 60) {
-      console.warn(`[Validation] Long video detected: ${Math.round(resultVideo.duration)}s. Analysis may take a while.`);
       showValidationWarning(`Long video detected (${Math.round(resultVideo.duration)}s) -- analysis may take a moment.`);
       showProgress(3, 'Long video detected -- analysis may take a moment...');
     }
@@ -383,7 +382,6 @@ async function runAnalysis(file: File): Promise<void> {
     if (videoWidth > 0 && videoHeight > 0) {
       const minDim = Math.min(videoWidth, videoHeight);
       if (minDim < 240) {
-        console.warn(`[Validation] Low resolution video: ${videoWidth}x${videoHeight}`);
         showValidationWarning(`Low resolution video (${videoWidth}x${videoHeight}) -- results may be less accurate.`);
         showProgress(3, 'Low resolution detected -- results may be less accurate...');
       }
@@ -510,7 +508,7 @@ async function runAnalysis(file: File): Promise<void> {
         }
       } catch (err) {
         // Front video processing failed -- continue with side-only analysis
-        console.warn('Front video processing failed, using side view only:', err);
+        // Front video processing failed -- continue with side-only analysis
         analysis.sideViewWarning = 'Front view video could not be processed -- using side view only.';
       }
     }
@@ -580,7 +578,7 @@ async function runAnalysis(file: File): Promise<void> {
       }
     } catch (err) {
       // Snapshot capture is optional -- continue without them
-      console.warn('Snapshot capture failed:', err);
+      // Snapshot capture is optional -- continue without them
     }
 
     // Compute DOTS score for session record (if bodyweight and 1RM available)
@@ -1084,14 +1082,30 @@ initExampleVideo();
 initHistorySection();
 initHeaderHistoryLink();
 
+// ─── Global Storage Full Banner ───
+
+document.addEventListener('storage-warning', () => {
+  const existing = document.getElementById('storage-full-warning');
+  if (existing) return;
+  const banner = document.createElement('div');
+  banner.id = 'storage-full-warning';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;padding:8px 16px;background:var(--warning);color:#000;font-size:12px;text-align:center;z-index:9999;cursor:pointer;';
+  banner.textContent = 'Storage is nearly full. Export your data (Settings \u2192 Export All Data) to prevent data loss.';
+  banner.addEventListener('click', () => banner.remove());
+  document.body.prepend(banner);
+});
+
 // ─── Storage Warning Clear Button ───
 
 const clearStorageBtn = document.getElementById('clear-storage-btn');
 if (clearStorageBtn) {
   clearStorageBtn.addEventListener('click', () => {
+    if (!confirm('This will delete all your data (workout history, programs, settings, etc.). This cannot be undone. Continue?')) return;
     localStorage.clear();
     const warning = document.getElementById('storage-warning');
     if (warning) warning.style.display = 'none';
+    const fullWarning = document.getElementById('storage-full-warning');
+    if (fullWarning) fullWarning.remove();
   });
 }
 
@@ -1112,47 +1126,114 @@ if (reshowBtn) {
 
 const modeUploadBtn = document.getElementById('mode-upload') as HTMLButtonElement | null;
 const modeLiveBtn = document.getElementById('mode-live') as HTMLButtonElement | null;
+const modeProgramBtn = document.getElementById('mode-program') as HTMLButtonElement | null;
+const modeCoachBtn = document.getElementById('mode-coach') as HTMLButtonElement | null;
 const uploadPanel = document.getElementById('upload-panel');
 const livePanel = document.getElementById('live-panel');
+const programPanel = document.getElementById('program-panel');
+const coachPanel = document.getElementById('coach-panel');
 
-function setMode(mode: 'upload' | 'live'): void {
+function setMode(mode: 'upload' | 'live' | 'program' | 'coach'): void {
   if (!uploadPanel || !livePanel || !modeUploadBtn || !modeLiveBtn) return;
 
+  const allBtns = [modeUploadBtn, modeLiveBtn, modeProgramBtn, modeCoachBtn];
+  const allPanels = [uploadPanel, livePanel, programPanel, coachPanel];
+
+  // Deactivate all
+  for (const btn of allBtns) {
+    if (btn) {
+      btn.classList.remove('active');
+      btn.setAttribute('aria-selected', 'false');
+    }
+  }
+  for (const panel of allPanels) {
+    if (panel) panel.style.display = 'none';
+  }
+
+  // Activate selected
   if (mode === 'upload') {
     uploadPanel.style.display = '';
-    livePanel.style.display = 'none';
     modeUploadBtn.classList.add('active');
     modeUploadBtn.setAttribute('aria-selected', 'true');
-    modeLiveBtn.classList.remove('active');
-    modeLiveBtn.setAttribute('aria-selected', 'false');
-  } else {
-    uploadPanel.style.display = 'none';
+  } else if (mode === 'live') {
     livePanel.style.display = '';
-    modeUploadBtn.classList.remove('active');
-    modeUploadBtn.setAttribute('aria-selected', 'false');
     modeLiveBtn.classList.add('active');
     modeLiveBtn.setAttribute('aria-selected', 'true');
+  } else if (mode === 'program') {
+    if (programPanel) programPanel.style.display = '';
+    modeProgramBtn?.classList.add('active');
+    modeProgramBtn?.setAttribute('aria-selected', 'true');
+    // Initialize workout planner when tab is first opened
+    initWorkoutPlannerOnce();
+  } else if (mode === 'coach') {
+    if (coachPanel) coachPanel.style.display = '';
+    modeCoachBtn?.classList.add('active');
+    modeCoachBtn?.setAttribute('aria-selected', 'true');
+    initCoachOnce();
   }
+}
+
+let workoutPlannerInitialized = false;
+function initWorkoutPlannerOnce(): void {
+  if (workoutPlannerInitialized) return;
+  workoutPlannerInitialized = true;
+  import('./ui-workout').then(({ initWorkoutPlanner, injectWorkoutPlannerStyles }) => {
+    injectWorkoutPlannerStyles();
+    initWorkoutPlanner();
+  }).catch(() => {
+    const container = document.getElementById('workout-planner-section');
+    if (container) container.innerHTML = '<div class="card card--static" style="text-align:center;padding:2rem;"><p style="color:var(--danger);">Failed to load training module. Please refresh the page.</p></div>';
+  });
+}
+
+let coachInitialized = false;
+function initCoachOnce(): void {
+  if (coachInitialized) return;
+  coachInitialized = true;
+  import('./ui-coach').then(({ initCoachUI, injectCoachStyles }) => {
+    injectCoachStyles();
+    initCoachUI();
+  }).catch(() => {
+    const container = document.getElementById('coach-section');
+    if (container) container.innerHTML = '<div class="card card--static" style="text-align:center;padding:2rem;"><p style="color:var(--danger);">Failed to load coach module. Please refresh the page.</p></div>';
+  });
 }
 
 modeUploadBtn?.addEventListener('click', () => setMode('upload'));
 modeLiveBtn?.addEventListener('click', () => setMode('live'));
+modeProgramBtn?.addEventListener('click', () => setMode('program'));
+modeCoachBtn?.addEventListener('click', () => setMode('coach'));
+
+// Listen for custom switch-mode events (e.g., from workout planner's "Check My Form" button)
+document.addEventListener('switch-mode', (e: Event) => {
+  const mode = (e as CustomEvent).detail;
+  if (mode === 'upload' || mode === 'live' || mode === 'program' || mode === 'coach') {
+    setMode(mode);
+  }
+});
 
 // Arrow key navigation for mode toggle tabs (WAI-ARIA Tab Pattern)
-modeUploadBtn?.addEventListener('keydown', (e: KeyboardEvent) => {
-  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-    e.preventDefault();
-    setMode('live');
-    modeLiveBtn?.focus();
-  }
-});
-modeLiveBtn?.addEventListener('keydown', (e: KeyboardEvent) => {
-  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-    e.preventDefault();
-    setMode('upload');
-    modeUploadBtn?.focus();
-  }
-});
+const modeBtns = [modeProgramBtn, modeUploadBtn, modeLiveBtn, modeCoachBtn].filter(Boolean) as HTMLButtonElement[];
+for (let i = 0; i < modeBtns.length; i++) {
+  modeBtns[i].addEventListener('keydown', (e: KeyboardEvent) => {
+    let nextIdx: number | null = null;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      nextIdx = (i + 1) % modeBtns.length;
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      nextIdx = (i - 1 + modeBtns.length) % modeBtns.length;
+    }
+    if (nextIdx !== null) {
+      const modes: Array<'upload' | 'live' | 'program' | 'coach'> = ['program', 'upload', 'live', 'coach'];
+      setMode(modes[nextIdx]);
+      modeBtns[nextIdx].focus();
+    }
+  });
+}
+
+// Default to program (Training) tab — initialize workout planner immediately
+initWorkoutPlannerOnce();
 
 // ─── Live Mode ───
 

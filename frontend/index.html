@@ -2,19 +2,28 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0f0f0f" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="Lift Coach — Free AI-powered powerlifting coach. 15 evidence-based programs, computer vision form analysis, adaptive programming, and in-workout tracking. Available on web and iOS." />
+  <meta property="og:title" content="Lift Coach — AI Powerlifting Coach" />
+  <meta property="og:description" content="Free AI-powered powerlifting programming, form analysis, and progress tracking. The only app that sees your form AND programs your training." />
+  <meta property="og:type" content="website" />
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
-  <link rel="apple-touch-icon" href="icon.svg" />
-  <title>Lift Form Analyzer — Squat, Deadlift, Bench, OHP</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <title>Lift Coach — AI Powerlifting</title>
   <script>
     (function() {
       var theme = localStorage.getItem('squat_form_theme');
       if (theme === 'light') {
         document.documentElement.setAttribute('data-theme', 'light');
+      } else if (!theme && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+      // Update theme-color meta for status bar
+      if (document.documentElement.getAttribute('data-theme') === 'light') {
         var meta = document.querySelector('meta[name="theme-color"]');
         if (meta) meta.setAttribute('content', '#f5f5f7');
       }
@@ -192,6 +201,8 @@
       line-height: 1.6;
       min-height: 100vh;
       font-size: var(--font-body);
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
       padding-left: env(safe-area-inset-left);
       padding-right: env(safe-area-inset-right);
     }
@@ -212,6 +223,29 @@
 
     .skip-nav:focus {
       top: 0;
+    }
+
+    /* ===== Footer Settings Buttons ===== */
+    .footer-btn {
+      padding: var(--space-xs) var(--space-sm);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      cursor: pointer;
+      font-size: var(--font-xs);
+      min-height: 36px;
+    }
+    .footer-btn:hover {
+      border-color: var(--border-hover);
+    }
+    .footer-btn-danger {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: transparent;
+    }
+    .footer-btn-danger:hover {
+      background: rgba(248, 113, 113, 0.1);
     }
 
     /* ===== Focus ring for keyboard navigation ===== */
@@ -4015,6 +4049,15 @@
       margin: 0.25rem 0 0.75rem;
     }
 
+    /* Workout planner loading state (before JS injects styles) */
+    .wp-loading-placeholder {
+      text-align: center;
+      padding: 2rem;
+    }
+    .wp-loading-text {
+      color: var(--text-muted);
+    }
+
     /* Focus section timestamp */
     .focus-timestamp {
       font-size: var(--font-sm);
@@ -4372,51 +4415,44 @@
   </noscript>
 
   <!-- Onboarding Overlay (first-time visitors) -->
-  <div id="onboarding-overlay" class="onboarding-overlay" role="dialog" aria-modal="true" aria-label="Welcome to Lift Form Analyzer">
+  <div id="onboarding-overlay" class="onboarding-overlay" role="dialog" aria-modal="true" aria-label="Welcome to Lift Coach">
     <div class="onboarding-card onboarding-card--positioned">
       <button id="onboarding-close-x" class="btn-link onboarding-close-x" aria-label="Close">&#10005;</button>
-      <h2>Welcome to Lift Form Analyzer</h2>
-      <p>Upload a video of your squat, deadlift, or bench press and get instant feedback on your form.</p>
+      <h2>Welcome to Lift Coach</h2>
+      <p>Your AI-powered training partner. Get a personalized program, track your workouts, and check your form -- all in one app.</p>
 
       <div class="onboarding-steps">
         <div class="onboarding-step">
           <div class="step-number">1</div>
-          <div class="step-text"><strong>Film your set</strong>
-            <div style="margin-top: 0.25rem;">Prop your phone at hip height, 2-4 meters away, filming from the side. Full body visible, 3-10 reps.</div>
+          <div class="step-text"><strong>Get a training program</strong>
+            <div style="margin-top: 0.25rem;">Answer 3 quick questions and we'll recommend a proven strength program matched to your experience and schedule.</div>
           </div>
         </div>
         <div class="onboarding-step">
           <div class="step-number">2</div>
-          <div class="step-text"><strong>Upload the video</strong>
-            <div style="margin-top: 0.25rem;">Tap the button on the next screen. The AI will analyze your form in about 30-60 seconds.</div>
+          <div class="step-text"><strong>Follow your daily workout</strong>
+            <div style="margin-top: 0.25rem;">Each session tells you exactly what to do -- warm-up sets, working weights, and rest times. Just log your sets as you go.</div>
           </div>
         </div>
         <div class="onboarding-step">
           <div class="step-number">3</div>
-          <div class="step-text"><strong>Get your grade &amp; what to fix</strong>
-            <div style="margin-top: 0.25rem;">You'll see a grade (A-D), what you did well, and the #1 thing to work on with exercises to help.</div>
+          <div class="step-text"><strong>Check your form anytime</strong>
+            <div style="margin-top: 0.25rem;">Film a set and get an instant grade (A-D) with specific cues to improve. Switch to the Form Check tab to try it.</div>
           </div>
         </div>
       </div>
 
       <details class="feature-discovery" style="margin-bottom: var(--space-md);">
-        <summary>Learn more about grades &amp; features</summary>
-        <div class="grade-legend" style="margin-top: var(--space-sm);">
-          <h3>What the grades mean</h3>
-          <div class="grade-row"><span class="grade-badge grade-a">A</span> Excellent form -- minor polish only</div>
-          <div class="grade-row"><span class="grade-badge grade-b">B</span> Good form -- one or two things to work on</div>
-          <div class="grade-row"><span class="grade-badge grade-c">C</span> Decent -- a few areas need attention</div>
-          <div class="grade-row"><span class="grade-badge grade-d">D</span> Getting there -- the exercises below will help</div>
-          <div class="grade-row"><span class="grade-badge grade-kw">KW</span> Keep Working -- you're building the foundation</div>
-        </div>
+        <summary>Learn more about features</summary>
         <div style="font-size: var(--font-sm); color: var(--text-secondary); margin-top: var(--space-sm); line-height: 1.6;">
-          <strong style="color: var(--accent);">Camera tip:</strong> Side view gives the best depth and trunk analysis. Front view improves knee tracking.<br>
+          <strong style="color: var(--accent);">Training:</strong> Science-backed programs with automatic progression, deload scheduling, and adaptation based on your feedback.<br>
+          <strong style="color: var(--accent);">Form Check:</strong> Upload a video of any lift. AI analyzes depth, bar path, and 30+ form cues in 30-60 seconds.<br>
           <strong style="color: var(--accent);">Live Mode:</strong> Real-time voice coaching while you train (squats only for now).<br>
-          <strong style="color: var(--accent);">Good form basics:</strong> Squat -- thighs parallel, chest up. Deadlift -- flat back, hinge at hips. Bench -- bar to chest, pause, press up.
+          <strong style="color: var(--accent);">Camera tip:</strong> Side view at hip height, 2-4 meters away, full body visible.
         </div>
       </details>
 
-      <p class="onboarding-disclaimer">This tool provides general form feedback, not medical advice. If you have pain, injuries, or medical conditions, consult a healthcare professional before following any exercise recommendations.</p>
+      <p class="onboarding-disclaimer">This tool provides general training and form feedback, not medical advice. If you have pain, injuries, or medical conditions, consult a healthcare professional before following any exercise recommendations.</p>
 
       <button id="onboarding-dismiss" class="btn btn-primary w-full" aria-label="Get started">Got it, let's go!</button>
     </div>
@@ -4432,8 +4468,8 @@
         <span class="theme-icon-light">&#9790;</span>
       </button>
     </div>
-    <h1>Lift Form Analyzer</h1>
-    <p>AI-powered form analysis for squat, deadlift &amp; bench &mdash; your video never leaves your device <button class="btn-link" id="reshow-onboarding" aria-label="Show how it works">(How does this work?)</button></p>
+    <h1>Lift Coach</h1>
+    <p>AI-powered powerlifting programming, progress tracking, and form analysis <button class="btn-link" id="reshow-onboarding" aria-label="Show how it works">(How does this work?)</button></p>
     <button id="header-history-link" aria-label="View session history">History (<span id="header-history-count">0</span>)</button>
     <span id="offline-status" class="offline-status"></span>
   </header>
@@ -4442,17 +4478,32 @@
     <div class="container">
 
       <!-- Mode Toggle -->
-      <div class="mode-toggle" role="tablist" aria-label="Analysis mode">
-        <button id="mode-upload" class="mode-tab active" role="tab" aria-selected="true" aria-controls="upload-panel">
-          Upload Video
+      <div class="mode-toggle" role="tablist" aria-label="App mode">
+        <button id="mode-program" class="mode-tab active" role="tab" aria-selected="true" aria-controls="program-panel">
+          Training
+        </button>
+        <button id="mode-upload" class="mode-tab" role="tab" aria-selected="false" aria-controls="upload-panel">
+          Form Check
         </button>
         <button id="mode-live" class="mode-tab" role="tab" aria-selected="false" aria-controls="live-panel">
           Live Mode
         </button>
+        <button id="mode-coach" class="mode-tab" role="tab" aria-selected="false" aria-controls="coach-panel">
+          Coach
+        </button>
       </div>
 
-      <!-- Upload Panel (default) -->
-      <div id="upload-panel" role="tabpanel" aria-labelledby="mode-upload" tabindex="0">
+      <!-- Training Program Panel (default) -->
+      <div id="program-panel" role="tabpanel" aria-labelledby="mode-program" tabindex="0">
+        <section id="workout-planner-section" aria-label="Training">
+          <div class="card card--static wp-loading-placeholder">
+            <p class="wp-loading-text">Loading your training program...</p>
+          </div>
+        </section>
+      </div>
+
+      <!-- Upload Panel -->
+      <div id="upload-panel" role="tabpanel" aria-labelledby="mode-upload" tabindex="0" style="display: none;">
 
       <!-- B2: Pre-analysis warmup card (shown for beginners) -->
       <div id="warmup-card" class="warmup-card" style="display: none;">
@@ -4857,6 +4908,15 @@
         </div>
       </div><!-- /live-panel -->
 
+      <!-- AI Coach Panel -->
+      <div id="coach-panel" role="tabpanel" aria-labelledby="mode-coach" tabindex="0" style="display: none;">
+        <section id="coach-section" aria-label="AI Coach">
+          <div class="card card--static" style="text-align: center; padding: 2rem;">
+            <p style="color: var(--text-muted);">Loading coach...</p>
+          </div>
+        </section>
+      </div>
+
       <!-- Progress Section -->
       <section id="progress-section" class="card card--static" aria-label="Analysis progress">
         <h2>Analyzing...</h2>
@@ -5015,6 +5075,96 @@
       Consult a physician before beginning any exercise program.
       Always listen to your body &mdash; stop if you feel pain.
     </p>
+    <details id="privacy-policy" style="margin-top: var(--space-sm); font-size: var(--font-xs); color: var(--text-muted);">
+      <summary style="cursor: pointer; text-decoration: underline;">Privacy Policy</summary>
+      <div style="max-width: 600px; margin: var(--space-md) auto; line-height: 1.8;">
+        <h3>Privacy Policy</h3>
+        <p><strong>Last updated:</strong> March 2026</p>
+        <p><strong>Data Storage:</strong> All your training data (workout logs, body measurements, program state, form analysis scores) is stored locally on your device. We do not have servers that collect or store your data.</p>
+        <p><strong>Video Processing:</strong> Form analysis videos are processed entirely on your device using MediaPipe. Video data never leaves your device and is never uploaded to any server.</p>
+        <p><strong>AI Coach (Optional):</strong> If you provide an Anthropic API key, your training context (not video) is sent to Anthropic's API for AI coaching responses. This is opt-in and uses your own API key. We never see or store your API key or conversations.</p>
+        <p><strong>Cloud Sync (Optional):</strong> If you sign in with Firebase, your training data is synced to Google's Firebase servers to enable cross-device access. You can delete your cloud data at any time.</p>
+        <p><strong>Analytics:</strong> We do not use any analytics, tracking pixels, or advertising SDKs.</p>
+        <p><strong>Data Deletion:</strong> You can delete all your data at any time from the app settings. Go to Settings &amp; Data &rarr; Delete All Data.</p>
+        <p><strong>Contact:</strong> For privacy questions, email privacy@liftcoach.app</p>
+      </div>
+    </details>
+    <details id="terms-of-service" style="margin-top: var(--space-xs); font-size: var(--font-xs); color: var(--text-muted);">
+      <summary style="cursor: pointer; text-decoration: underline;">Terms of Service</summary>
+      <div style="max-width: 600px; margin: var(--space-md) auto; line-height: 1.8;">
+        <h3>Terms of Service</h3>
+        <p><strong>Last updated:</strong> March 2026</p>
+        <p>Lift Coach is a fitness tool that provides AI-based training recommendations. By using this app, you agree to the following terms:</p>
+        <p><strong>Not Medical Advice:</strong> This app provides form feedback and training recommendations based on general exercise science principles. It is not a substitute for professional medical advice, personal training, or physiotherapy. Always consult a physician before beginning any exercise program.</p>
+        <p><strong>Use at Your Own Risk:</strong> You assume all risk of injury associated with exercise. The app's form analysis and programming recommendations are AI-generated estimates that may contain errors. Always listen to your body and stop if you experience pain.</p>
+        <p><strong>Data:</strong> Your data is stored locally on your device. We are not responsible for data loss due to device failure, browser data clearing, or other causes. We recommend regular data exports.</p>
+        <p><strong>AI Features:</strong> The AI coach and form analysis use machine learning models that may produce inaccurate results. Do not rely solely on AI recommendations for training decisions.</p>
+        <p><strong>Changes:</strong> We may update these terms at any time. Continued use of the app constitutes acceptance of updated terms.</p>
+      </div>
+    </details>
+    <details id="about-section" style="margin-top: var(--space-xs); font-size: var(--font-xs); color: var(--text-muted);">
+      <summary style="cursor: pointer; text-decoration: underline;">About Lift Coach</summary>
+      <div style="max-width: 600px; margin: var(--space-md) auto; line-height: 1.8;">
+        <h3>Lift Coach v2.0.0</h3>
+        <p>AI-powered powerlifting programming, progress tracking, and form analysis.</p>
+        <p><strong>Features:</strong></p>
+        <ul style="padding-left: 1.5rem; margin: var(--space-xs) 0;">
+          <li>15 evidence-based training programs (Starting Strength, 5/3/1, GZCLP, Texas Method, and more)</li>
+          <li>AI form analysis via computer vision (unique &mdash; no other app does this)</li>
+          <li>6-signal adaptive programming (adjusts based on form, RPE, readiness, injuries, fatigue)</li>
+          <li>In-workout tracker with rest timer, plate calculator, and RPE calculator</li>
+          <li>AI coaching chat (offline + optional Claude API)</li>
+          <li>PR tracking, workout calendar, body measurements</li>
+        </ul>
+        <p><strong>Methodology sources:</strong> Rippetoe (Starting Strength), Wendler (5/3/1), Nuckols (Stronger by Science), Krapf (Ground Zero Strength), Nippard, Zourdos, Helms, Schoenfeld, Israetel, and peer-reviewed research.</p>
+        <p><strong>Keyboard shortcuts:</strong></p>
+        <ul style="padding-left: 1.5rem; margin: var(--space-xs) 0;">
+          <li><kbd>H</kbd> &mdash; scroll to history</li>
+          <li><kbd>N</kbd> &mdash; start new analysis</li>
+          <li><kbd>Esc</kbd> &mdash; close modals</li>
+          <li><kbd>1</kbd>&ndash;<kbd>9</kbd> &mdash; jump to rep in results</li>
+        </ul>
+        <p><strong>Support:</strong> <a href="mailto:support@liftcoach.app" style="color: var(--accent);">support@liftcoach.app</a></p>
+        <p><strong>Report a bug:</strong> <a href="mailto:bugs@liftcoach.app" style="color: var(--accent);">bugs@liftcoach.app</a></p>
+      </div>
+    </details>
+    <details id="app-settings" style="margin-top: var(--space-xs); font-size: var(--font-xs); color: var(--text-muted);">
+      <summary style="cursor: pointer; text-decoration: underline;">Settings &amp; Data</summary>
+      <div style="max-width: 600px; margin: var(--space-md) auto; padding: var(--space-md);">
+        <p style="margin-bottom: var(--space-sm);">App version: 2.0.0</p>
+        <p style="margin-bottom: var(--space-sm);">
+          <button id="export-all-data" class="footer-btn">
+            Export All Data (JSON)
+          </button>
+        </p>
+        <p style="margin-bottom: var(--space-sm);">
+          <button id="import-all-data" class="footer-btn">
+            Import Data (JSON)
+          </button>
+          <input type="file" id="import-file-input" accept=".json" style="display:none;" />
+        </p>
+        <p style="margin-bottom: var(--space-sm);">
+          <button id="delete-all-data" class="footer-btn footer-btn-danger">
+            Delete All Data
+          </button>
+        </p>
+        <p style="font-size: var(--font-2xs); color: var(--text-muted);">Deleting all data is permanent and cannot be undone. This removes all workout history, programs, body tracking, goals, and settings.</p>
+      </div>
+    </details>
+    <details id="licenses-section" style="margin-top: var(--space-xs); font-size: var(--font-xs); color: var(--text-muted);">
+      <summary style="cursor: pointer; text-decoration: underline;">Open Source Licenses</summary>
+      <div style="max-width: 600px; margin: var(--space-md) auto; line-height: 1.8;">
+        <p>Lift Coach uses the following open source software:</p>
+        <ul style="padding-left: 1.5rem;">
+          <li><strong>MediaPipe</strong> (Google) — Apache 2.0 License — Computer vision for pose estimation</li>
+          <li><strong>Vite</strong> — MIT License — Build tool</li>
+          <li><strong>TypeScript</strong> (Microsoft) — Apache 2.0 License — Programming language</li>
+          <li><strong>Capacitor</strong> (Ionic) — MIT License — Native platform bridge</li>
+          <li><strong>Vitest</strong> — MIT License — Test framework</li>
+        </ul>
+        <p style="margin-top: var(--space-sm);">Training methodology citations are included within each program's science basis section.</p>
+      </div>
+    </details>
   </footer>
 
   <script type="module" src="/src/main.ts"></script>
@@ -5025,6 +5175,69 @@
         navigator.serviceWorker.register('./sw.js').catch(() => {});
       });
     }
+
+    // Export all data
+    document.getElementById('export-all-data')?.addEventListener('click', function() {
+      var data = {};
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (key && key.startsWith('squat_form_')) {
+          try { data[key] = JSON.parse(localStorage.getItem(key)); } catch(e) { data[key] = localStorage.getItem(key); }
+        }
+      }
+      var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'lift-coach-backup-' + new Date().toISOString().slice(0,10) + '.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // Import data from backup
+    document.getElementById('import-all-data')?.addEventListener('click', function() {
+      document.getElementById('import-file-input')?.click();
+    });
+    document.getElementById('import-file-input')?.addEventListener('change', function(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function() {
+        try {
+          var data = JSON.parse(reader.result);
+          if (confirm('This will merge imported data with your current data. Existing data will be overwritten where keys match. Continue?')) {
+            for (var key in data) {
+              if (key.startsWith('squat_form_')) {
+                localStorage.setItem(key, typeof data[key] === 'string' ? data[key] : JSON.stringify(data[key]));
+              }
+            }
+            alert('Data imported successfully. The app will reload.');
+            location.reload();
+          }
+        } catch(err) {
+          alert('Invalid backup file. Please select a JSON file exported from Lift Coach.');
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    // Delete all data (GDPR-compliant)
+    document.getElementById('delete-all-data')?.addEventListener('click', function() {
+      if (confirm('Are you sure you want to delete ALL your data? This includes all workout history, programs, body tracking, goals, and settings. This cannot be undone.')) {
+        if (confirm('This is your final warning. ALL data will be permanently deleted. Continue?')) {
+          var keys = [];
+          for (var i = 0; i < localStorage.length; i++) {
+            var key = localStorage.key(i);
+            if (key && key.startsWith('squat_form_')) keys.push(key);
+          }
+          keys.forEach(function(k) { localStorage.removeItem(k); });
+          // Also clear IndexedDB (progress photos)
+          indexedDB.deleteDatabase('lift_coach_photos');
+          alert('All data has been deleted. The app will now reload.');
+          location.reload();
+        }
+      }
+    });
 
     // Theme toggle
     document.getElementById('theme-toggle').addEventListener('click', function() {

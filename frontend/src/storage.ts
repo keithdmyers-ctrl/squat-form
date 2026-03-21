@@ -83,7 +83,7 @@ export function saveSession(
       if (warning) {
         warning.style.display = 'block';
       } else {
-        console.warn('Session could not be saved: storage quota exceeded');
+        document.dispatchEvent(new CustomEvent('storage-warning', { detail: 'Storage is full. Some data may not be saved.' }));
       }
     }
   }
@@ -120,7 +120,7 @@ export function saveSettings(
       training_phase: trainingPhase ?? '',
     }));
   } catch {
-    // localStorage full -- silently continue
+    document.dispatchEvent(new CustomEvent('storage-warning', { detail: 'Storage is full. Some data may not be saved.' }));
   }
 }
 
@@ -146,6 +146,6 @@ export function savePrescreen(): void {
   try {
     localStorage.setItem(PRESCREEN_KEY, '1');
   } catch {
-    // localStorage full -- silently continue
+    document.dispatchEvent(new CustomEvent('storage-warning', { detail: 'Storage is full. Some data may not be saved.' }));
   }
 }

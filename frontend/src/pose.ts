@@ -69,13 +69,12 @@ async function resolveWasmUrl(): Promise<string> {
   try {
     const response = await fetch(`${LOCAL_WASM_URL}/vision_wasm_internal.js`, { method: 'HEAD' });
     if (response.ok) {
-      console.log('[PoseProcessor] Using local WASM files');
       return LOCAL_WASM_URL;
     }
   } catch {
     // Local not available
   }
-  console.log('[PoseProcessor] Local WASM not found, falling back to CDN');
+  // Local WASM not found, falling back to CDN
   return CDN_WASM_URL;
 }
 
@@ -89,13 +88,12 @@ async function resolveModelUrl(lite = false): Promise<string> {
   try {
     const response = await fetch(localPath, { method: 'HEAD' });
     if (response.ok) {
-      console.log(`[PoseProcessor] Using local ${lite ? 'lite' : 'full'} model file`);
       return localPath;
     }
   } catch {
     // Local not available
   }
-  console.log(`[PoseProcessor] Local ${lite ? 'lite' : 'full'} model not found, falling back to CDN`);
+  // Local model not found, falling back to CDN
   return cdnPath;
 }
 
@@ -107,7 +105,7 @@ async function loadVisionFileset(wasmUrl: string): Promise<Awaited<ReturnType<ty
     return await FilesetResolver.forVisionTasks(wasmUrl);
   } catch (err) {
     if (wasmUrl !== CDN_WASM_URL) {
-      console.warn('[PoseProcessor] Local WASM load failed, retrying with CDN:', err);
+      // Local WASM load failed, retrying with CDN
       return await FilesetResolver.forVisionTasks(CDN_WASM_URL);
     }
     throw new Error(
@@ -139,9 +137,9 @@ export function prewarmMediaPipe(): void {
       prewarmedModelUrlLite = liteModelUrl;
       // Pre-fetch only the lite model (for live mode); full model loads on-demand for video upload
       await fetch(liteModelUrl);
-      console.log('[PoseProcessor] Pre-warm complete (lite model only)');
+      // Pre-warm complete
     } catch (err) {
-      console.warn('[PoseProcessor] Pre-warm failed (will retry on init):', err);
+      // Pre-warm failed (will retry on init)
     }
   })();
 }
@@ -176,7 +174,7 @@ export class PoseProcessor {
       });
     } catch (err) {
       if (modelUrl !== CDN_MODEL_PATH_FULL) {
-        console.warn('[PoseProcessor] Local model load failed, retrying with CDN:', err);
+        // Local model load failed, retrying with CDN
         this.landmarker = await PoseLandmarker.createFromOptions(vision, {
           baseOptions: {
             modelAssetPath: CDN_MODEL_PATH_FULL,
@@ -238,7 +236,7 @@ export class PoseProcessor {
       await createLandmarker(modelUrl);
     } catch (err) {
       if (modelUrl !== CDN_MODEL_PATH_LITE) {
-        console.warn('[PoseProcessor] Local model load failed, retrying with CDN:', err);
+        // Local model load failed, retrying with CDN
         await createLandmarker(CDN_MODEL_PATH_LITE);
       } else {
         throw new Error(
@@ -391,9 +389,7 @@ export class PoseProcessor {
 
     // Warn if >50% of processed frames had multiple people
     if (totalProcessedFrames > 0 && multiPersonFrames / totalProcessedFrames > 0.5) {
-      console.warn(
-        `Multiple people detected in ${multiPersonFrames}/${totalProcessedFrames} frames (${Math.round(multiPersonFrames / totalProcessedFrames * 100)}%).`,
-      );
+      // Multiple people detected -- set warning for UI
       this._multiPersonWarning = 'Multiple people detected in the video. Results may be inaccurate -- please ensure only one person is visible.';
     } else {
       this._multiPersonWarning = null;
