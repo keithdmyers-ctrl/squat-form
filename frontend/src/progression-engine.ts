@@ -13,6 +13,103 @@ import { PROGRAMS, EXERCISE_SLOTS, getExerciseName } from './workout-programs';
 import type { ProgramState, LiftProgress, WorkoutLog, SessionDifficulty, ScheduleOverride } from './workout-storage';
 import { loadWorkoutLogs, loadUserProfile } from './workout-storage';
 
+// ─── Weight Safety Caps ───
+
+/**
+ * Absolute weight ceilings per lift, by sex (lbs).
+ * Based on all-time world records plus a margin.
+ * Any calculated weight exceeding these is clamped.
+ */
+export const WEIGHT_SAFETY_CAPS: Record<string, { male: number; female: number }> = {
+  squat: { male: 1400, female: 900 },      // World records ~1306/882 lbs
+  bench: { male: 800, female: 600 },        // World records ~783/457 lbs
+  deadlift: { male: 1200, female: 700 },    // World records ~1105/636 lbs
+  ohp: { male: 500, female: 300 },          // Reasonable ceiling
+  row: { male: 600, female: 400 },          // Reasonable ceiling
+};
+
+/**
+ * Minimum bar weight — weight recommendations should never go below
+ * an empty barbell.
+ */
+export const MIN_BAR_WEIGHT = { lbs: 45, kg: 20 };
+
+/**
+ * Bodyweight-relative sanity thresholds.
+ * If a recommended weight exceeds these multiples of bodyweight,
+ * a warning is generated.
+ */
+const BW_SANITY_THRESHOLDS: Record<string, number> = {
+  squat: 4,
+  deadlift: 4,
+  bench: 3,
+  ohp: 2,
+  row: 2.5,
+};
+
+/**
+ * Check whether a recommended weight is within safe bounds.
+ * Returns warnings if the weight exceeds absolute caps or
+ * bodyweight-relative sanity thresholds.
+ */
+export function checkWeightSafety(
+  weight: number,
+  lift: string,
+  sex?: string,
+  bodyweight?: number,
+): { safe: boolean; warnings: string[] } {
+  const warnings: string[] = [];
+  let safe = true;
+
+  // Absolute cap check
+  const caps = WEIGHT_SAFETY_CAPS[lift];
+  if (caps) {
+    const capForSex = sex === 'female' ? caps.female : caps.male;
+    if (weight > capForSex) {
+      safe = false;
+      warnings.push(
+        `${lift} weight ${weight} lbs exceeds the absolute safety cap of ${capForSex} lbs ` +
+        `(based on ${sex === 'female' ? 'female' : 'male'} world records). Weight has been clamped.`
+      );
+    }
+  }
+
+  // Bodyweight-relative sanity check
+  if (bodyweight && bodyweight > 0) {
+    const threshold = BW_SANITY_THRESHOLDS[lift];
+    if (threshold && weight > bodyweight * threshold) {
+      warnings.push(
+        `${lift} weight ${weight} lbs exceeds ${threshold}x bodyweight (${bodyweight} lbs). ` +
+        `This is an unusually high ratio — verify the weight is correct.`
+      );
+    }
+  }
+
+  return { safe, warnings };
+}
+
+/**
+ * Clamp a weight to the safety cap for a given lift and sex.
+ * Returns the clamped weight and whether clamping occurred.
+ */
+function clampToSafetyCap(weight: number, lift: string, sex?: string): { weight: number; clamped: boolean } {
+  const caps = WEIGHT_SAFETY_CAPS[lift];
+  if (!caps) return { weight, clamped: false };
+  const capForSex = sex === 'female' ? caps.female : caps.male;
+  if (weight > capForSex) {
+    return { weight: capForSex, clamped: true };
+  }
+  return { weight, clamped: false };
+}
+
+/**
+ * Ensure a weight never goes below the empty bar.
+ */
+export function enforceBarMinimum(weight: number, unit: string): number {
+  const minWeight = unit === 'kg' ? MIN_BAR_WEIGHT.kg : MIN_BAR_WEIGHT.lbs;
+  return Math.max(weight, minWeight);
+}
+
 // ─── Generated Workout Types ───
 
 export interface GeneratedWorkout {
@@ -250,6 +347,16 @@ export function generateWorkout(state: ProgramState): GeneratedWorkout | null {
     const blockDayOffset = state.currentWeek < bounds.str ? 0 : state.currentWeek < bounds.peak ? 2 : 4;
     const blockDays = 2; // Each block has 2 days (Day A and Day B)
     dayIndex = blockDayOffset + (state.currentDay % blockDays);
+  } else if (program.id === 'calgary_barbell_16') {
+    // 4 blocks of 4 weeks, each with 2 workout templates (8 total)
+    const blockIdx = state.currentWeek <= 4 ? 0 : state.currentWeek <= 8 ? 1 : state.currentWeek <= 12 ? 2 : 3;
+    const blockDayOffset = blockIdx * 2;
+    dayIndex = blockDayOffset + (state.currentDay % 2);
+  } else if (program.id === 'calgary_barbell_8') {
+    // 2 blocks of 4 weeks, each with 2 workout templates (4 total)
+    const blockIdx = state.currentWeek <= 4 ? 0 : 1;
+    const blockDayOffset = blockIdx * 2;
+    dayIndex = blockDayOffset + (state.currentDay % 2);
   } else {
     dayIndex = state.currentDay % program.workouts.length;
   }
@@ -305,6 +412,48 @@ export function generateWorkout(state: ProgramState): GeneratedWorkout | null {
 
     return genEx;
   });
+
+  // GZCLP: adjust T1 sets/reps based on current lift stage.
+  // Stage 1: 5×3+, Stage 2: 6×2+, Stage 3: 10×1+
+  if (program.id === 'gzclp') {
+    for (const ex of exercises) {
+      const slot = EXERCISE_SLOTS[ex.exerciseSlot];
+      if (!slot?.isMainLift) continue;
+
+      // Only adjust T1 exercises (first main lift in each workout — identified by having 5x3+ pattern)
+      const isT1 = ex.sets.some(s => s.targetReps === '3+' || s.targetReps === '2+' || s.targetReps === '1+');
+      if (!isT1) continue;
+
+      const liftKey = ex.exerciseSlot;
+      const progress = state.liftProgress[liftKey];
+      if (!progress) continue;
+
+      const stage = progress.stage ?? 1;
+      const stageConfig: Record<number, { sets: number; reps: string; notes: string }> = {
+        1: { sets: 5, reps: '3+', notes: 'T1 Stage 1 — last set AMRAP (stop 1-2 reps from failure)' },
+        2: { sets: 6, reps: '2+', notes: 'T1 Stage 2 — last set AMRAP. Advanced to this stage after failing to complete Stage 1.' },
+        3: { sets: 10, reps: '1+', notes: 'T1 Stage 3 — last set AMRAP. Final stage before testing new 5RM and resetting.' },
+      };
+
+      const config = stageConfig[stage] ?? stageConfig[1];
+      const weight = ex.sets[0]?.targetWeight ?? 0;
+      const restSeconds = ex.sets[0]?.restSeconds ?? 180;
+
+      // Rebuild sets for this exercise based on current stage
+      ex.sets = [];
+      for (let i = 0; i < config.sets; i++) {
+        const isLast = i === config.sets - 1;
+        ex.sets.push({
+          setNumber: i + 1,
+          targetReps: config.reps,
+          targetWeight: weight,
+          restSeconds,
+          isAmrap: isLast,
+          notes: isLast ? config.notes : undefined,
+        });
+      }
+    }
+  }
 
   // Starting Strength: alternate press/bench across sessions.
   // SS prescribes that bench and press swap each session (A has press, B has bench,
@@ -466,6 +615,13 @@ function calculateTargetWeight(
     : exerciseSlot === 'rdl' ? 'deadlift'
     : exerciseSlot;
 
+  // Helper: apply safety cap before returning any calculated weight
+  const safeCap = (w: number): number => {
+    if (w <= 0) return w;
+    const { weight: capped } = clampToSafetyCap(w, liftKey);
+    return capped;
+  };
+
   // LP programs: use current weight from progress tracker
   if (program.progression.type === 'linear_session' || program.progression.type === 'linear_weekly') {
     const progress = state.liftProgress[liftKey];
@@ -474,9 +630,9 @@ function calculateTargetWeight(
       // Volume (Mon) = 90% of 5RM, Recovery (Wed) = 80% of Volume (~72% of 5RM), Intensity (Fri) = 5RM
       if (program.id === 'texas_method') {
         const dayIdx = state.currentDay % program.workouts.length;
-        if (dayIdx === 0) return roundToPlate(progress.currentWeight * 0.90, progress.unit); // Volume day
-        if (dayIdx === 1) return roundToPlate(progress.currentWeight * 0.72, progress.unit); // Recovery day
-        return progress.currentWeight; // Intensity day: actual 5RM
+        if (dayIdx === 0) return safeCap(roundToPlate(progress.currentWeight * 0.90, progress.unit)); // Volume day
+        if (dayIdx === 1) return safeCap(roundToPlate(progress.currentWeight * 0.72, progress.unit)); // Recovery day
+        return safeCap(progress.currentWeight); // Intensity day: actual 5RM
       }
 
       // Starting Strength phase-aware weight calculation
@@ -485,7 +641,7 @@ function calculateTargetWeight(
 
         // Back-off sets at 90% of top set (Phases 4-5)
         if (setScheme.notes?.includes('Back-off')) {
-          return roundToPlate(progress.currentWeight * 0.90, progress.unit);
+          return safeCap(roundToPlate(progress.currentWeight * 0.90, progress.unit));
         }
 
         // Light squat day at 80% of heavy day (Phases 3-5)
@@ -494,12 +650,12 @@ function calculateTargetWeight(
           const dayInPhase = state.currentDay % daysInPhase;
           // Light day is day index 1 in phases 3-5
           if (dayInPhase === 1) {
-            return roundToPlate(progress.currentWeight * 0.80, progress.unit);
+            return safeCap(roundToPlate(progress.currentWeight * 0.80, progress.unit));
           }
         }
       }
 
-      return progress.currentWeight;
+      return safeCap(progress.currentWeight);
     }
   }
 
@@ -508,13 +664,13 @@ function calculateTargetWeight(
     const tm = state.trainingMaxes[liftKey];
     // Adjust percentage based on current week in cycle (for 5/3/1)
     const adjustedPct = get531WeekPercentage(setScheme.intensityPct, state);
-    return roundToPlate(tm * adjustedPct / 100, state.weightUnit);
+    return safeCap(roundToPlate(tm * adjustedPct / 100, state.weightUnit));
   }
 
   // RPE-based: estimate from training max using RPE-to-% table
   if (setScheme.rpe && state.trainingMaxes[liftKey]) {
     const pct = rpeToPct(setScheme.rpe, parseReps(setScheme.reps));
-    return roundToPlate(state.trainingMaxes[liftKey] * pct, state.weightUnit);
+    return safeCap(roundToPlate(state.trainingMaxes[liftKey] * pct, state.weightUnit));
   }
 
   return 0;
@@ -589,8 +745,43 @@ function getWeekLabel(state: ProgramState, program: ProgramDefinition): string {
     return `Cycle ${state.cycleNumber}, ${weekNames[weekIdx]}`;
   }
   if (program.id === 'gzcl_jt2') {
-    if (state.currentWeek <= 6) return `Volume Phase — Week ${state.currentWeek}/6`;
+    if (state.currentWeek <= 6) {
+      const rmTargets = ['', '10RM', '8RM', '6RM', '4RM', '3RM', '2RM'];
+      return `Volume Phase — Week ${state.currentWeek}/6 (Find ${rmTargets[state.currentWeek]})`;
+    }
+    if (state.currentWeek <= 12) {
+      const rmTargets = ['', '', '', '', '', '', '', '4RM', '3RM', '2RM', '1RM', '1RM', '1RM Test'];
+      return `Intensity Phase — Week ${state.currentWeek - 6}/6 (${rmTargets[state.currentWeek] ?? 'Peaking'})`;
+    }
     return `Intensity Phase — Week ${state.currentWeek - 6}/6`;
+  }
+  if (program.id === 'candito_6week') {
+    const weekInCycle = ((state.currentWeek - 1) % 6) + 1;
+    const phaseNames: Record<number, string> = {
+      1: 'Muscular Development',
+      2: 'Muscular Development',
+      3: 'Strength',
+      4: 'Strength',
+      5: 'Peaking',
+      6: 'Test / Deload',
+    };
+    return `Phase: ${phaseNames[weekInCycle]} — Week ${weekInCycle}/6`;
+  }
+  if (program.id === 'calgary_barbell_16') {
+    if (state.currentWeek <= 4) return `Hypertrophy Block — Week ${state.currentWeek}/4`;
+    if (state.currentWeek <= 8) return `Strength Block — Week ${state.currentWeek - 4}/4`;
+    if (state.currentWeek <= 12) return `Peaking Block — Week ${state.currentWeek - 8}/4`;
+    return `Competition Block — Week ${state.currentWeek - 12}/4`;
+  }
+  if (program.id === 'calgary_barbell_8') {
+    if (state.currentWeek <= 4) return `Strength Block — Week ${state.currentWeek}/4`;
+    return `Peaking Block — Week ${state.currentWeek - 4}/4`;
+  }
+  if (program.id === 'sheiko_29') return `Prep Cycle 1 — Week ${state.currentWeek}/4`;
+  if (program.id === 'sheiko_31') {
+    const weekNames = ['Loading 75-80%', 'Loading 80-85%', 'Loading 85-90%', 'Meet Week / Taper'];
+    const weekIdx = Math.min(state.currentWeek - 1, 3);
+    return `Competition Cycle — ${weekNames[weekIdx]}`;
   }
   if (program.id === 'block_periodization') {
     const bounds = state.blockBoundaries ?? { hyp: 1, str: 6, peak: 11 };
@@ -879,7 +1070,7 @@ export function recordSetResult(
       const phaseAdvance = detectSSPhaseAdvancement(state);
       if (phaseAdvance) {
         // Still apply the deload, but also advance phase
-        const deloadWeight = roundToPlate(weight * 0.9, progress.unit);
+        const deloadWeight = enforceBarMinimum(roundToPlate(weight * 0.9, progress.unit), progress.unit);
         progress.currentWeight = deloadWeight;
         state.lpPhase = phaseAdvance.newPhase;
         state.currentDay = 0; // Reset day counter for new phase
@@ -893,13 +1084,13 @@ export function recordSetResult(
       progress.stage = 1;
       // Test new 5RM → restart at 85%
       const new5RM = progress.lastSuccessWeight;
-      progress.currentWeight = roundToPlate(new5RM * 0.85, progress.unit);
+      progress.currentWeight = enforceBarMinimum(roundToPlate(new5RM * 0.85, progress.unit), progress.unit);
       return `${progress.liftName} has cycled through all stages. Testing new 5RM at ${new5RM} ${progress.unit}, ` +
         `restarting at 85% (${progress.currentWeight} ${progress.unit}).`;
     }
 
     // Standard deload: -10%
-    const deloadWeight = roundToPlate(weight * 0.9, progress.unit);
+    const deloadWeight = enforceBarMinimum(roundToPlate(weight * 0.9, progress.unit), progress.unit);
     progress.currentWeight = deloadWeight;
 
     // Check if LP is exhausted
@@ -1006,9 +1197,9 @@ export function advanceWorkout(state: ProgramState): void {
   if (program.id === 'starting_strength') {
     const phase = state.lpPhase ?? 1;
     daysPerCycle = phase <= 2 ? 2 : 3;
-  } else if (program.id === 'block_periodization') {
-    // Block periodization: each block has 2 workout days (Day A + Day B),
-    // so advance the week after every 2 workouts, not after all 6.
+  } else if (program.id === 'block_periodization' || program.id === 'calgary_barbell_16' || program.id === 'calgary_barbell_8') {
+    // Block-based programs: each block has 2 workout days (Day A + Day B),
+    // so advance the week after every 2 workouts, not after all templates.
     daysPerCycle = 2;
   } else {
     daysPerCycle = program.workouts.length;
@@ -1037,7 +1228,10 @@ function advanceWeek(state: ProgramState, program: ProgramDefinition): void {
       });
       // Reduce all lift weights to 80%
       for (const progress of Object.values(state.liftProgress)) {
-        progress.currentWeight = roundToPlate(progress.currentWeight * 0.8, progress.unit);
+        progress.currentWeight = enforceBarMinimum(
+          roundToPlate(progress.currentWeight * 0.8, progress.unit),
+          progress.unit,
+        );
       }
     }
     // Clean up expired overrides

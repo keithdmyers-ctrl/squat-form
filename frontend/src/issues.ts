@@ -328,6 +328,45 @@ export const CUE_DATABASE: Record<string, CueEntry> = {
     explanationBeginner:
       'One arm is pushing faster than the other, making the bar tilt. This is really common — almost everyone has a stronger side! Try using dumbbells instead of a barbell sometimes, which forces each arm to do equal work and helps you catch up on your weaker side.',
   },
+  bracing_reminder: {
+    cue: 'Big belly breath — brace hard — then lift',
+    alternateCues: ['Fill your trunk with air — 360 degrees of pressure', 'Pretend someone is about to punch you in the stomach'],
+    priority: 2,
+    explanation:
+      'Proper core bracing is the foundation of every heavy lift. Take a deep breath into your belly, brace your core as if you were about to be punched, and maintain that tension throughout the entire rep. Push your abs OUT against your belt (or where a belt would be).',
+    explanationLow:
+      'Reminder: breathe and brace at the top of every rep. Take a deep belly breath and tighten your core before each rep.',
+    explanationHigh:
+      'Your trunk is unstable — this often means bracing is insufficient. Before every rep: big belly breath, brace hard (push your abs out), and hold that tightness through the entire rep. This protects your spine and makes you stronger.',
+    explanationBeginner:
+      'Before each rep, take a big breath into your stomach (not your chest), tighten your abs like you\'re about to be punched, and hold that tightness while you lift. This protects your spine and makes you stronger.',
+  },
+  lateral_shift: {
+    cue: 'Drive both feet evenly — spread the floor with BOTH feet',
+    alternateCues: ['Keep the bar centered — imagine balancing a glass of water on each end', 'Push your weaker side harder'],
+    priority: 2,
+    explanation:
+      'Your upper body is shifting to one side during the ascent. This asymmetric loading pattern increases stress on the spine and can indicate a muscle imbalance between sides (Cholewicki et al. 2005). Single-leg exercises like Bulgarian split squats and single-leg Romanian deadlifts are the most effective fix — do the weak side first, then match reps on the strong side.',
+    explanationLow:
+      'Slight lateral lean detected during the ascent. Monitor this — add single-leg work to prevent it from getting worse.',
+    explanationHigh:
+      'Significant lateral trunk shift during the ascent. This puts asymmetric stress on your spine. Reduce the weight and prioritize single-leg work to correct the imbalance.',
+    explanationBeginner:
+      'You\'re leaning to one side as you stand up. This usually means one side is stronger or tighter than the other. It\'s really common and fixable! Try to push evenly through both feet, and add exercises like lunges and split squats to balance out your sides.',
+  },
+  cervical_hyperextension: {
+    cue: 'Pack your chin — make a double chin',
+    alternateCues: ['Look at a spot on the floor 6-8 feet ahead', 'Keep your neck in line with your spine — neutral head position'],
+    priority: 4,
+    explanation:
+      'Your head is tilted back (looking up at the ceiling) during the lift. This hyperextends the cervical spine under load, which can contribute to neck pain and headaches (Kritz et al. 2009). Practice keeping a neutral head position — a broomstick on your back should touch your head, upper back, and tailbone simultaneously.',
+    explanationLow:
+      'Slight upward head tilt detected. Try to keep your neck in line with your spine — pick a spot on the floor a few feet ahead.',
+    explanationHigh:
+      'Your head is significantly extended (looking up). Under heavy loads, this can cause neck pain and headaches. Pack your chin and look at a spot on the floor 6-8 feet ahead.',
+    explanationBeginner:
+      'You\'re looking up at the ceiling while you lift. This can strain your neck. Try to keep your head in line with your spine — pick a spot on the floor about 6 feet ahead of you.',
+  },
   press_stall: {
     cue: 'Drive through the sticking point — don\'t let the bar stop',
     alternateCues: ['Explode off the chest — maximum speed from the start', 'Think speed, not just strength, off the bottom'],
@@ -548,6 +587,80 @@ export function detectRepIssues(
         phase: SquatPhase.BOTTOM,
         frame: rep.bottomFrame,
       });
+    }
+  }
+
+  // 12. Bracing reminder — educational cue based on trunk instability indicators
+  // Triggers when good morning pattern is detected OR trunk score is poor
+  {
+    const hasTrunkInstability = rep.goodMorning || rep.trunkAngleChangeOnAscent > 10;
+    // Approximate trunk score: if trunk angle is very high relative to expected, trunk score is poor
+    const [, maxTrunkExp] = getTrunkAngleRange(config.squatType, calibration);
+    const trunkOvershoot = rep.maxTrunkAngle - maxTrunkExp;
+    const poorTrunkScore = trunkOvershoot > tolerance * 2;
+
+    if (hasTrunkInstability || poorTrunkScore) {
+      issues.push({
+        name: 'bracing_reminder',
+        severity: IssueSeverity.LOW,
+        description: 'Proper core bracing is the foundation of every heavy lift. Take a deep breath into your belly, brace your core as if you were about to be punched, and maintain that tension throughout the entire rep.',
+        value: rep.trunkAngleChangeOnAscent,
+        threshold: 10,
+        phase: SquatPhase.STANDING,
+        frame: rep.startFrame,
+      });
+    }
+  }
+
+  // 13. Lateral trunk shift — detect leaning to one side during the ascent
+  {
+    const lateralShiftValues = rep.frameAngles
+      .map((fa) => fa.lateralShift)
+      .filter((v): v is number => v !== undefined && v !== null);
+    if (lateralShiftValues.length > 0) {
+      const maxAbsShift = Math.max(...lateralShiftValues.map(Math.abs));
+      if (maxAbsShift > 0.03) {
+        const shiftSeverity = maxAbsShift > 0.10
+          ? IssueSeverity.HIGH
+          : maxAbsShift > 0.06
+            ? IssueSeverity.MODERATE
+            : IssueSeverity.LOW;
+        issues.push({
+          name: 'lateral_shift',
+          severity: shiftSeverity,
+          description: 'Your upper body is shifting to one side during the ascent. This asymmetric loading pattern increases stress on the spine and can indicate a muscle imbalance between sides.',
+          value: maxAbsShift,
+          threshold: 0.03,
+          phase: SquatPhase.ASCENDING,
+          frame: rep.bottomFrame,
+        });
+      }
+    }
+  }
+
+  // 14. Cervical hyperextension — detect looking up / neck extension
+  {
+    const neckAngleValues = rep.frameAngles
+      .map((fa) => fa.neckAngle)
+      .filter((v): v is number => v !== undefined && v !== null);
+    if (neckAngleValues.length > 0) {
+      const maxNeckExtension = Math.max(...neckAngleValues);
+      if (maxNeckExtension > 15) {
+        const neckSeverity = maxNeckExtension > 35
+          ? IssueSeverity.HIGH
+          : maxNeckExtension > 25
+            ? IssueSeverity.MODERATE
+            : IssueSeverity.LOW;
+        issues.push({
+          name: 'cervical_hyperextension',
+          severity: neckSeverity,
+          description: `Your head is tilted back ${maxNeckExtension.toFixed(0)}° during the lift. This hyperextends the cervical spine under load.`,
+          value: maxNeckExtension,
+          threshold: 15,
+          phase: SquatPhase.ASCENDING,
+          frame: rep.bottomFrame,
+        });
+      }
     }
   }
 

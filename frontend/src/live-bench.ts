@@ -21,7 +21,7 @@ import type {
 } from './types';
 import type { LiveExerciseStrategy } from './live';
 import { clamp, scoreToGrade } from './scorer';
-import type { BenchConfig } from './exercises/bench';
+import type { BenchConfig, BenchPauseResult } from './exercises/bench';
 import {
   scoreBenchROM,
   scoreBenchLockout,
@@ -29,6 +29,8 @@ import {
   scoreBenchSymmetry,
   scoreBenchTempo,
   scoreBenchPause,
+  scoreBenchPauseDetailed,
+  detectBenchPause,
   detectBenchIssues,
   getBenchCues,
   getBenchPositiveFeedback,
@@ -38,89 +40,108 @@ import {
 
 // ─── Elbow-angle driven phase detector (live-specific with re-descending) ───
 
-const EXTENDED_ELBOW_ANGLE = 155;
-const DESCENDING_THRESHOLD = 2.0;
-const BOTTOM_VELOCITY_THRESHOLD = 1.5;
-const ASCENDING_THRESHOLD = 2.0;
-const SMOOTHING_WINDOW = 5;
-const HISTORY_WINDOW = 3;
+import { GenericPhaseDetector } from './phase-detector';
+import type { PhaseDetectorConfig } from './phase-detector';
 
-function smoothAngle(buffer: number[], newValue: number, windowSize: number): number {
-  buffer.push(newValue);
-  if (buffer.length > windowSize) buffer.shift();
-  return buffer.reduce((sum, v) => sum + v, 0) / buffer.length;
-}
+const LIVE_BENCH_PHASE_CONFIG: PhaseDetectorConfig = {
+  standingAngle: 155,
+  descendingThreshold: 2.0,
+  bottomVelocityThreshold: 1.5,
+  ascendingThreshold: 2.0,
+  minRepFrames: 6,
+  liveMode: true,
+};
 
-class LiveBenchPhaseDetector {
-  private phase: SquatPhase = SquatPhase.STANDING;
-  private smoothBuffer: number[] = [];
-  private smoothedHistory: number[] = [];
-  private prevSmoothedAngle: number | null = null;
-  private bottomHoldCount = 0;
+// ─── Live Pause Tracker ───
 
-  reset(): void {
-    this.phase = SquatPhase.STANDING;
-    this.smoothBuffer = [];
-    this.smoothedHistory = [];
-    this.prevSmoothedAngle = null;
-    this.bottomHoldCount = 0;
+/** Minimum frames at bottom to show "HOLD" in live mode. */
+const LIVE_HOLD_DISPLAY_FRAMES = 2;
+/** Minimum pause duration (seconds) before showing "PRESS!" command. */
+const LIVE_PRESS_COMMAND_THRESHOLD_S = 1.0;
+
+/**
+ * Tracks pause state in real-time during the BOTTOM phase of a live bench rep.
+ * Counts consecutive low-velocity frames and provides visual cue state.
+ */
+export class LivePauseTracker {
+  /** Number of consecutive low-velocity frames at bottom. */
+  private pauseFrameCount = 0;
+  /** Elbow angles collected during the current bottom phase. */
+  private bottomElbowAngles: number[] = [];
+  /** Whether we're currently tracking a bottom phase. */
+  private inBottom = false;
+  /** The last pause result computed when leaving bottom. */
+  private lastPauseResult: BenchPauseResult | null = null;
+  /** Estimated FPS for converting frames to time. */
+  private fps = 30;
+
+  /** Start tracking a new bottom phase. */
+  enterBottom(fps: number): void {
+    this.inBottom = true;
+    this.pauseFrameCount = 0;
+    this.bottomElbowAngles = [];
+    this.fps = fps > 0 ? fps : 30;
   }
 
-  private cumulativeDelta(): number {
-    if (this.smoothedHistory.length < 2) return 0;
-    return this.smoothedHistory[this.smoothedHistory.length - 1] - this.smoothedHistory[0];
-  }
-
-  update(elbowAngle: number): SquatPhase {
-    const smoothed = smoothAngle(this.smoothBuffer, elbowAngle, SMOOTHING_WINDOW);
-    this.smoothedHistory.push(smoothed);
-    if (this.smoothedHistory.length > HISTORY_WINDOW + 1) this.smoothedHistory.shift();
-
-    const delta = this.prevSmoothedAngle !== null ? smoothed - this.prevSmoothedAngle : 0;
-    const cumDelta = this.cumulativeDelta();
-
-    switch (this.phase) {
-      case SquatPhase.STANDING: // Arms extended
-        this.bottomHoldCount = 0;
-        if (smoothed < EXTENDED_ELBOW_ANGLE && cumDelta < -DESCENDING_THRESHOLD) {
-          this.phase = SquatPhase.DESCENDING;
-        }
-        break;
-
-      case SquatPhase.DESCENDING: // Lowering bar
-        if (Math.abs(delta) < BOTTOM_VELOCITY_THRESHOLD) {
-          this.bottomHoldCount++;
-          if (this.bottomHoldCount >= 2) {
-            this.phase = SquatPhase.BOTTOM;
-            this.bottomHoldCount = 0;
-          }
-        } else if (delta > 0) {
-          this.phase = SquatPhase.BOTTOM;
-          this.bottomHoldCount = 0;
-        } else {
-          this.bottomHoldCount = 0;
-        }
-        break;
-
-      case SquatPhase.BOTTOM: // Bar on chest
-        if (cumDelta > ASCENDING_THRESHOLD) {
-          this.phase = SquatPhase.ASCENDING;
-        }
-        break;
-
-      case SquatPhase.ASCENDING: // Pressing
-        if (smoothed >= EXTENDED_ELBOW_ANGLE) {
-          this.phase = SquatPhase.STANDING;
-        } else if (delta < -3) {
-          // Live mode: bar coming back down
-          this.phase = SquatPhase.DESCENDING;
-          this.bottomHoldCount = 0;
-        }
-        break;
+  /** Record a frame while in the bottom phase. */
+  recordFrame(elbowAngle: number): void {
+    if (!this.inBottom) return;
+    this.bottomElbowAngles.push(elbowAngle);
+    const n = this.bottomElbowAngles.length;
+    if (n >= 2) {
+      const delta = Math.abs(this.bottomElbowAngles[n - 1] - this.bottomElbowAngles[n - 2]);
+      if (delta < 1.5) {
+        this.pauseFrameCount++;
+      } else {
+        this.pauseFrameCount = 0;
+      }
+    } else {
+      this.pauseFrameCount = 1; // First frame counts
     }
+  }
 
-    this.prevSmoothedAngle = smoothed;
-    return this.phase;
+  /** Leave the bottom phase and finalize the pause result. */
+  leaveBottom(): BenchPauseResult | null {
+    if (!this.inBottom) return this.lastPauseResult;
+    this.inBottom = false;
+    if (this.bottomElbowAngles.length < 2) {
+      this.lastPauseResult = null;
+      return null;
+    }
+    // Use the same detection logic as the offline analyzer
+    const bottomRelIdx = this.bottomElbowAngles.reduce(
+      (minI, a, i, arr) => (a < arr[minI] ? i : minI), 0,
+    );
+    this.lastPauseResult = detectBenchPause(this.bottomElbowAngles, bottomRelIdx, this.fps);
+    return this.lastPauseResult;
+  }
+
+  /** Get the current pause duration in seconds (while still at bottom). */
+  getCurrentPauseDurationS(): number {
+    return this.fps > 0 ? this.pauseFrameCount / this.fps : 0;
+  }
+
+  /** Should we display "HOLD" to the user? */
+  shouldShowHold(): boolean {
+    return this.inBottom && this.pauseFrameCount >= LIVE_HOLD_DISPLAY_FRAMES;
+  }
+
+  /** Should we display "PRESS!" (referee command simulation)? */
+  shouldShowPress(): boolean {
+    return this.inBottom && this.getCurrentPauseDurationS() >= LIVE_PRESS_COMMAND_THRESHOLD_S;
+  }
+
+  /** Get the most recently computed pause result (from the last completed rep). */
+  getLastPauseResult(): BenchPauseResult | null {
+    return this.lastPauseResult;
+  }
+
+  /** Reset all state. */
+  reset(): void {
+    this.pauseFrameCount = 0;
+    this.bottomElbowAngles = [];
+    this.inBottom = false;
+    this.lastPauseResult = null;
   }
 }
 
@@ -130,16 +151,23 @@ export class BenchLiveStrategy implements LiveExerciseStrategy {
   exerciseType = 'bench_press';
   standingThreshold = 150;
   noRepsMessage = 'No reps detected. Make sure you complete full bench press reps \u2014 arms extended, lower to chest, and press back up.';
-  private phaseDetector: LiveBenchPhaseDetector;
+  private phaseDetector: GenericPhaseDetector;
   private benchType: BenchType;
   private experienceLevel: ExperienceLevel;
   private competitionMode: boolean;
+  /** Real-time pause tracker for live feedback. */
+  readonly pauseTracker: LivePauseTracker;
+  /** The last phase seen, used to detect BOTTOM entry/exit. */
+  private lastPhase: SquatPhase = SquatPhase.STANDING;
+  /** Estimated FPS (updated by the LiveAnalyzer's processFrame timing). */
+  private estimatedFps = 30;
 
   constructor(benchType: BenchType = 'flat', experienceLevel: ExperienceLevel = 'beginner', competitionMode = false) {
-    this.phaseDetector = new LiveBenchPhaseDetector();
+    this.phaseDetector = new GenericPhaseDetector(LIVE_BENCH_PHASE_CONFIG);
     this.benchType = benchType;
     this.experienceLevel = experienceLevel;
     this.competitionMode = competitionMode;
+    this.pauseTracker = new LivePauseTracker();
   }
 
   /** Build a BenchConfig from the strategy's parameters for use with exercise scoring functions. */
@@ -151,8 +179,28 @@ export class BenchLiveStrategy implements LiveExerciseStrategy {
     };
   }
 
+  /** Update the estimated FPS (called by external code that tracks frame timing). */
+  setEstimatedFps(fps: number): void {
+    this.estimatedFps = fps > 0 ? fps : 30;
+  }
+
   detectPhase(angles: FrameAngles): SquatPhase {
-    return this.phaseDetector.update(angles.elbowAngle ?? 180);
+    const phase = this.phaseDetector.update(angles.elbowAngle ?? 180);
+    const elbowAngle = angles.elbowAngle ?? 180;
+
+    // Track BOTTOM phase entry/exit for pause detection
+    if (phase === SquatPhase.BOTTOM && this.lastPhase !== SquatPhase.BOTTOM) {
+      this.pauseTracker.enterBottom(this.estimatedFps);
+    }
+    if (phase === SquatPhase.BOTTOM) {
+      this.pauseTracker.recordFrame(elbowAngle);
+    }
+    if (this.lastPhase === SquatPhase.BOTTOM && phase !== SquatPhase.BOTTOM) {
+      this.pauseTracker.leaveBottom();
+    }
+
+    this.lastPhase = phase;
+    return phase;
   }
 
   isCalibrated(angles: FrameAngles): boolean {
@@ -179,13 +227,20 @@ export class BenchLiveStrategy implements LiveExerciseStrategy {
     const benchConfig = this.getConfig();
     const isCompetition = this.competitionMode;
 
+    // Get the pause result from the tracker (computed when leaving BOTTOM phase)
+    const pauseResult = this.pauseTracker.getLastPauseResult();
+
     const minElbow = Math.min(...rep.frameAngles.map(fa => fa.elbowAngle ?? 180));
     const rom = scoreBenchROM(minElbow, benchConfig);
     const lockout = scoreBenchLockout(rep);
     const control = scoreBenchControl(rep);
     const symmetry = scoreBenchSymmetry(rep);
     const tempo = isCompetition ? 100 : scoreBenchTempo(rep.descentDuration, rep.ascentDuration);
-    const pause = scoreBenchPause(rep.bottomDuration, benchConfig);
+
+    // Use detailed pause scoring when available, otherwise fall back to duration-based
+    const pause = pauseResult
+      ? scoreBenchPauseDetailed(pauseResult, benchConfig)
+      : scoreBenchPause(rep.bottomDuration, benchConfig);
 
     const w = isCompetition ? BENCH_COMPETITION_WEIGHTS : BENCH_WEIGHTS;
 
@@ -201,7 +256,7 @@ export class BenchLiveStrategy implements LiveExerciseStrategy {
       0, 100,
     );
 
-    const issues = detectBenchIssues(rep, benchConfig);
+    const issues = detectBenchIssues(rep, benchConfig, pauseResult ?? undefined);
     const cues = getBenchCues(issues, this.experienceLevel);
     const positiveFeedback = getBenchPositiveFeedback({
       rom, lockout, control, symmetry, tempo, pause,
@@ -210,6 +265,11 @@ export class BenchLiveStrategy implements LiveExerciseStrategy {
     let totalScore = overall;
     const highCount = issues.filter(i => i.severity === 'high').length;
     if (highCount > 0) totalScore = Math.max(0, totalScore - highCount * 5);
+
+    // Competition mode: cap score at 50 if no pause detected
+    if (isCompetition && pauseResult && (!pauseResult.detected || pauseResult.durationMs < 300)) {
+      totalScore = Math.min(totalScore, 50);
+    }
 
     return {
       depthScore: rom,
@@ -230,5 +290,7 @@ export class BenchLiveStrategy implements LiveExerciseStrategy {
 
   reset(): void {
     this.phaseDetector.reset();
+    this.pauseTracker.reset();
+    this.lastPhase = SquatPhase.STANDING;
   }
 }

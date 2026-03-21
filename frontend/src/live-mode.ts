@@ -133,6 +133,7 @@ export function initLiveMode(deps: LiveModeDeps): void {
   let livePoseProcessor: PoseProcessor | null = null;
   let liveAnalyzer: LiveAnalyzer | null = null;
   let liveAnimFrameId: number | null = null;
+  let liveLoopRunning = false;
   let liveStream: MediaStream | null = null;
   let lastLiveProcessTime = 0;
   let currentFacingMode: 'user' | 'environment' = 'environment';
@@ -253,6 +254,21 @@ export function initLiveMode(deps: LiveModeDeps): void {
       });
 
       liveVideo.srcObject = liveStream;
+
+      // Re-attach camera disconnection handlers for the new stream
+      const newVideoTrack = liveStream.getVideoTracks()[0];
+      if (newVideoTrack) {
+        newVideoTrack.onended = () => {
+          showCameraDisconnectedMessage();
+        };
+        newVideoTrack.onmute = () => {
+          showPausedMessage('Camera paused \u2014 is your privacy cover closed?');
+        };
+        newVideoTrack.onunmute = () => {
+          hidePausedMessage();
+        };
+      }
+
       await new Promise<void>((resolve) => {
         liveVideo!.onloadedmetadata = () => resolve();
       });
@@ -293,6 +309,35 @@ export function initLiveMode(deps: LiveModeDeps): void {
       return liveAnalyzer.getStrategy().noRepsMessage;
     }
     return 'No reps detected. Make sure you complete full reps.';
+  }
+
+  /** Show a message when the camera is disconnected, stop the session, and offer a retry button. */
+  function showCameraDisconnectedMessage(): void {
+    // Stop analysis and clean up resources (but don't display results)
+    stopLiveSession(false);
+
+    showErrorCard(
+      'Camera disconnected. Please reconnect your camera and try again.',
+      'generic',
+      () => { startLiveSession(); },
+      null,
+    );
+  }
+
+  /** Show a paused overlay message (e.g., privacy shutter closed). */
+  function showPausedMessage(message: string): void {
+    if (livePhaseBadge) {
+      livePhaseBadge.textContent = message;
+      livePhaseBadge.className = 'phase-badge phase-warning';
+    }
+  }
+
+  /** Hide the paused overlay message and restore the current phase display. */
+  function hidePausedMessage(): void {
+    if (livePhaseBadge) {
+      livePhaseBadge.textContent = getPhaseLabel(currentExerciseType, currentPhaseKey);
+      livePhaseBadge.className = `phase-badge ${PHASE_CSS_CLASS[currentPhaseKey] ?? ''}`;
+    }
   }
 
   async function startLiveSession(): Promise<void> {
@@ -353,6 +398,22 @@ export function initLiveMode(deps: LiveModeDeps): void {
       });
 
       liveVideo.srcObject = liveStream;
+
+      // Detect camera disconnection or muting
+      const videoTrack = liveStream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.onended = () => {
+          // Camera was physically disconnected
+          showCameraDisconnectedMessage();
+        };
+        videoTrack.onmute = () => {
+          // Camera temporarily unavailable (e.g., privacy shutter closed)
+          showPausedMessage('Camera paused \u2014 is your privacy cover closed?');
+        };
+        videoTrack.onunmute = () => {
+          hidePausedMessage();
+        };
+      }
 
       // Mirror only front-facing camera
       updateMirror(currentFacingMode);
@@ -497,8 +558,9 @@ export function initLiveMode(deps: LiveModeDeps): void {
       }, 30000);
 
       // Animation loop: process frames and draw overlay
+      liveLoopRunning = true;
       function liveLoop(timestamp: number): void {
-        if (!liveVideo || !liveOverlay || !livePoseProcessor) return;
+        if (!liveLoopRunning || !liveVideo || !liveOverlay || !livePoseProcessor) return;
 
         // Adaptive frame skipping: process less often when standing idle
         const interval = currentPhaseKey === 'standing'
@@ -593,6 +655,7 @@ export function initLiveMode(deps: LiveModeDeps): void {
     }
 
     // Stop animation loop (handle both RAF and setTimeout scheduling)
+    liveLoopRunning = false;
     if (liveAnimFrameId !== null) {
       cancelAnimationFrame(liveAnimFrameId);
       clearTimeout(liveAnimFrameId);

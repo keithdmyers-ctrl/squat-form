@@ -15,6 +15,11 @@
  * - Nippard J. Powerbuilding System (2022)
  * - Krapf S. (SSC, Ground Zero Strength) 4-Day Upper-Lower framework (2024)
  * - Nippard J. The Essentials Program (2023)
+ * - Sheiko B. Powerlifting: A Guide for Coaches and Athletes (2018)
+ * - Candito J. Linear/Periodization Strength Program (canditotraininghq.com)
+ * - Lewis B. / Calgary Barbell (calgarybarbell.com)
+ * - Nuckols G. Stronger by Science (2020)
+ * - Metallicadpa / r/Fitness PPL Program
  */
 
 // ─── Types ───
@@ -108,6 +113,28 @@ export interface ProgramDefinition {
   typicalDurationWeeks: [number, number]; // min, max
   /** Estimated session duration in minutes */
   sessionMinutes?: number;
+  /**
+   * Weekly percentage waves within block programs.
+   * Maps block index (0-based) to per-week overrides.
+   * Each week within a block can override intensity, rep scheme, and volume.
+   *
+   * Used by block periodization programs (Calgary Barbell, Candito, Sheiko, etc.)
+   * to provide week-to-week variation within each mesocycle block.
+   */
+  weeklyWaves?: {
+    [blockIndex: number]: {
+      [weekInBlock: number]: WeeklyWaveEntry;
+    };
+  };
+}
+
+export interface WeeklyWaveEntry {
+  /** Override the block's default intensity percentage (of 1RM or training max). */
+  intensityPct: number;
+  /** Override rep scheme if different from block default (e.g., "4x8", "3x3", "1x1"). */
+  repTarget?: string;
+  /** Volume multiplier: 1.0 = normal, 0.5 = deload. Scales set count. */
+  volumeMultiplier?: number;
 }
 
 // ─── Exercise Slot Definitions ───
@@ -277,6 +304,56 @@ export const EXERCISE_SLOTS: Record<string, ExerciseSlot> = {
     bodyweight: 'Box Squat (bodyweight)',
     isMainLift: false,
     muscleGroups: ['quads', 'glutes'],
+  },
+  lateral_raise: {
+    name: 'Lateral Raise',
+    barbell: 'Cable Lateral Raise',
+    dumbbell: 'Dumbbell Lateral Raise',
+    bodyweight: 'Band Lateral Raise',
+    isMainLift: false,
+    muscleGroups: ['shoulders'],
+  },
+  dip: {
+    name: 'Dip',
+    barbell: 'Weighted Dip',
+    dumbbell: 'Bench Dip (weighted)',
+    bodyweight: 'Bodyweight Dip',
+    isMainLift: false,
+    muscleGroups: ['chest', 'triceps', 'front_delts'],
+  },
+  chest_fly: {
+    name: 'Chest Fly',
+    barbell: 'Cable Fly',
+    dumbbell: 'Dumbbell Fly',
+    bodyweight: 'Band Chest Fly',
+    isMainLift: false,
+    muscleGroups: ['chest'],
+  },
+  hamstring_curl: {
+    name: 'Hamstring Curl',
+    barbell: 'Lying Leg Curl',
+    barbellHome: 'Nordic Curl',
+    dumbbell: 'Dumbbell Hamstring Curl',
+    bodyweight: 'Nordic Curl',
+    isMainLift: false,
+    muscleGroups: ['hamstrings'],
+  },
+  calf_raise: {
+    name: 'Calf Raise',
+    barbell: 'Standing Calf Raise (machine)',
+    barbellHome: 'Barbell Calf Raise',
+    dumbbell: 'Dumbbell Calf Raise',
+    bodyweight: 'Bodyweight Calf Raise',
+    isMainLift: false,
+    muscleGroups: ['calves'],
+  },
+  rear_delt_fly: {
+    name: 'Rear Delt Fly',
+    barbell: 'Reverse Pec Deck',
+    dumbbell: 'Dumbbell Rear Delt Fly',
+    bodyweight: 'Band Pull-apart',
+    isMainLift: false,
+    muscleGroups: ['rear_delts'],
   },
 };
 
@@ -939,7 +1016,7 @@ export const PROGRAMS: Record<string, ProgramDefinition> = {
     name: 'GZCL Jacked & Tan 2.0',
     shortName: 'J&T 2.0',
     author: 'Cody Lefever',
-    description: '12-week intermediate powerbuilding program (~75 min sessions). Weeks 1-6: volume phase working from 10RM down to 2RM. Weeks 7-12: intensity phase with rep maxes and back-off sets. Culminates in 1RM test.',
+    description: '12-week intermediate powerbuilding program (~75 min sessions). Uses a daily rep max (RM) finder methodology: work up to a target RM, then perform back-off sets at a percentage of that RM. Weeks 1-6 (Volume Block): RM target decreases each week (10RM → 8RM → 6RM → 4RM → 3RM → 2RM) while back-off volume accumulates. Weeks 7-12 (Intensity Block): heavier RM targets with reduced volume, culminating in a 1RM test in week 12.',
     level: 'intermediate',
     goals: ['powerbuilding', 'strength', 'hypertrophy'],
     daysPerWeek: [4],
@@ -950,10 +1027,14 @@ export const PROGRAMS: Record<string, ProgramDefinition> = {
         dayLabel: 'Day 1 — Squat',
         exercises: [
           { exerciseSlot: 'squat', sets: [
-            { sets: 4, reps: '10', restSeconds: 180, notes: 'T1: Weeks 1-6 work to rep max, then back-off sets. Week 1: find 10RM. Week 6: find 2RM.' },
+            { sets: 1, reps: '10', restSeconds: 180, notes: 'T1: Work up to a daily RM (Wk1: 10RM, Wk2: 8RM, Wk3: 6RM, Wk4: 4RM, Wk5: 3RM, Wk6: 2RM)' },
+            { sets: 3, reps: '6', restSeconds: 120, notes: 'T1 back-offs: 3 sets at ~65-70% of today\'s RM. Reduce reps as RM target drops across weeks.' },
           ] },
-          { exerciseSlot: 'front_squat', sets: [{ sets: 4, reps: '10', restSeconds: 120, notes: 'T2a: Supporting compound' }] },
-          { exerciseSlot: 'leg_press', sets: [{ sets: 3, reps: '15', restSeconds: 90, notes: 'T2b' }] },
+          { exerciseSlot: 'front_squat', sets: [
+            { sets: 1, reps: '10', restSeconds: 120, notes: 'T2a: Find daily RM at target reps (follows same weekly RM progression)' },
+            { sets: 3, reps: '8', restSeconds: 90, notes: 'T2a back-offs at ~65% of RM' },
+          ] },
+          { exerciseSlot: 'leg_press', sets: [{ sets: 3, reps: '15', restSeconds: 90, notes: 'T2b: Straight sets' }] },
           { exerciseSlot: 'pullup', sets: [{ sets: 4, reps: '15+', restSeconds: 60, notes: 'T3: Last set AMRAP' }] },
         ],
       },
@@ -962,9 +1043,13 @@ export const PROGRAMS: Record<string, ProgramDefinition> = {
         dayLabel: 'Day 2 — Bench',
         exercises: [
           { exerciseSlot: 'bench', sets: [
-            { sets: 4, reps: '10', restSeconds: 180, notes: 'T1: Work to rep max → back-off sets' },
+            { sets: 1, reps: '10', restSeconds: 180, notes: 'T1: Work up to daily RM (Wk1: 10RM → Wk6: 2RM)' },
+            { sets: 3, reps: '6', restSeconds: 120, notes: 'T1 back-offs at ~65-70% of RM' },
           ] },
-          { exerciseSlot: 'close_grip_bench', sets: [{ sets: 4, reps: '10', restSeconds: 120, notes: 'T2a' }] },
+          { exerciseSlot: 'close_grip_bench', sets: [
+            { sets: 1, reps: '10', restSeconds: 120, notes: 'T2a: Find daily RM' },
+            { sets: 3, reps: '8', restSeconds: 90, notes: 'T2a back-offs at ~65% of RM' },
+          ] },
           { exerciseSlot: 'row', sets: [{ sets: 4, reps: '12', restSeconds: 90, notes: 'T2b' }] },
           { exerciseSlot: 'face_pull', sets: [{ sets: 4, reps: '20', restSeconds: 45, notes: 'T3' }] },
         ],
@@ -974,9 +1059,13 @@ export const PROGRAMS: Record<string, ProgramDefinition> = {
         dayLabel: 'Day 3 — Deadlift',
         exercises: [
           { exerciseSlot: 'deadlift', sets: [
-            { sets: 3, reps: '10', restSeconds: 180, notes: 'T1: Work to rep max → back-off sets' },
+            { sets: 1, reps: '10', restSeconds: 180, notes: 'T1: Work up to daily RM (Wk1: 10RM → Wk6: 2RM)' },
+            { sets: 2, reps: '6', restSeconds: 120, notes: 'T1 back-offs at ~65-70% of RM' },
           ] },
-          { exerciseSlot: 'rdl', sets: [{ sets: 3, reps: '10', restSeconds: 120, notes: 'T2a' }] },
+          { exerciseSlot: 'rdl', sets: [
+            { sets: 1, reps: '10', restSeconds: 120, notes: 'T2a: Find daily RM' },
+            { sets: 2, reps: '8', restSeconds: 90, notes: 'T2a back-offs at ~65% of RM' },
+          ] },
           { exerciseSlot: 'hip_thrust', sets: [{ sets: 3, reps: '12', restSeconds: 90, notes: 'T2b' }] },
           { exerciseSlot: 'ab_work', sets: [{ sets: 3, reps: '15', restSeconds: 60, notes: 'T3' }] },
         ],
@@ -986,9 +1075,13 @@ export const PROGRAMS: Record<string, ProgramDefinition> = {
         dayLabel: 'Day 4 — OHP',
         exercises: [
           { exerciseSlot: 'ohp', sets: [
-            { sets: 4, reps: '10', restSeconds: 180, notes: 'T1: Work to rep max → back-off sets' },
+            { sets: 1, reps: '10', restSeconds: 180, notes: 'T1: Work up to daily RM (Wk1: 10RM → Wk6: 2RM)' },
+            { sets: 3, reps: '6', restSeconds: 120, notes: 'T1 back-offs at ~65-70% of RM' },
           ] },
-          { exerciseSlot: 'bench', sets: [{ sets: 4, reps: '10', restSeconds: 120, notes: 'T2a: Volume bench' }] },
+          { exerciseSlot: 'bench', sets: [
+            { sets: 1, reps: '10', restSeconds: 120, notes: 'T2a: Volume bench — find daily RM' },
+            { sets: 3, reps: '8', restSeconds: 90, notes: 'T2a back-offs at ~65% of RM' },
+          ] },
           { exerciseSlot: 'pullup', sets: [{ sets: 4, reps: '10', restSeconds: 90, notes: 'T2b' }] },
           { exerciseSlot: 'curl', sets: [{ sets: 3, reps: '15', restSeconds: 45, notes: 'T3' }] },
         ],
@@ -997,19 +1090,19 @@ export const PROGRAMS: Record<string, ProgramDefinition> = {
     progression: {
       type: 'block',
       incrementLbs: { upper: 5, lower: 10 },
-      description: 'Weeks 1-6 (Volume): T1 rep max decreases each week (10RM→8RM→6RM→4RM→3RM→2RM). Back-off sets at a percentage of the day\'s rep max. Weeks 7-12 (Intensity): Use week 6 results to set working weights. Work down to a 1RM test in week 12. T2/T3 volume decreases as T1 intensity increases.',
+      description: 'Rep Max Finder methodology: Weeks 1-6 (Volume Block) — T1 RM target decreases weekly: 10RM → 8RM → 6RM → 4RM → 3RM → 2RM. Work up to that RM, then do back-off sets at 65-70% of the RM weight. Back-off reps also decrease as intensity increases. Weeks 7-12 (Intensity Block) — use Week 6 results to set working weights. Continue RM progression: 4RM → 3RM → 2RM → 1RM over weeks 9-12. T2/T3 volume tapers as T1 intensity peaks. Week 12: test 1RM on all main lifts.',
       stallProtocol: 'The 12-week structure is self-contained. If a rep max test yields lower than expected, adjust back-off set percentages down 5%. After completing the full 12 weeks, evaluate results and choose next program.',
       maxStallCycles: 1,
     },
     deload: {
-      frequency: 'Built into the periodization (week 12 is essentially a test/deload)',
-      method: 'Auto-taper: volume decreases naturally as intensity increases in weeks 7-12.',
+      frequency: 'Built into the periodization (volume naturally tapers in weeks 7-12)',
+      method: 'Auto-taper: as RM target drops to 2RM/1RM, back-off volume decreases. Take 1 week off after the 12-week cycle.',
       duration: 'Take 1 week off after the 12-week cycle before starting next program.',
       citation: 'Lefever C. Jacked & Tan 2.0 (swoleateveryheight.blogspot.com, 2016)',
     },
     transitionCriteria: 'Complete the 12-week cycle. Results from week 12 1RM tests inform next program selection.',
     transitionOptions: ['531_bbb', '531_fsl', 'block_periodization', 'dup', 'texas_method'],
-    scienceBasis: 'J&T 2.0 implements linear periodization within a mesocycle (high reps → low reps), which is well-supported for strength development (Rhea & Alderman 2004). The tiered exercise structure provides both specificity (T1 compounds) and variety (T2/T3), addressing the repeated-bout effect while accumulating volume. The 12-week timeframe matches research on optimal mesocycle length for strength and hypertrophy gains.',
+    scienceBasis: 'J&T 2.0 implements linear periodization within a mesocycle (high reps → low reps) using a daily RM finder, which is well-supported for strength development (Rhea & Alderman 2004). The RM + back-off structure autoregulates intensity daily — your RM is your RM for that day, accounting for readiness. The tiered exercise structure provides both specificity (T1 compounds) and variety (T2/T3), addressing the repeated-bout effect while accumulating volume. The 12-week timeframe matches research on optimal mesocycle length for strength and hypertrophy gains.',
     typicalDurationWeeks: [12, 12],
     sessionMinutes: 75,
   },
@@ -1019,85 +1112,113 @@ export const PROGRAMS: Record<string, ProgramDefinition> = {
     name: 'nSuns 5/3/1 LP',
     shortName: 'nSuns',
     author: 'nSuns (Reddit)',
-    description: 'High-volume 5/3/1 variant with weekly linear progression (~80 min sessions). 17 working sets per session across two main lifts. AMRAP performance drives weekly weight increases.',
+    description: 'High-volume 5/3/1 variant with weekly linear progression (~80 min sessions). Each session has a T1 lift (8-9 sets with pyramid + AMRAP) and a T2 secondary lift (8 sets with its own descending percentage scheme). AMRAP performance on the T1 "1+" set drives weekly weight increases.',
     level: 'intermediate',
     goals: ['strength', 'powerlifting'],
     daysPerWeek: [4, 5],
     equipmentMin: 'barbell_home',
     workouts: [
       {
-        name: 'Day 1: Bench + OHP',
+        name: 'Day 1: Bench (T1) + OHP (T2)',
         dayLabel: 'Day 1 — Bench/OHP',
         exercises: [
           { exerciseSlot: 'bench', sets: [
-            { sets: 1, reps: '5', intensityPct: 75, restSeconds: 120 },
-            { sets: 1, reps: '3', intensityPct: 85, restSeconds: 120 },
-            { sets: 1, reps: '1+', intensityPct: 95, restSeconds: 180, notes: 'AMRAP — performance here drives progression' },
-            { sets: 1, reps: '3', intensityPct: 90, restSeconds: 120 },
-            { sets: 1, reps: '5', intensityPct: 85, restSeconds: 120 },
-            { sets: 1, reps: '3', intensityPct: 80, restSeconds: 120 },
-            { sets: 1, reps: '5', intensityPct: 75, restSeconds: 120 },
-            { sets: 1, reps: '5+', intensityPct: 70, restSeconds: 120, notes: 'Volume AMRAP' },
+            { sets: 1, reps: '5', intensityPct: 75, restSeconds: 120, notes: 'T1 set 1' },
+            { sets: 1, reps: '3', intensityPct: 85, restSeconds: 120, notes: 'T1 set 2' },
+            { sets: 1, reps: '1+', intensityPct: 95, restSeconds: 180, notes: 'T1 AMRAP — performance here drives progression' },
+            { sets: 1, reps: '3', intensityPct: 90, restSeconds: 120, notes: 'T1 set 4' },
+            { sets: 1, reps: '5', intensityPct: 85, restSeconds: 120, notes: 'T1 set 5' },
+            { sets: 1, reps: '3', intensityPct: 80, restSeconds: 120, notes: 'T1 set 6' },
+            { sets: 1, reps: '5', intensityPct: 75, restSeconds: 120, notes: 'T1 set 7' },
+            { sets: 1, reps: '5+', intensityPct: 70, restSeconds: 120, notes: 'T1 set 8 — volume AMRAP' },
           ] },
           { exerciseSlot: 'ohp', sets: [
-            { sets: 3, reps: '8', intensityPct: 65, restSeconds: 90, notes: 'T2 OHP volume (6-8 sets)' },
+            { sets: 1, reps: '6', intensityPct: 50, restSeconds: 90, notes: 'T2 set 1 — OHP uses its own TM' },
+            { sets: 1, reps: '5', intensityPct: 60, restSeconds: 90, notes: 'T2 set 2' },
+            { sets: 1, reps: '3', intensityPct: 70, restSeconds: 90, notes: 'T2 set 3' },
+            { sets: 1, reps: '5', intensityPct: 70, restSeconds: 90, notes: 'T2 set 4' },
+            { sets: 1, reps: '7', intensityPct: 70, restSeconds: 90, notes: 'T2 set 5' },
+            { sets: 1, reps: '4', intensityPct: 65, restSeconds: 90, notes: 'T2 set 6' },
+            { sets: 1, reps: '6', intensityPct: 60, restSeconds: 90, notes: 'T2 set 7' },
+            { sets: 1, reps: '8', intensityPct: 55, restSeconds: 90, notes: 'T2 set 8' },
           ] },
         ],
       },
       {
-        name: 'Day 2: Squat + Sumo DL',
+        name: 'Day 2: Squat (T1) + RDL (T2)',
         dayLabel: 'Day 2 — Squat',
         exercises: [
           { exerciseSlot: 'squat', sets: [
-            { sets: 1, reps: '5', intensityPct: 75, restSeconds: 120 },
-            { sets: 1, reps: '3', intensityPct: 85, restSeconds: 120 },
-            { sets: 1, reps: '1+', intensityPct: 95, restSeconds: 180, notes: 'AMRAP' },
-            { sets: 1, reps: '3', intensityPct: 90, restSeconds: 120 },
-            { sets: 1, reps: '5', intensityPct: 85, restSeconds: 120 },
-            { sets: 1, reps: '3', intensityPct: 80, restSeconds: 120 },
-            { sets: 1, reps: '5', intensityPct: 75, restSeconds: 120 },
-            { sets: 1, reps: '5+', intensityPct: 70, restSeconds: 120 },
+            { sets: 1, reps: '5', intensityPct: 75, restSeconds: 120, notes: 'T1 set 1' },
+            { sets: 1, reps: '3', intensityPct: 85, restSeconds: 120, notes: 'T1 set 2' },
+            { sets: 1, reps: '1+', intensityPct: 95, restSeconds: 180, notes: 'T1 AMRAP' },
+            { sets: 1, reps: '3', intensityPct: 90, restSeconds: 120, notes: 'T1 set 4' },
+            { sets: 1, reps: '5', intensityPct: 85, restSeconds: 120, notes: 'T1 set 5' },
+            { sets: 1, reps: '3', intensityPct: 80, restSeconds: 120, notes: 'T1 set 6' },
+            { sets: 1, reps: '5', intensityPct: 75, restSeconds: 120, notes: 'T1 set 7' },
+            { sets: 1, reps: '5+', intensityPct: 70, restSeconds: 120, notes: 'T1 set 8 — volume AMRAP' },
           ] },
           { exerciseSlot: 'rdl', sets: [
-            { sets: 3, reps: '8', intensityPct: 50, restSeconds: 90, notes: 'T2 deadlift variant' },
+            { sets: 1, reps: '5', intensityPct: 50, restSeconds: 90, notes: 'T2 set 1 — deadlift variant' },
+            { sets: 1, reps: '5', intensityPct: 60, restSeconds: 90, notes: 'T2 set 2' },
+            { sets: 1, reps: '3', intensityPct: 70, restSeconds: 90, notes: 'T2 set 3' },
+            { sets: 1, reps: '5', intensityPct: 70, restSeconds: 90, notes: 'T2 set 4' },
+            { sets: 1, reps: '7', intensityPct: 70, restSeconds: 90, notes: 'T2 set 5' },
+            { sets: 1, reps: '4', intensityPct: 65, restSeconds: 90, notes: 'T2 set 6' },
+            { sets: 1, reps: '6', intensityPct: 60, restSeconds: 90, notes: 'T2 set 7' },
+            { sets: 1, reps: '8', intensityPct: 55, restSeconds: 90, notes: 'T2 set 8' },
           ] },
         ],
       },
       {
-        name: 'Day 3: OHP + Bench',
+        name: 'Day 3: OHP (T1) + CG Bench (T2)',
         dayLabel: 'Day 3 — OHP',
         exercises: [
           { exerciseSlot: 'ohp', sets: [
-            { sets: 1, reps: '5', intensityPct: 75, restSeconds: 120 },
-            { sets: 1, reps: '3', intensityPct: 85, restSeconds: 120 },
-            { sets: 1, reps: '1+', intensityPct: 95, restSeconds: 180, notes: 'AMRAP' },
-            { sets: 1, reps: '3', intensityPct: 90, restSeconds: 120 },
-            { sets: 1, reps: '5', intensityPct: 85, restSeconds: 120 },
-            { sets: 1, reps: '3', intensityPct: 80, restSeconds: 120 },
-            { sets: 1, reps: '5', intensityPct: 75, restSeconds: 120 },
-            { sets: 1, reps: '5+', intensityPct: 70, restSeconds: 120 },
+            { sets: 1, reps: '5', intensityPct: 75, restSeconds: 120, notes: 'T1 set 1' },
+            { sets: 1, reps: '3', intensityPct: 85, restSeconds: 120, notes: 'T1 set 2' },
+            { sets: 1, reps: '1+', intensityPct: 95, restSeconds: 180, notes: 'T1 AMRAP' },
+            { sets: 1, reps: '3', intensityPct: 90, restSeconds: 120, notes: 'T1 set 4' },
+            { sets: 1, reps: '5', intensityPct: 85, restSeconds: 120, notes: 'T1 set 5' },
+            { sets: 1, reps: '3', intensityPct: 80, restSeconds: 120, notes: 'T1 set 6' },
+            { sets: 1, reps: '5', intensityPct: 75, restSeconds: 120, notes: 'T1 set 7' },
+            { sets: 1, reps: '5+', intensityPct: 70, restSeconds: 120, notes: 'T1 set 8 — volume AMRAP' },
           ] },
           { exerciseSlot: 'close_grip_bench', sets: [
-            { sets: 3, reps: '8', intensityPct: 65, restSeconds: 90, notes: 'T2 bench variant' },
+            { sets: 1, reps: '6', intensityPct: 50, restSeconds: 90, notes: 'T2 set 1 — bench variant (CG bench)' },
+            { sets: 1, reps: '5', intensityPct: 60, restSeconds: 90, notes: 'T2 set 2' },
+            { sets: 1, reps: '3', intensityPct: 70, restSeconds: 90, notes: 'T2 set 3' },
+            { sets: 1, reps: '5', intensityPct: 70, restSeconds: 90, notes: 'T2 set 4' },
+            { sets: 1, reps: '7', intensityPct: 70, restSeconds: 90, notes: 'T2 set 5' },
+            { sets: 1, reps: '4', intensityPct: 65, restSeconds: 90, notes: 'T2 set 6' },
+            { sets: 1, reps: '6', intensityPct: 60, restSeconds: 90, notes: 'T2 set 7' },
+            { sets: 1, reps: '8', intensityPct: 55, restSeconds: 90, notes: 'T2 set 8' },
           ] },
         ],
       },
       {
-        name: 'Day 4: Deadlift + Front Squat',
+        name: 'Day 4: Deadlift (T1) + Front Squat (T2)',
         dayLabel: 'Day 4 — Deadlift',
         exercises: [
           { exerciseSlot: 'deadlift', sets: [
-            { sets: 1, reps: '5', intensityPct: 75, restSeconds: 120 },
-            { sets: 1, reps: '3', intensityPct: 85, restSeconds: 120 },
-            { sets: 1, reps: '1+', intensityPct: 95, restSeconds: 180, notes: 'AMRAP' },
-            { sets: 1, reps: '3', intensityPct: 90, restSeconds: 180 },
-            { sets: 1, reps: '3', intensityPct: 85, restSeconds: 120 },
-            { sets: 1, reps: '3', intensityPct: 80, restSeconds: 120 },
-            { sets: 1, reps: '5', intensityPct: 75, restSeconds: 120 },
-            { sets: 1, reps: '5+', intensityPct: 70, restSeconds: 120 },
+            { sets: 1, reps: '5', intensityPct: 75, restSeconds: 120, notes: 'T1 set 1' },
+            { sets: 1, reps: '3', intensityPct: 85, restSeconds: 120, notes: 'T1 set 2' },
+            { sets: 1, reps: '1+', intensityPct: 95, restSeconds: 180, notes: 'T1 AMRAP' },
+            { sets: 1, reps: '3', intensityPct: 90, restSeconds: 180, notes: 'T1 set 4' },
+            { sets: 1, reps: '3', intensityPct: 85, restSeconds: 120, notes: 'T1 set 5' },
+            { sets: 1, reps: '3', intensityPct: 80, restSeconds: 120, notes: 'T1 set 6' },
+            { sets: 1, reps: '5', intensityPct: 75, restSeconds: 120, notes: 'T1 set 7' },
+            { sets: 1, reps: '5+', intensityPct: 70, restSeconds: 120, notes: 'T1 set 8 — volume AMRAP' },
           ] },
           { exerciseSlot: 'front_squat', sets: [
-            { sets: 3, reps: '8', intensityPct: 55, restSeconds: 90, notes: 'T2 squat variant' },
+            { sets: 1, reps: '5', intensityPct: 40, restSeconds: 90, notes: 'T2 set 1 — squat variant' },
+            { sets: 1, reps: '5', intensityPct: 50, restSeconds: 90, notes: 'T2 set 2' },
+            { sets: 1, reps: '3', intensityPct: 60, restSeconds: 90, notes: 'T2 set 3' },
+            { sets: 1, reps: '5', intensityPct: 60, restSeconds: 90, notes: 'T2 set 4' },
+            { sets: 1, reps: '7', intensityPct: 60, restSeconds: 90, notes: 'T2 set 5' },
+            { sets: 1, reps: '4', intensityPct: 55, restSeconds: 90, notes: 'T2 set 6' },
+            { sets: 1, reps: '6', intensityPct: 50, restSeconds: 90, notes: 'T2 set 7' },
+            { sets: 1, reps: '8', intensityPct: 45, restSeconds: 90, notes: 'T2 set 8' },
           ] },
         ],
       },
@@ -1105,7 +1226,7 @@ export const PROGRAMS: Record<string, ProgramDefinition> = {
     progression: {
       type: 'amrap_driven',
       incrementLbs: { upper: 5, lower: 10 },
-      description: 'Based on AMRAP "1+" set performance: 0-1 reps = no increase; 2-3 reps = +5 lbs; 4-5 reps = +5-10 lbs; 5+ reps = +10-15 lbs. Progression is weekly. Each lift progresses independently based on its AMRAP performance.',
+      description: 'Based on T1 AMRAP "1+" set performance: 0-1 reps = no increase; 2-3 reps = +5 lbs; 4-5 reps = +5-10 lbs; 5+ reps = +10-15 lbs. Progression is weekly. T1 and T2 lifts each track their own Training Max — T2 percentages are based on the T2 lift\'s TM. Each lift progresses independently.',
       stallProtocol: 'If AMRAP yields 0 reps at the prescribed weight, deload TM by 10% and rebuild. If stalling persists across 2-3 cycles, switch to a non-LP program (5/3/1 standard, block periodization).',
       maxStallCycles: 2,
     },
@@ -1117,7 +1238,7 @@ export const PROGRAMS: Record<string, ProgramDefinition> = {
     },
     transitionCriteria: 'When AMRAP-driven weekly progression stalls repeatedly despite deloads. nSuns is very high volume and aggressive; most lifters transition after 3-6 months to a more periodized program.',
     transitionOptions: ['531_bbb', '531_fsl', 'block_periodization', 'gzcl_jt2', 'dup'],
-    scienceBasis: 'nSuns applies high volume (17 working sets per session) at varied percentages, providing a strong dose of both mechanical tension and metabolic stress. The AMRAP-driven progression provides autoregulation (superior to fixed percentages per meta-analysis PMC12336695). The weekly LP structure allows faster progression than standard 5/3/1 while the undulating daily percentages provide more stimulus variety than straight-set programs.',
+    scienceBasis: 'nSuns applies high volume (16-17 working sets per session) across T1 pyramid and T2 descending percentage schemes, providing a strong dose of both mechanical tension and metabolic stress. The T2 uses its own percentage pyramid (ascending then descending) to build volume on the secondary lift without excessive fatigue. The AMRAP-driven progression provides autoregulation (superior to fixed percentages per meta-analysis PMC12336695). The weekly LP structure allows faster progression than standard 5/3/1.',
     typicalDurationWeeks: [12, 24],
     sessionMinutes: 80,
   },
@@ -1377,6 +1498,29 @@ export const PROGRAMS: Record<string, ProgramDefinition> = {
     scienceBasis: 'Block periodization concentrates training on one primary quality per mesocycle, maximizing the dose-response for that quality while allowing other qualities to be maintained with minimal work. Research by Issurin (2008) shows this approach is superior to traditional (concurrent) periodization for trained athletes. The sequential development of hypertrophy → strength → peaking follows the biological principle of directed adaptation and has produced the majority of modern powerlifting world records.',
     typicalDurationWeeks: [12, 20],
     sessionMinutes: 75,
+    weeklyWaves: {
+      // Block 0: Hypertrophy (workouts 0-1)
+      0: {
+        1: { intensityPct: 63, repTarget: '4x10', volumeMultiplier: 1.0 },
+        2: { intensityPct: 65, repTarget: '4x8', volumeMultiplier: 1.0 },
+        3: { intensityPct: 68, repTarget: '4x8', volumeMultiplier: 1.0 },
+        4: { intensityPct: 58, repTarget: '3x10', volumeMultiplier: 0.6 },
+      },
+      // Block 1: Strength (workouts 2-3)
+      1: {
+        1: { intensityPct: 75, repTarget: '4x5', volumeMultiplier: 1.0 },
+        2: { intensityPct: 78, repTarget: '4x4', volumeMultiplier: 1.0 },
+        3: { intensityPct: 82, repTarget: '3x3', volumeMultiplier: 0.85 },
+        4: { intensityPct: 70, repTarget: '3x5', volumeMultiplier: 0.6 },
+      },
+      // Block 2: Peaking (workouts 4-5)
+      2: {
+        1: { intensityPct: 85, repTarget: '3x3', volumeMultiplier: 1.0 },
+        2: { intensityPct: 88, repTarget: '3x2', volumeMultiplier: 0.85 },
+        3: { intensityPct: 90, repTarget: '2x2', volumeMultiplier: 0.7 },
+        4: { intensityPct: 78, repTarget: '2x3', volumeMultiplier: 0.5 },
+      },
+    },
   },
 
   dup: {
@@ -1595,6 +1739,805 @@ export const PROGRAMS: Record<string, ProgramDefinition> = {
     typicalDurationWeeks: [12, 24],
     sessionMinutes: 50,
   },
+
+  // ═══════════════════════════════════════════
+  // SHEIKO COMPETITION PREP PROGRAMS
+  // ═══════════════════════════════════════════
+
+  sheiko_29: {
+    id: 'sheiko_29',
+    name: 'Sheiko #29 (Prep Cycle 1)',
+    shortName: 'Sheiko #29',
+    author: 'Boris Sheiko',
+    description: 'High-volume, high-specificity competition prep program (~90 min sessions). Prep Cycle 1: moderate-heavy weights (70-85% of competition max) with high frequency of SBD — each competition lift trained 2-3x/week. Each session includes 2-3 competition lifts with 3-6 sets of 2-5 reps. Accessories include good mornings, dips, flys, and back work.',
+    level: 'advanced',
+    goals: ['powerlifting', 'strength'],
+    daysPerWeek: [3, 4],
+    equipmentMin: 'full_gym',
+    workouts: [
+      {
+        name: 'Day 1: Squat + Bench',
+        dayLabel: 'Day 1 — Squat / Bench',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [
+            { sets: 1, reps: '5', intensityPct: 70, restSeconds: 180, notes: 'Competition squat — focus on competition commands' },
+            { sets: 1, reps: '4', intensityPct: 75, restSeconds: 180 },
+            { sets: 2, reps: '3', intensityPct: 80, restSeconds: 240 },
+            { sets: 1, reps: '3', intensityPct: 75, restSeconds: 180 },
+          ] },
+          { exerciseSlot: 'bench', sets: [
+            { sets: 1, reps: '5', intensityPct: 70, restSeconds: 180, notes: 'Competition bench — pause on chest' },
+            { sets: 1, reps: '4', intensityPct: 75, restSeconds: 180 },
+            { sets: 2, reps: '3', intensityPct: 80, restSeconds: 240 },
+            { sets: 2, reps: '3', intensityPct: 75, restSeconds: 180 },
+          ] },
+          { exerciseSlot: 'good_morning', sets: [{ sets: 4, reps: '5', restSeconds: 120, notes: 'Posterior chain accessory' }] },
+          { exerciseSlot: 'ab_work', sets: [{ sets: 3, reps: '10', restSeconds: 60 }] },
+        ],
+      },
+      {
+        name: 'Day 2: Deadlift + Bench',
+        dayLabel: 'Day 2 — Deadlift / Bench',
+        exercises: [
+          { exerciseSlot: 'deadlift', sets: [
+            { sets: 1, reps: '5', intensityPct: 70, restSeconds: 180, notes: 'Competition deadlift — full setup each rep' },
+            { sets: 1, reps: '4', intensityPct: 75, restSeconds: 240 },
+            { sets: 2, reps: '3', intensityPct: 80, restSeconds: 300 },
+            { sets: 1, reps: '3', intensityPct: 75, restSeconds: 180 },
+          ] },
+          { exerciseSlot: 'bench', sets: [
+            { sets: 1, reps: '5', intensityPct: 70, restSeconds: 120 },
+            { sets: 3, reps: '4', intensityPct: 75, restSeconds: 180 },
+          ] },
+          { exerciseSlot: 'dip', sets: [{ sets: 3, reps: '6', restSeconds: 90, notes: 'Weighted dips for lockout strength' }] },
+          { exerciseSlot: 'row', sets: [{ sets: 4, reps: '8', restSeconds: 90, notes: 'Back volume' }] },
+        ],
+      },
+      {
+        name: 'Day 3: Squat + Bench Light',
+        dayLabel: 'Day 3 — Squat / Bench (Light)',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [
+            { sets: 1, reps: '5', intensityPct: 70, restSeconds: 180, notes: 'Technique squats — moderate weight' },
+            { sets: 3, reps: '4', intensityPct: 75, restSeconds: 180 },
+            { sets: 1, reps: '3', intensityPct: 80, restSeconds: 240 },
+          ] },
+          { exerciseSlot: 'bench', sets: [
+            { sets: 1, reps: '5', intensityPct: 70, restSeconds: 120 },
+            { sets: 2, reps: '4', intensityPct: 75, restSeconds: 180 },
+            { sets: 1, reps: '3', intensityPct: 80, restSeconds: 240 },
+          ] },
+          { exerciseSlot: 'chest_fly', sets: [{ sets: 3, reps: '10', restSeconds: 60, notes: 'Pec accessory' }] },
+          { exerciseSlot: 'pullup', sets: [{ sets: 3, reps: '8', restSeconds: 90 }] },
+        ],
+      },
+    ],
+    progression: {
+      type: 'block',
+      incrementLbs: { upper: 5, lower: 5 },
+      description: 'Sheiko programs use fixed percentages based on your competition max (not a training max). Percentages are prescribed per session across the 4-week cycle. Volume undulates within each week (heavier and lighter days alternate). Progression comes from completing the full 4-week cycle and then moving to the next cycle (#31) with updated maxes.',
+      stallProtocol: 'If prescribed weights feel too heavy (RPE consistently above 9 on sets that should be moderate), reduce your competition max estimate by 5%. If too easy, increase by 2.5%. The percentages are precisely calibrated — trust the process.',
+      maxStallCycles: 1,
+    },
+    deload: {
+      frequency: 'Built into the undulating weekly structure (lighter sessions alternate with heavier ones)',
+      method: 'The program self-regulates volume through session variation. Between cycles (#29 → #31), take 3-5 rest days.',
+      duration: '3-5 days between cycles',
+      citation: 'Sheiko B. Powerlifting: A Guide for Coaches and Athletes (2018); Verkhoshansky Y. & Siff M. Supertraining (2009) — conjugate-sequence periodization for advanced athletes',
+    },
+    transitionCriteria: 'After completing #29, proceed directly to #31 (Competition Cycle) for peaking. Can repeat #29 if not preparing for a competition.',
+    transitionOptions: ['sheiko_31', 'block_periodization', 'dup'],
+    scienceBasis: 'Sheiko programs use high-frequency, moderate-intensity training to accumulate enormous volumes of competition lift practice. The approach is rooted in Soviet sport science: Verkhoshansky\'s principle of concentrated loading and delayed training effect. Each session practices 2-3 competition lifts to develop movement efficiency through repetition. The 70-85% intensity range provides high mechanical tension without excessive neural fatigue. Sheiko\'s methodology has produced multiple IPF world champions and is the standard for Russian competitive powerlifting (Sheiko 2018).',
+    typicalDurationWeeks: [4, 4],
+    sessionMinutes: 90,
+    weeklyWaves: {
+      // Sheiko #29 is a single 4-week prep block — sub-maximal wave loading
+      0: {
+        1: { intensityPct: 72, repTarget: '5x3-5', volumeMultiplier: 1.0 },
+        2: { intensityPct: 76, repTarget: '5x3-4', volumeMultiplier: 1.0 },
+        3: { intensityPct: 80, repTarget: '4x2-3', volumeMultiplier: 0.9 },
+        4: { intensityPct: 74, repTarget: '4x3-4', volumeMultiplier: 0.7 },
+      },
+    },
+  },
+
+  sheiko_31: {
+    id: 'sheiko_31',
+    name: 'Sheiko #31 (Competition Cycle)',
+    shortName: 'Sheiko #31',
+    author: 'Boris Sheiko',
+    description: 'Competition peaking program (~85 min sessions). Intensity increases and volume decreases across 4 weeks: Week 1 at 75-80%, Week 2 at 80-85%, Week 3 at 85-90%, Week 4 is deload/meet week with planned openers. Designed to follow #29 prep cycle. Peaks you for a 1RM performance on meet day.',
+    level: 'advanced',
+    goals: ['powerlifting', 'strength'],
+    daysPerWeek: [3, 4],
+    equipmentMin: 'full_gym',
+    workouts: [
+      {
+        name: 'Day 1: Squat + Bench (Heavy)',
+        dayLabel: 'Day 1 — Squat / Bench',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [
+            { sets: 1, reps: '4', intensityPct: 75, restSeconds: 180, notes: 'Competition squat — Wk1: 75-80%, Wk2: 80-85%, Wk3: 85-90%, Wk4: openers' },
+            { sets: 2, reps: '3', intensityPct: 80, restSeconds: 240 },
+            { sets: 2, reps: '2', intensityPct: 85, restSeconds: 300 },
+          ] },
+          { exerciseSlot: 'bench', sets: [
+            { sets: 1, reps: '4', intensityPct: 75, restSeconds: 180, notes: 'Competition bench — match squat\'s weekly intensity progression' },
+            { sets: 2, reps: '3', intensityPct: 80, restSeconds: 240 },
+            { sets: 2, reps: '2', intensityPct: 85, restSeconds: 300 },
+          ] },
+          { exerciseSlot: 'good_morning', sets: [{ sets: 3, reps: '5', restSeconds: 120, notes: 'Light posterior chain — reduce across weeks' }] },
+        ],
+      },
+      {
+        name: 'Day 2: Deadlift + Bench',
+        dayLabel: 'Day 2 — Deadlift / Bench',
+        exercises: [
+          { exerciseSlot: 'deadlift', sets: [
+            { sets: 1, reps: '4', intensityPct: 75, restSeconds: 240, notes: 'Competition deadlift — intensity increases weekly' },
+            { sets: 2, reps: '3', intensityPct: 80, restSeconds: 300 },
+            { sets: 1, reps: '2', intensityPct: 85, restSeconds: 300 },
+          ] },
+          { exerciseSlot: 'bench', sets: [
+            { sets: 1, reps: '4', intensityPct: 75, restSeconds: 180 },
+            { sets: 2, reps: '3', intensityPct: 80, restSeconds: 180 },
+          ] },
+          { exerciseSlot: 'row', sets: [{ sets: 3, reps: '6', restSeconds: 90, notes: 'Light back work — maintain only' }] },
+        ],
+      },
+      {
+        name: 'Day 3: Squat + Bench (Moderate)',
+        dayLabel: 'Day 3 — Squat / Bench (Moderate)',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [
+            { sets: 1, reps: '4', intensityPct: 70, restSeconds: 180, notes: 'Moderate practice — lower intensity than Day 1' },
+            { sets: 2, reps: '3', intensityPct: 75, restSeconds: 180 },
+            { sets: 1, reps: '2', intensityPct: 80, restSeconds: 240 },
+          ] },
+          { exerciseSlot: 'bench', sets: [
+            { sets: 1, reps: '4', intensityPct: 70, restSeconds: 120 },
+            { sets: 2, reps: '3', intensityPct: 75, restSeconds: 180 },
+            { sets: 1, reps: '2', intensityPct: 80, restSeconds: 240 },
+          ] },
+          { exerciseSlot: 'dip', sets: [{ sets: 2, reps: '6', restSeconds: 90, notes: 'Light accessory — reduce in weeks 3-4' }] },
+        ],
+      },
+    ],
+    progression: {
+      type: 'block',
+      incrementLbs: { upper: 5, lower: 5 },
+      description: 'Prescribed percentages increase across the 4-week cycle: Week 1 at 75-80%, Week 2 at 80-85%, Week 3 at 85-90%, Week 4 (meet week) at opener weight only. Volume tapers: Week 1 has the most sets, Week 4 the least. All percentages are based on your expected competition max (what you plan to hit on the platform).',
+      stallProtocol: 'If a set at prescribed intensity cannot be completed, reduce your competition max estimate by 2.5-5%. In week 4, practice openers only — do not attempt heavy singles before the meet.',
+      maxStallCycles: 1,
+    },
+    deload: {
+      frequency: 'Week 4 is the built-in taper/deload (meet week)',
+      method: 'Week 4: practice openers only (2-3 singles at ~90% of planned opener). No accessory work. Full rest 2 days before competition.',
+      duration: 'Week 4 (final week of cycle)',
+      citation: 'Sheiko B. Powerlifting: A Guide for Coaches and Athletes (2018); PMC7552788 taper meta-analysis — 2-5% performance improvement from optimal taper strategy',
+    },
+    transitionCriteria: 'After competition, take 1-2 weeks off, then restart with #29 using updated maxes. If not competing, can transition to any general strength program.',
+    transitionOptions: ['sheiko_29', 'block_periodization', 'dup', 'conjugate'],
+    scienceBasis: 'The competition cycle applies the delayed training effect from the high-volume prep cycle (#29). As volume drops and intensity rises, the accumulated fatigue dissipates while the adaptation (increased strength) is expressed. This follows Verkhoshansky\'s concentrated loading → realization model. The taper in week 4 aligns with meta-analysis findings (PMC7552788): a 2-week taper with volume reduction of 40-60% while maintaining intensity produces 2-5% performance improvement. Sheiko\'s system has produced numerous IPF world champions (Sheiko 2018).',
+    typicalDurationWeeks: [4, 4],
+    sessionMinutes: 85,
+    weeklyWaves: {
+      // Sheiko #31 is a single 4-week competition cycle — rising intensity, tapering volume
+      0: {
+        1: { intensityPct: 78, repTarget: '5x3-4', volumeMultiplier: 1.0 },
+        2: { intensityPct: 83, repTarget: '4x2-3', volumeMultiplier: 0.85 },
+        3: { intensityPct: 88, repTarget: '3x1-2', volumeMultiplier: 0.6 },
+        4: { intensityPct: 90, repTarget: 'openers only', volumeMultiplier: 0.3 },
+      },
+    },
+  },
+
+  // ═══════════════════════════════════════════
+  // CANDITO 6-WEEK STRENGTH PROGRAM
+  // ═══════════════════════════════════════════
+
+  candito_6week: {
+    id: 'candito_6week',
+    name: 'Candito 6-Week Strength Program',
+    shortName: 'Candito 6-Wk',
+    author: 'Jonnie Candito',
+    description: 'Self-contained 6-week block with built-in periodization, peaking, and testing (~70 min sessions). Upper/Lower split, 4 days per week. Phase 1 (Wk 1-2): Muscular Development (8-12 reps). Phase 2 (Wk 3-4): Strength (3-6 reps, heavy). Phase 3 (Wk 5): Peaking (heavy singles/doubles). Phase 4 (Wk 6): Test/Deload (test new maxes). Repeat with updated maxes.',
+    level: 'intermediate',
+    goals: ['strength', 'powerlifting'],
+    daysPerWeek: [4],
+    equipmentMin: 'barbell_home',
+    workouts: [
+      {
+        name: 'Lower Body A',
+        dayLabel: 'Lower A — Squat Focus',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [
+            { sets: 4, reps: '10', intensityPct: 65, restSeconds: 120, notes: 'Wk1-2: 4x8-12 @ 65-70%. Wk3-4: 4x3-6 @ 80-87%. Wk5: 3x1-2 @ 90-95%. Wk6: test 1RM.' },
+          ] },
+          { exerciseSlot: 'rdl', sets: [{ sets: 3, reps: '10', restSeconds: 120, notes: 'Wk1-2: moderate volume. Wk3-5: reduce to 2x6-8. Wk6: skip.' }] },
+          { exerciseSlot: 'leg_press', sets: [{ sets: 3, reps: '12', restSeconds: 90, notes: 'Accessory — Wk1-2 only. Drop in Wk3+.' }] },
+          { exerciseSlot: 'ab_work', sets: [{ sets: 3, reps: '15', restSeconds: 60 }] },
+        ],
+      },
+      {
+        name: 'Upper Body A',
+        dayLabel: 'Upper A — Bench Focus',
+        exercises: [
+          { exerciseSlot: 'bench', sets: [
+            { sets: 4, reps: '10', intensityPct: 65, restSeconds: 120, notes: 'Wk1-2: 4x8-12 @ 65-70%. Wk3-4: 4x3-6 @ 80-87%. Wk5: 3x1-2 @ 90-95%. Wk6: test 1RM.' },
+          ] },
+          { exerciseSlot: 'ohp', sets: [{ sets: 3, reps: '10', restSeconds: 120, notes: 'Wk1-2: moderate volume. Wk3-4: 3x6. Wk5-6: reduce.' }] },
+          { exerciseSlot: 'row', sets: [{ sets: 3, reps: '10', restSeconds: 90 }] },
+          { exerciseSlot: 'face_pull', sets: [{ sets: 3, reps: '15', restSeconds: 60, notes: 'Shoulder health' }] },
+        ],
+      },
+      {
+        name: 'Lower Body B',
+        dayLabel: 'Lower B — Deadlift Focus',
+        exercises: [
+          { exerciseSlot: 'deadlift', sets: [
+            { sets: 4, reps: '10', intensityPct: 65, restSeconds: 120, notes: 'Wk1-2: 4x8-12 @ 65-70%. Wk3-4: 4x3-6 @ 80-87%. Wk5: 3x1-2 @ 90-95%. Wk6: test 1RM.' },
+          ] },
+          { exerciseSlot: 'squat', sets: [{ sets: 3, reps: '8', intensityPct: 60, restSeconds: 120, notes: 'Light squat volume — technique focus' }] },
+          { exerciseSlot: 'hip_thrust', sets: [{ sets: 3, reps: '12', restSeconds: 90, notes: 'Wk1-2 accessory. Reduce in Wk3+.' }] },
+        ],
+      },
+      {
+        name: 'Upper Body B',
+        dayLabel: 'Upper B — Volume Press',
+        exercises: [
+          { exerciseSlot: 'bench', sets: [{ sets: 3, reps: '8', intensityPct: 65, restSeconds: 120, notes: 'Volume bench — lighter than Upper A' }] },
+          { exerciseSlot: 'ohp', sets: [{ sets: 3, reps: '8', restSeconds: 120, notes: 'Volume pressing' }] },
+          { exerciseSlot: 'pullup', sets: [{ sets: 4, reps: '10', restSeconds: 90, notes: 'Pull volume' }] },
+          { exerciseSlot: 'curl', sets: [{ sets: 3, reps: '12', restSeconds: 60 }] },
+          { exerciseSlot: 'tricep_extension', sets: [{ sets: 3, reps: '12', restSeconds: 60 }] },
+        ],
+      },
+    ],
+    progression: {
+      type: 'block',
+      incrementLbs: { upper: 5, lower: 10 },
+      description: 'Phase 1 (Wk 1-2, Muscular Development): 4x8-12 at 65-70% 1RM. Focus on muscle and work capacity. Phase 2 (Wk 3-4, Strength): 4x3-6 at 80-87% 1RM. Reduce accessories, increase intensity. Phase 3 (Wk 5, Peaking): Work up to heavy singles/doubles at 90-95%. Minimal accessories. Phase 4 (Wk 6, Test/Deload): Test new 1RM on SBD, then deload. Use Week 6 results to set next cycle maxes.',
+      stallProtocol: 'If Week 6 tests do not improve over the previous cycle, add an extra week of Phase 1 volume in the next cycle. If tests are significantly lower, evaluate recovery (sleep, nutrition, stress).',
+      maxStallCycles: 2,
+    },
+    deload: {
+      frequency: 'Built into Week 6 (after testing, remaining days are light)',
+      method: 'Week 6: Test 1RM on SBD (Monday/Tuesday), then take remaining days at 50-60% for recovery. Take 2-3 rest days before starting the next 6-week cycle.',
+      duration: '3-5 days after testing',
+      citation: 'Candito J. Linear/Periodization Strength Program (free program, canditotraininghq.com); block periodization concepts from Issurin (2008)',
+    },
+    transitionCriteria: 'Can be repeated indefinitely. If progress stalls across 2-3 cycles despite good recovery, transition to a more advanced periodization scheme.',
+    transitionOptions: ['block_periodization', '531_bbb', 'dup', 'gzcl_jt2'],
+    scienceBasis: 'Candito\'s program applies classic Western periodization (hypertrophy → strength → peaking) in a compressed 6-week format. The phase structure ensures each quality is trained in sequence: Phase 1 builds work capacity and muscle mass (Schoenfeld 2010), Phase 2 converts that mass into strength via neural adaptation (Sale 1988), and Phase 3 peaks performance through intensity realization (Issurin 2008). The built-in testing in Week 6 provides objective feedback for auto-regulation of the next cycle. This compressed periodization has been widely adopted in the intermediate powerlifting community due to its simplicity and effectiveness.',
+    typicalDurationWeeks: [6, 24],
+    sessionMinutes: 70,
+    weeklyWaves: {
+      // Phase 1: Muscular Development (Weeks 1-2)
+      0: {
+        1: { intensityPct: 65, repTarget: '4x10', volumeMultiplier: 1.0 },
+        2: { intensityPct: 70, repTarget: '3x8', volumeMultiplier: 0.9 },
+      },
+      // Phase 2: Strength (Weeks 3-4)
+      1: {
+        3: { intensityPct: 80, repTarget: '4x5', volumeMultiplier: 1.0 },
+        4: { intensityPct: 85, repTarget: '3x3', volumeMultiplier: 0.85 },
+      },
+      // Phase 3: Peaking (Week 5)
+      2: {
+        5: { intensityPct: 92, repTarget: '1-2RM work-up', volumeMultiplier: 0.5 },
+      },
+      // Phase 4: Test/Deload (Week 6)
+      3: {
+        6: { intensityPct: 100, repTarget: 'test maxes or deload', volumeMultiplier: 0.3 },
+      },
+    },
+  },
+
+  // ═══════════════════════════════════════════
+  // CALGARY BARBELL PROGRAMS
+  // ═══════════════════════════════════════════
+
+  calgary_barbell_16: {
+    id: 'calgary_barbell_16',
+    name: 'Calgary Barbell 16-Week',
+    shortName: 'CalgaryBB 16wk',
+    author: 'Bryce Lewis / Calgary Barbell',
+    description: 'Full 16-week competition prep program (~80 min sessions). 4 blocks of 4 weeks: Block 1 (Hypertrophy) → Block 2 (Strength) → Block 3 (Peaking) → Block 4 (Competition/Taper). SBD each session with 2x frequency on weak lifts. Accessories decrease across blocks as intensity rises.',
+    level: 'advanced',
+    goals: ['powerlifting', 'strength'],
+    daysPerWeek: [4],
+    equipmentMin: 'barbell_home',
+    workouts: [
+      // Block 1: Hypertrophy (Weeks 1-4)
+      {
+        name: 'Block 1 Hyp — Day A: SBD',
+        dayLabel: 'Hyp A — Squat / Bench / Deadlift',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [{ sets: 4, reps: '8-10', intensityPct: 65, rpe: 7, restSeconds: 120, notes: 'Block 1 (Hypertrophy): 4x8-12 @ 65-72%. Build work capacity.' }] },
+          { exerciseSlot: 'bench', sets: [{ sets: 4, reps: '8-10', intensityPct: 67, rpe: 7, restSeconds: 120 }] },
+          { exerciseSlot: 'deadlift', sets: [{ sets: 3, reps: '8', intensityPct: 65, rpe: 7, restSeconds: 150, notes: 'Moderate DL volume' }] },
+          { exerciseSlot: 'pullup', sets: [{ sets: 3, reps: '12', restSeconds: 60 }] },
+        ],
+      },
+      {
+        name: 'Block 1 Hyp — Day B: SBD',
+        dayLabel: 'Hyp B — Squat / Bench / Deadlift',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [{ sets: 3, reps: '10-12', intensityPct: 62, rpe: 7, restSeconds: 120, notes: 'Volume squat — lighter intensity' }] },
+          { exerciseSlot: 'bench', sets: [{ sets: 4, reps: '10-12', intensityPct: 63, rpe: 7, restSeconds: 120 }] },
+          { exerciseSlot: 'rdl', sets: [{ sets: 3, reps: '10', restSeconds: 120, notes: 'Deadlift accessory for hamstring volume' }] },
+          { exerciseSlot: 'row', sets: [{ sets: 3, reps: '12', restSeconds: 90 }] },
+          { exerciseSlot: 'face_pull', sets: [{ sets: 3, reps: '15', restSeconds: 45 }] },
+        ],
+      },
+      // Block 2: Strength (Weeks 5-8)
+      {
+        name: 'Block 2 Str — Day A: SBD',
+        dayLabel: 'Str A — Squat / Bench / Deadlift',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [{ sets: 4, reps: '5-6', intensityPct: 77, rpe: 8, restSeconds: 240, notes: 'Block 2 (Strength): 4x5-6 @ 75-82%. Heavier loads, lower reps.' }] },
+          { exerciseSlot: 'bench', sets: [{ sets: 4, reps: '5-6', intensityPct: 78, rpe: 8, restSeconds: 240 }] },
+          { exerciseSlot: 'deadlift', sets: [{ sets: 3, reps: '5', intensityPct: 78, rpe: 8, restSeconds: 300 }] },
+          { exerciseSlot: 'pullup', sets: [{ sets: 3, reps: '8', restSeconds: 90 }] },
+        ],
+      },
+      {
+        name: 'Block 2 Str — Day B: SBD',
+        dayLabel: 'Str B — Squat / Bench / Deadlift',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [{ sets: 3, reps: '6-8', intensityPct: 73, rpe: 7, restSeconds: 180, notes: 'Moderate squat — technique focus' }] },
+          { exerciseSlot: 'bench', sets: [{ sets: 3, reps: '6-8', intensityPct: 74, rpe: 7, restSeconds: 180 }] },
+          { exerciseSlot: 'deadlift', sets: [{ sets: 2, reps: '5', intensityPct: 72, rpe: 7, restSeconds: 240, notes: 'Light deadlift work' }] },
+          { exerciseSlot: 'row', sets: [{ sets: 3, reps: '8', restSeconds: 90 }] },
+        ],
+      },
+      // Block 3: Peaking (Weeks 9-12)
+      {
+        name: 'Block 3 Peak — Day A: SBD',
+        dayLabel: 'Peak A — Squat / Bench / Deadlift',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [{ sets: 3, reps: '3-4', intensityPct: 85, rpe: 8.5, restSeconds: 300, notes: 'Block 3 (Peaking): 3x3-4 @ 82-90%. Near-max work.' }] },
+          { exerciseSlot: 'bench', sets: [{ sets: 3, reps: '3-4', intensityPct: 85, rpe: 8.5, restSeconds: 300 }] },
+          { exerciseSlot: 'deadlift', sets: [{ sets: 2, reps: '3', intensityPct: 87, rpe: 8.5, restSeconds: 360 }] },
+        ],
+      },
+      {
+        name: 'Block 3 Peak — Day B: SBD',
+        dayLabel: 'Peak B — Squat / Bench / Deadlift',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [{ sets: 2, reps: '4-5', intensityPct: 78, rpe: 7, restSeconds: 240, notes: 'Light practice day — maintain technique' }] },
+          { exerciseSlot: 'bench', sets: [{ sets: 2, reps: '4-5', intensityPct: 78, rpe: 7, restSeconds: 240 }] },
+          { exerciseSlot: 'deadlift', sets: [{ sets: 1, reps: '3', intensityPct: 78, rpe: 7, restSeconds: 240, notes: 'Maintenance pull' }] },
+        ],
+      },
+      // Block 4: Competition Taper (Weeks 13-16)
+      {
+        name: 'Block 4 Comp — Day A: Openers',
+        dayLabel: 'Comp A — Opener Practice',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [{ sets: 2, reps: '1-2', intensityPct: 90, rpe: 8, restSeconds: 360, notes: 'Block 4 (Competition): 2x1-2 @ 90-95%. Practice openers. Taper volume.' }] },
+          { exerciseSlot: 'bench', sets: [{ sets: 2, reps: '1-2', intensityPct: 90, rpe: 8, restSeconds: 360 }] },
+          { exerciseSlot: 'deadlift', sets: [{ sets: 1, reps: '1-2', intensityPct: 90, rpe: 8, restSeconds: 360 }] },
+        ],
+      },
+      {
+        name: 'Block 4 Comp — Day B: Light',
+        dayLabel: 'Comp B — Light Maintenance',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [{ sets: 2, reps: '3', intensityPct: 70, restSeconds: 180, notes: 'Light movement prep — maintain neural patterns' }] },
+          { exerciseSlot: 'bench', sets: [{ sets: 2, reps: '3', intensityPct: 70, restSeconds: 180 }] },
+        ],
+      },
+    ],
+    progression: {
+      type: 'block',
+      incrementLbs: { upper: 5, lower: 5 },
+      description: 'Block 1 (Hypertrophy, Wk 1-4): 4x8-12 @ 65-72%. Build muscle and work capacity. Block 2 (Strength, Wk 5-8): 4x5-6 @ 75-82%. Convert hypertrophy into strength. Block 3 (Peaking, Wk 9-12): 3x3-4 @ 82-90%. Near-max work, reduced volume. Block 4 (Competition, Wk 13-16): 2x1-2 @ 90-100%. Taper volume, practice openers, compete. SBD trained in every session across all blocks.',
+      stallProtocol: 'If peaking weights in Block 3 feel heavier than expected, extend Block 2 by 1-2 weeks. If Block 1 hypertrophy work shows no improvement, increase volume by 1-2 sets per exercise.',
+      maxStallCycles: 1,
+    },
+    deload: {
+      frequency: 'Bridge week between blocks (reduce volume 40%), plus Block 4 taper',
+      method: 'Bridge weeks: 50% volume, 80% intensity. Block 4 taper: volume drops 50-60% while intensity stays at 90%+.',
+      duration: '1 week between blocks; Block 4 is the final taper',
+      citation: 'Lewis B. / Calgary Barbell (calgarybarbell.com); Issurin V. Block Periodization (2008); PMC7552788 taper meta-analysis',
+    },
+    transitionCriteria: 'Complete the 16-week macrocycle. After competition, take 1-2 weeks off, then restart at Block 1 with updated maxes.',
+    transitionOptions: ['calgary_barbell_16', 'sheiko_29', 'block_periodization'],
+    scienceBasis: 'Calgary Barbell\'s 16-week program follows classic block periodization (Issurin 2008) with SBD practiced in every session for maximum specificity. The 4-block structure (hypertrophy → strength → peaking → competition) aligns with directed adaptation theory: each block develops a specific quality while maintaining others. High SBD frequency (4x/week) provides more practice opportunities for technical refinement. The progressive volume decrease and intensity increase across blocks creates a supercompensation peak for competition day. Bryce Lewis has used this framework to coach numerous national-level competitors.',
+    typicalDurationWeeks: [16, 16],
+    sessionMinutes: 80,
+    weeklyWaves: {
+      // Block 0: Hypertrophy (Weeks 1-4)
+      0: {
+        1: { intensityPct: 65, repTarget: '4x8', volumeMultiplier: 1.0 },
+        2: { intensityPct: 68, repTarget: '4x7', volumeMultiplier: 1.0 },
+        3: { intensityPct: 72, repTarget: '4x6', volumeMultiplier: 1.0 },
+        4: { intensityPct: 60, repTarget: '3x8', volumeMultiplier: 0.6 },
+      },
+      // Block 1: Strength (Weeks 5-8)
+      1: {
+        1: { intensityPct: 75, repTarget: '4x5', volumeMultiplier: 1.0 },
+        2: { intensityPct: 78, repTarget: '4x4', volumeMultiplier: 1.0 },
+        3: { intensityPct: 82, repTarget: '3x3', volumeMultiplier: 0.85 },
+        4: { intensityPct: 70, repTarget: '3x5', volumeMultiplier: 0.6 },
+      },
+      // Block 2: Peaking (Weeks 9-12)
+      2: {
+        1: { intensityPct: 82, repTarget: '3x3', volumeMultiplier: 1.0 },
+        2: { intensityPct: 85, repTarget: '3x2', volumeMultiplier: 0.85 },
+        3: { intensityPct: 90, repTarget: '2x2', volumeMultiplier: 0.7 },
+        4: { intensityPct: 75, repTarget: '2x3', volumeMultiplier: 0.5 },
+      },
+      // Block 3: Competition (Weeks 13-16)
+      3: {
+        1: { intensityPct: 90, repTarget: '2x2', volumeMultiplier: 0.7 },
+        2: { intensityPct: 93, repTarget: '2x1', volumeMultiplier: 0.5 },
+        3: { intensityPct: 95, repTarget: '1x1', volumeMultiplier: 0.3 },
+        4: { intensityPct: 90, repTarget: 'opener only', volumeMultiplier: 0.2 },
+      },
+    },
+  },
+
+  calgary_barbell_8: {
+    id: 'calgary_barbell_8',
+    name: 'Calgary Barbell 8-Week',
+    shortName: 'CalgaryBB 8wk',
+    author: 'Bryce Lewis / Calgary Barbell',
+    description: 'Condensed 8-week competition prep (~75 min sessions). 2 blocks of 4 weeks: Block 1 (Strength) → Block 2 (Peaking/Competition). Ideal when you have less than 12 weeks to prepare, or as a follow-up to a hypertrophy phase. SBD each session.',
+    level: 'intermediate',
+    goals: ['powerlifting', 'strength'],
+    daysPerWeek: [4],
+    equipmentMin: 'barbell_home',
+    workouts: [
+      // Block 1: Strength (Weeks 1-4)
+      {
+        name: 'Strength — Day A: SBD Heavy',
+        dayLabel: 'Str A — Squat / Bench / Deadlift',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [{ sets: 4, reps: '4-6', intensityPct: 78, rpe: 8, restSeconds: 240, notes: 'Block 1 (Strength): build to heavy working sets' }] },
+          { exerciseSlot: 'bench', sets: [{ sets: 4, reps: '4-6', intensityPct: 78, rpe: 8, restSeconds: 240 }] },
+          { exerciseSlot: 'deadlift', sets: [{ sets: 3, reps: '4', intensityPct: 80, rpe: 8, restSeconds: 300 }] },
+          { exerciseSlot: 'row', sets: [{ sets: 3, reps: '8', restSeconds: 90 }] },
+        ],
+      },
+      {
+        name: 'Strength — Day B: SBD Volume',
+        dayLabel: 'Str B — Squat / Bench / Deadlift',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [{ sets: 3, reps: '6-8', intensityPct: 72, rpe: 7, restSeconds: 180, notes: 'Moderate squat volume' }] },
+          { exerciseSlot: 'bench', sets: [{ sets: 3, reps: '6-8', intensityPct: 72, rpe: 7, restSeconds: 180 }] },
+          { exerciseSlot: 'rdl', sets: [{ sets: 3, reps: '8', restSeconds: 120, notes: 'Deadlift accessory' }] },
+          { exerciseSlot: 'pullup', sets: [{ sets: 3, reps: '10', restSeconds: 90 }] },
+        ],
+      },
+      // Block 2: Peaking + Competition (Weeks 5-8)
+      {
+        name: 'Peaking — Day A: SBD Heavy',
+        dayLabel: 'Peak A — Squat / Bench / Deadlift',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [{ sets: 3, reps: '2-3', intensityPct: 87, rpe: 8.5, restSeconds: 300, notes: 'Block 2 (Peaking): heavy singles/doubles/triples' }] },
+          { exerciseSlot: 'bench', sets: [{ sets: 3, reps: '2-3', intensityPct: 87, rpe: 8.5, restSeconds: 300 }] },
+          { exerciseSlot: 'deadlift', sets: [{ sets: 2, reps: '2-3', intensityPct: 88, rpe: 8.5, restSeconds: 360 }] },
+        ],
+      },
+      {
+        name: 'Peaking — Day B: SBD Light',
+        dayLabel: 'Peak B — Squat / Bench / Deadlift (Light)',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [{ sets: 2, reps: '4', intensityPct: 75, rpe: 7, restSeconds: 180, notes: 'Light practice — maintain technique' }] },
+          { exerciseSlot: 'bench', sets: [{ sets: 2, reps: '4', intensityPct: 75, rpe: 7, restSeconds: 180 }] },
+          { exerciseSlot: 'deadlift', sets: [{ sets: 1, reps: '3', intensityPct: 73, rpe: 7, restSeconds: 240 }] },
+        ],
+      },
+    ],
+    progression: {
+      type: 'block',
+      incrementLbs: { upper: 5, lower: 5 },
+      description: 'Block 1 (Strength, Wk 1-4): 4x4-6 @ 75-82%. Heavy working sets with moderate volume. Block 2 (Peaking, Wk 5-8): 3x2-3 @ 82-92%. Volume tapers as intensity rises. Final week: practice openers at 90% for singles. Use after completing a hypertrophy phase or when preparation time is limited.',
+      stallProtocol: 'If Block 2 weights feel too heavy, extend Block 1 by 1 week. Use RPE to auto-regulate: if sets are consistently RPE 9.5+, reduce intensity by 2-3%.',
+      maxStallCycles: 1,
+    },
+    deload: {
+      frequency: 'Bridge day between blocks + final week taper',
+      method: 'Take 2-3 lighter days between Block 1 and Block 2. Final week: opener singles only.',
+      duration: '2-3 days between blocks',
+      citation: 'Lewis B. / Calgary Barbell (calgarybarbell.com); Issurin V. Block Periodization (2008)',
+    },
+    transitionCriteria: 'After competition or testing, take 1 week off, then either repeat or transition to a full 16-week cycle for more comprehensive preparation.',
+    transitionOptions: ['calgary_barbell_16', 'sheiko_29', '531_bbb', 'block_periodization'],
+    scienceBasis: 'This condensed program applies the same block periodization principles as the 16-week version but skips the initial hypertrophy block, making it suitable for lifters who have already completed a volume phase or have limited preparation time. The 2-block structure (strength → peaking) has been shown effective for competition preparation when baseline muscle mass is adequate (Issurin 2008). Calgary Barbell\'s emphasis on SBD in every session maximizes competition lift specificity.',
+    typicalDurationWeeks: [8, 8],
+    sessionMinutes: 75,
+    weeklyWaves: {
+      // Block 0: Strength (Weeks 1-4)
+      0: {
+        1: { intensityPct: 75, repTarget: '4x5', volumeMultiplier: 1.0 },
+        2: { intensityPct: 78, repTarget: '4x4', volumeMultiplier: 1.0 },
+        3: { intensityPct: 82, repTarget: '3x3', volumeMultiplier: 0.85 },
+        4: { intensityPct: 70, repTarget: '3x5', volumeMultiplier: 0.6 },
+      },
+      // Block 1: Peaking/Competition (Weeks 5-8)
+      1: {
+        1: { intensityPct: 85, repTarget: '3x3', volumeMultiplier: 1.0 },
+        2: { intensityPct: 88, repTarget: '3x2', volumeMultiplier: 0.85 },
+        3: { intensityPct: 92, repTarget: '2x1', volumeMultiplier: 0.6 },
+        4: { intensityPct: 90, repTarget: 'opener only', volumeMultiplier: 0.3 },
+      },
+    },
+  },
+
+  // ═══════════════════════════════════════════
+  // STRONGER BY SCIENCE (SBS) PROGRAMS
+  // ═══════════════════════════════════════════
+
+  sbs_hypertrophy: {
+    id: 'sbs_hypertrophy',
+    name: 'SBS Hypertrophy (AMRAP-Driven)',
+    shortName: 'SBS Hypertrophy',
+    author: 'Greg Nuckols',
+    description: 'Autoregulated hypertrophy program (~70 min sessions). Each main lift has target reps with an AMRAP set — if you exceed the target, weight increases more aggressively next week. Rep ranges of 8-12 for main lifts, higher for accessories. Optional overwarm single before working sets builds confidence at heavier loads without adding fatigue.',
+    level: 'intermediate',
+    goals: ['hypertrophy', 'powerbuilding', 'general'],
+    daysPerWeek: [3, 4],
+    equipmentMin: 'barbell_home',
+    workouts: [
+      {
+        name: 'Day 1: Squat + Bench',
+        dayLabel: 'Day 1 — Squat / Bench',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [
+            { sets: 1, reps: '1', intensityPct: 85, restSeconds: 180, notes: 'Overwarm single (optional) — practice heavy weight. Should feel smooth, not grindy.' },
+            { sets: 3, reps: '10', intensityPct: 68, rpe: 8, restSeconds: 120, notes: 'Working sets — target 10 reps per set' },
+            { sets: 1, reps: '10+', intensityPct: 68, rpe: 10, restSeconds: 120, notes: 'AMRAP set — more reps = more weight added next week' },
+          ] },
+          { exerciseSlot: 'bench', sets: [
+            { sets: 1, reps: '1', intensityPct: 85, restSeconds: 180, notes: 'Overwarm single (optional)' },
+            { sets: 3, reps: '10', intensityPct: 68, rpe: 8, restSeconds: 120 },
+            { sets: 1, reps: '10+', intensityPct: 68, rpe: 10, restSeconds: 120, notes: 'AMRAP — drives progression' },
+          ] },
+          { exerciseSlot: 'row', sets: [{ sets: 3, reps: '12', restSeconds: 90 }] },
+          { exerciseSlot: 'face_pull', sets: [{ sets: 3, reps: '15', restSeconds: 45 }] },
+        ],
+      },
+      {
+        name: 'Day 2: Deadlift + OHP',
+        dayLabel: 'Day 2 — Deadlift / OHP',
+        exercises: [
+          { exerciseSlot: 'deadlift', sets: [
+            { sets: 1, reps: '1', intensityPct: 85, restSeconds: 180, notes: 'Overwarm single (optional)' },
+            { sets: 3, reps: '8', intensityPct: 70, rpe: 8, restSeconds: 150 },
+            { sets: 1, reps: '8+', intensityPct: 70, rpe: 10, restSeconds: 150, notes: 'AMRAP — drives progression' },
+          ] },
+          { exerciseSlot: 'ohp', sets: [
+            { sets: 3, reps: '10', intensityPct: 65, rpe: 8, restSeconds: 120 },
+            { sets: 1, reps: '10+', intensityPct: 65, rpe: 10, restSeconds: 120, notes: 'AMRAP' },
+          ] },
+          { exerciseSlot: 'pullup', sets: [{ sets: 3, reps: '10', restSeconds: 90 }] },
+          { exerciseSlot: 'curl', sets: [{ sets: 3, reps: '12', restSeconds: 60 }] },
+        ],
+      },
+      {
+        name: 'Day 3: Squat + Bench (Volume)',
+        dayLabel: 'Day 3 — Squat / Bench (Volume)',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [
+            { sets: 3, reps: '10', intensityPct: 65, rpe: 7, restSeconds: 120, notes: 'Volume day — lighter than Day 1' },
+            { sets: 1, reps: '10+', intensityPct: 65, rpe: 10, restSeconds: 120, notes: 'AMRAP' },
+          ] },
+          { exerciseSlot: 'bench', sets: [
+            { sets: 3, reps: '10', intensityPct: 65, rpe: 7, restSeconds: 120 },
+            { sets: 1, reps: '10+', intensityPct: 65, rpe: 10, restSeconds: 120, notes: 'AMRAP' },
+          ] },
+          { exerciseSlot: 'rdl', sets: [{ sets: 3, reps: '10', restSeconds: 120 }] },
+          { exerciseSlot: 'ab_work', sets: [{ sets: 3, reps: '15', restSeconds: 60 }] },
+        ],
+      },
+    ],
+    progression: {
+      type: 'amrap_driven',
+      incrementLbs: { upper: 5, lower: 5 },
+      description: 'AMRAP-driven autoregulation: each exercise has a target rep count. If you hit the target, weight increases by the standard increment. If you exceed the target by 3+ reps, weight increases double. If you fall short, weight stays the same or decreases. This self-adjusting mechanism ensures you are always training at the right intensity for your current recovery state. Per Greg Nuckols: "The program adjusts itself to you."',
+      stallProtocol: 'If AMRAP sets consistently fail to hit target reps for 2+ weeks, reduce working weight by 5-7%. If stalling persists, take a deload week. After 2 deload cycles without progress, transition to SBS Strength or a different approach.',
+      maxStallCycles: 2,
+    },
+    deload: {
+      frequency: 'Every 6-8 weeks, or when AMRAP performance declines for 2+ consecutive weeks',
+      method: 'Reduce all weights to 85-90% of current working weights. Perform prescribed sets/reps but no AMRAP sets (stop at target). Resume normal progression the following week.',
+      duration: '1 week',
+      citation: 'Nuckols G. Stronger by Science (2020, strongerbyscience.com); AMRAP-driven autoregulation aligns with Zourdos et al. (2016, PMID: 26666744) findings on RPE-based programming; Helms et al. (2016) on autoregulation for strength athletes',
+    },
+    transitionCriteria: 'Can be run indefinitely. Transition to SBS Strength for a lower-rep phase, or to a peaking program before competition.',
+    transitionOptions: ['sbs_strength', '531_bbb', 'block_periodization', 'gzcl_jt2'],
+    scienceBasis: 'SBS Hypertrophy uses AMRAP-driven autoregulation to adjust training loads to daily readiness, which is superior to fixed-percentage programming (meta-analysis PMC12336695). The 8-12 rep range is optimal for hypertrophy (Schoenfeld 2010; Schoenfeld et al. 2017 PMID: 28834797). The overwarm single maintains neuromuscular efficiency at heavy loads without adding significant fatigue (Androulakis-Korakakis et al. 2020, PMC8435792). Greg Nuckols\' programming philosophy emphasizes the minimum effective dose with autoregulation — training hard enough to drive adaptation, but not so hard that it compromises recovery (Nuckols 2020).',
+    typicalDurationWeeks: [12, 52],
+    sessionMinutes: 70,
+  },
+
+  sbs_strength: {
+    id: 'sbs_strength',
+    name: 'SBS Strength (RTF)',
+    shortName: 'SBS Strength',
+    author: 'Greg Nuckols',
+    description: 'Strength-focused AMRAP-driven program (~75 min sessions). Same autoregulation as SBS Hypertrophy but with heavier weights and lower reps (3-6 for main lifts). "RTF" = Reps to Failure. AMRAP performance on the last set drives weekly weight adjustments. Ideal for lifters who want to build strength without a fixed peaking date.',
+    level: 'intermediate',
+    goals: ['strength', 'powerlifting'],
+    daysPerWeek: [3, 4],
+    equipmentMin: 'barbell_home',
+    workouts: [
+      {
+        name: 'Day 1: Squat + Bench',
+        dayLabel: 'Day 1 — Squat / Bench',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [
+            { sets: 1, reps: '1', intensityPct: 88, restSeconds: 240, notes: 'Overwarm single — heavier than working sets. Build confidence.' },
+            { sets: 3, reps: '5', intensityPct: 78, rpe: 8, restSeconds: 180, notes: 'Working sets — heavy fives' },
+            { sets: 1, reps: '5+', intensityPct: 78, rpe: 10, restSeconds: 180, notes: 'AMRAP — drives progression' },
+          ] },
+          { exerciseSlot: 'bench', sets: [
+            { sets: 1, reps: '1', intensityPct: 88, restSeconds: 240, notes: 'Overwarm single' },
+            { sets: 3, reps: '5', intensityPct: 78, rpe: 8, restSeconds: 180 },
+            { sets: 1, reps: '5+', intensityPct: 78, rpe: 10, restSeconds: 180, notes: 'AMRAP' },
+          ] },
+          { exerciseSlot: 'row', sets: [{ sets: 3, reps: '8', restSeconds: 90 }] },
+        ],
+      },
+      {
+        name: 'Day 2: Deadlift + OHP',
+        dayLabel: 'Day 2 — Deadlift / OHP',
+        exercises: [
+          { exerciseSlot: 'deadlift', sets: [
+            { sets: 1, reps: '1', intensityPct: 90, restSeconds: 300, notes: 'Overwarm single' },
+            { sets: 3, reps: '4', intensityPct: 80, rpe: 8, restSeconds: 240 },
+            { sets: 1, reps: '4+', intensityPct: 80, rpe: 10, restSeconds: 240, notes: 'AMRAP' },
+          ] },
+          { exerciseSlot: 'ohp', sets: [
+            { sets: 3, reps: '5', intensityPct: 75, rpe: 8, restSeconds: 180 },
+            { sets: 1, reps: '5+', intensityPct: 75, rpe: 10, restSeconds: 180, notes: 'AMRAP' },
+          ] },
+          { exerciseSlot: 'pullup', sets: [{ sets: 3, reps: '8', restSeconds: 90 }] },
+          { exerciseSlot: 'ab_work', sets: [{ sets: 3, reps: '12', restSeconds: 60 }] },
+        ],
+      },
+      {
+        name: 'Day 3: Squat + Bench (Moderate)',
+        dayLabel: 'Day 3 — Squat / Bench (Moderate)',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [
+            { sets: 3, reps: '6', intensityPct: 73, rpe: 7, restSeconds: 150, notes: 'Moderate day — slightly lighter than Day 1' },
+            { sets: 1, reps: '6+', intensityPct: 73, rpe: 10, restSeconds: 150, notes: 'AMRAP' },
+          ] },
+          { exerciseSlot: 'bench', sets: [
+            { sets: 3, reps: '6', intensityPct: 73, rpe: 7, restSeconds: 150 },
+            { sets: 1, reps: '6+', intensityPct: 73, rpe: 10, restSeconds: 150, notes: 'AMRAP' },
+          ] },
+          { exerciseSlot: 'rdl', sets: [{ sets: 3, reps: '8', restSeconds: 120, notes: 'Hamstring accessory' }] },
+          { exerciseSlot: 'face_pull', sets: [{ sets: 3, reps: '15', restSeconds: 45 }] },
+        ],
+      },
+    ],
+    progression: {
+      type: 'amrap_driven',
+      incrementLbs: { upper: 5, lower: 5 },
+      description: 'Same AMRAP-driven autoregulation as SBS Hypertrophy, but with heavier loads (3-6 rep range for main lifts). Hit target reps → standard increment. Exceed target by 3+ → double increment. Fall short → maintain or decrease. The overwarm single is heavier (88-90% of 1RM) to build confidence and neural drive at competition-range loads.',
+      stallProtocol: 'If AMRAP consistently falls short of target for 2+ weeks, reduce working weight by 5-7%. After 2 deload cycles without improvement, switch to SBS Hypertrophy for a volume phase before returning.',
+      maxStallCycles: 2,
+    },
+    deload: {
+      frequency: 'Every 6-8 weeks, or when AMRAP performance declines consistently',
+      method: 'Reduce all weights to 85-90% of current working weights. No AMRAP sets — stop at target reps. Skip overwarm singles.',
+      duration: '1 week',
+      citation: 'Nuckols G. Stronger by Science (2020, strongerbyscience.com); Zourdos et al. (2016, PMID: 26666744) autoregulation',
+    },
+    transitionCriteria: 'Can be run indefinitely. Transition to SBS Hypertrophy for a volume phase, to Sheiko or Calgary Barbell for competition prep, or to any peaking program.',
+    transitionOptions: ['sbs_hypertrophy', 'sheiko_29', 'calgary_barbell_8', 'block_periodization'],
+    scienceBasis: 'SBS Strength applies the same AMRAP-driven autoregulation as the Hypertrophy template but at higher intensities (75-80% 1RM working sets). The 3-6 rep range targets maximal strength development through high mechanical tension (Schoenfeld 2010, PMID: 20847704). The overwarm single at 88-90% maintains peak force production capacity without meaningful fatigue (Androulakis-Korakakis et al. 2020). The combination of moderate-volume working sets plus AMRAP autoregulation has been shown to produce comparable or superior results to fixed-percentage programming (meta-analysis PMC12336695). Greg Nuckols\' approach is grounded in the principle that the best program is one that adjusts to your daily readiness.',
+    typicalDurationWeeks: [12, 52],
+    sessionMinutes: 75,
+  },
+
+  // ═══════════════════════════════════════════
+  // PPL (PUSH/PULL/LEGS)
+  // ═══════════════════════════════════════════
+
+  ppl: {
+    id: 'ppl',
+    name: 'Push/Pull/Legs (PPL)',
+    shortName: 'PPL',
+    author: 'Various (Reddit PPL / Metallicadpa)',
+    description: 'High-frequency 6-day split (~60 min sessions): Push/Pull/Legs repeated twice per week. Each muscle group trained 2x/week. Push days: bench + OHP + triceps + lateral raises. Pull days: rows + pull-ups + deadlift + biceps + rear delts. Leg days: squat + leg press + hamstrings + calves. Compound lifts use linear progression (3-5 reps), accessories use double progression (add weight when you hit the top of the rep range).',
+    level: 'intermediate',
+    goals: ['hypertrophy', 'powerbuilding', 'general'],
+    daysPerWeek: [6],
+    equipmentMin: 'full_gym',
+    workouts: [
+      {
+        name: 'Push A — Bench Focus',
+        dayLabel: 'Push A — Bench Focus',
+        exercises: [
+          { exerciseSlot: 'bench', sets: [{ sets: 4, reps: '5', rpe: 8, restSeconds: 180, notes: 'Strength: add weight when you hit 4x5' }] },
+          { exerciseSlot: 'ohp', sets: [{ sets: 3, reps: '8-12', rpe: 8, restSeconds: 120, notes: 'Hypertrophy: add weight when you hit 3x12' }] },
+          { exerciseSlot: 'dip', sets: [{ sets: 3, reps: '8-12', restSeconds: 90, notes: 'Weighted dips for chest/tricep mass' }] },
+          { exerciseSlot: 'lateral_raise', sets: [{ sets: 3, reps: '15-20', restSeconds: 60, notes: 'Side delt isolation' }] },
+          { exerciseSlot: 'tricep_extension', sets: [{ sets: 3, reps: '12-15', restSeconds: 60 }] },
+        ],
+      },
+      {
+        name: 'Pull A — Row Focus',
+        dayLabel: 'Pull A — Row Focus',
+        exercises: [
+          { exerciseSlot: 'row', sets: [{ sets: 4, reps: '5', rpe: 8, restSeconds: 180, notes: 'Strength: add weight when you hit 4x5' }] },
+          { exerciseSlot: 'pullup', sets: [{ sets: 3, reps: '8-12', restSeconds: 120, notes: 'Weighted pull-ups or lat pulldowns' }] },
+          { exerciseSlot: 'deadlift', sets: [{ sets: 1, reps: '5', rpe: 8, restSeconds: 300, notes: 'Heavy deadlift — 1 top set of 5' }] },
+          { exerciseSlot: 'rear_delt_fly', sets: [{ sets: 3, reps: '15-20', restSeconds: 60, notes: 'Rear delt isolation' }] },
+          { exerciseSlot: 'curl', sets: [{ sets: 3, reps: '10-12', restSeconds: 60 }] },
+        ],
+      },
+      {
+        name: 'Legs A — Squat Focus',
+        dayLabel: 'Legs A — Squat Focus',
+        exercises: [
+          { exerciseSlot: 'squat', sets: [{ sets: 4, reps: '5', rpe: 8, restSeconds: 240, notes: 'Strength: add weight when you hit 4x5' }] },
+          { exerciseSlot: 'rdl', sets: [{ sets: 3, reps: '8-10', restSeconds: 120, notes: 'Hamstring volume' }] },
+          { exerciseSlot: 'leg_press', sets: [{ sets: 3, reps: '10-12', restSeconds: 120, notes: 'Quad accessory' }] },
+          { exerciseSlot: 'hamstring_curl', sets: [{ sets: 3, reps: '10-12', restSeconds: 60 }] },
+          { exerciseSlot: 'calf_raise', sets: [{ sets: 4, reps: '12-15', restSeconds: 60 }] },
+        ],
+      },
+      {
+        name: 'Push B — OHP Focus',
+        dayLabel: 'Push B — OHP Focus',
+        exercises: [
+          { exerciseSlot: 'ohp', sets: [{ sets: 4, reps: '5', rpe: 8, restSeconds: 180, notes: 'Strength: add weight when you hit 4x5' }] },
+          { exerciseSlot: 'bench', sets: [{ sets: 3, reps: '8-12', rpe: 8, restSeconds: 120, notes: 'Volume bench — lighter than Push A' }] },
+          { exerciseSlot: 'chest_fly', sets: [{ sets: 3, reps: '12-15', restSeconds: 60, notes: 'Pec isolation' }] },
+          { exerciseSlot: 'lateral_raise', sets: [{ sets: 3, reps: '15-20', restSeconds: 60 }] },
+          { exerciseSlot: 'tricep_extension', sets: [{ sets: 3, reps: '12-15', restSeconds: 60 }] },
+        ],
+      },
+      {
+        name: 'Pull B — Pullup Focus',
+        dayLabel: 'Pull B — Pullup Focus',
+        exercises: [
+          { exerciseSlot: 'pullup', sets: [{ sets: 4, reps: '5', rpe: 8, restSeconds: 180, notes: 'Strength: weighted pull-ups, add weight when you hit 4x5' }] },
+          { exerciseSlot: 'row', sets: [{ sets: 3, reps: '8-12', restSeconds: 120, notes: 'Volume rows' }] },
+          { exerciseSlot: 'deadlift', sets: [{ sets: 3, reps: '8', intensityPct: 65, restSeconds: 120, notes: 'Volume deadlift — lighter than Pull A' }] },
+          { exerciseSlot: 'face_pull', sets: [{ sets: 3, reps: '15-20', restSeconds: 60, notes: 'Rear delt and rotator cuff' }] },
+          { exerciseSlot: 'curl', sets: [{ sets: 3, reps: '10-12', restSeconds: 60 }] },
+        ],
+      },
+      {
+        name: 'Legs B — Deadlift Focus',
+        dayLabel: 'Legs B — Deadlift Focus',
+        exercises: [
+          { exerciseSlot: 'deadlift', sets: [{ sets: 3, reps: '3-5', rpe: 8.5, restSeconds: 300, notes: 'Heavy deadlift — main pull day' }] },
+          { exerciseSlot: 'squat', sets: [{ sets: 3, reps: '8-10', intensityPct: 65, rpe: 7, restSeconds: 120, notes: 'Volume squat — lighter than Legs A' }] },
+          { exerciseSlot: 'hip_thrust', sets: [{ sets: 3, reps: '10-12', restSeconds: 90, notes: 'Glute emphasis' }] },
+          { exerciseSlot: 'hamstring_curl', sets: [{ sets: 3, reps: '10-12', restSeconds: 60 }] },
+          { exerciseSlot: 'calf_raise', sets: [{ sets: 4, reps: '12-15', restSeconds: 60 }] },
+        ],
+      },
+    ],
+    progression: {
+      type: 'linear_session',
+      incrementLbs: { upper: 5, lower: 5 },
+      description: 'Dual progression system: Compounds (bench, squat, deadlift, OHP, rows, pull-ups) use linear progression — add 5 lbs when you complete all prescribed sets at the target rep count. Accessories use double progression — when you hit the top of the rep range (e.g., 3x12) at a given weight, increase weight and aim for the bottom of the range (3x8). Each muscle group is trained 2x/week for optimal growth (Schoenfeld et al. 2016).',
+      stallProtocol: 'If a compound lift stalls for 2 sessions, deload 10% and rebuild. If stalling persists after 2 deload cycles, switch to a 5/3/1-based progression for that lift while keeping linear progression on others.',
+      maxStallCycles: 3,
+    },
+    deload: {
+      frequency: 'Every 6-8 weeks, or after 2 consecutive failed sessions on a lift',
+      method: 'Reduce all working weights to 85% for 1 week. Maintain normal volume and exercise selection.',
+      duration: '1 week',
+      citation: 'Metallicadpa / r/Fitness PPL program; Schoenfeld et al. (2016, PMID: 27102172) — training each muscle 2x/week is superior for hypertrophy',
+    },
+    transitionCriteria: 'PPL can be run indefinitely as a hypertrophy/general program. If powerlifting-specific peaking is needed, transition to a competition prep program. If 6 days/week is unsustainable, switch to an Upper/Lower or 5/3/1 template.',
+    transitionOptions: ['531_bbb', 'upper_lower_split', 'nippard_powerbuilding', 'gzcl_jt2'],
+    scienceBasis: 'PPL provides high training frequency (each muscle 2x/week) which Schoenfeld et al. (2016, PMID: 27102172) demonstrated produces significantly greater hypertrophy than 1x/week when volume is equated. The 6-day split allows high weekly volume to be distributed across more sessions, reducing per-session fatigue and allowing higher quality sets. The push/pull/legs organization groups synergistic muscles together while providing recovery between antagonist groups. The "Reddit PPL" (Metallicadpa) is one of the most recommended programs on r/Fitness for intermediate lifters pursuing hypertrophy. Compound progression (3-5 reps) builds strength while isolation work (12-20 reps) maximizes metabolic stress for muscle growth (Schoenfeld 2010, PMID: 20847704).',
+    typicalDurationWeeks: [12, 104],
+    sessionMinutes: 60,
+  },
 };
 
 // ─── Program Selection Logic ───
@@ -1627,7 +2570,7 @@ export interface UserProfile {
  * - 3 days/week: All beginner programs, Texas Method, HLM
  * - 4 days/week: 5/3/1 BBB/FSL, Upper-Lower Split, J&T 2.0, nSuns
  * - 5 days/week: nSuns (5-day), Powerbuilding 5x, DUP
- * - 6 days/week: PPL (not yet implemented)
+ * - 6 days/week: PPL (Push/Pull/Legs)
  */
 export function getFrequencyNote(daysPerWeek: number): string | null {
   switch (daysPerWeek) {
@@ -1636,7 +2579,7 @@ export function getFrequencyNote(daysPerWeek: number): string | null {
     case 2:
       return '2 days/week can work for maintenance or slow progress. Consider an A/B alternating full-body split.';
     case 6:
-      return '6 days/week suits a Push/Pull/Legs split (not yet implemented). Consider running a 5-day program with a 6th active recovery day.';
+      return '6 days/week suits a Push/Pull/Legs (PPL) split — each muscle group trained 2x/week for optimal growth.';
     default:
       return null;
   }
@@ -1658,7 +2601,7 @@ export function getFrequencyNote(daysPerWeek: number): string | null {
  * - 3 days/week: All beginner programs, Texas Method, HLM
  * - 4 days/week: 5/3/1 BBB/FSL, Upper-Lower Split, J&T 2.0, nSuns
  * - 5 days/week: nSuns (5-day), Powerbuilding 5x, DUP
- * - 6 days/week: PPL (not yet implemented)
+ * - 6 days/week: PPL (Push/Pull/Legs)
  */
 export function recommendPrograms(profile: UserProfile): ProgramDefinition[] {
   let candidates = Object.values(PROGRAMS).filter(p => {

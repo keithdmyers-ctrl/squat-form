@@ -23,6 +23,10 @@ export interface FrameAngles {
   shoulderAngle?: number;
   /** Average landmark visibility/confidence for this frame's angle computations (0-1). */
   landmarkConfidence?: number;
+  /** Lateral trunk shift: horizontal displacement of shoulder midpoint relative to hip midpoint, normalized by torso height. 0 = centered, positive = shifted right. */
+  lateralShift?: number;
+  /** Neck extension angle in degrees relative to the trunk. ~0 = neutral, positive = looking up, negative = looking down. */
+  neckAngle?: number;
 }
 
 // ─── Exercise Type ───
@@ -346,4 +350,48 @@ export interface SessionRecord {
   dots_score?: number;
   notes?: string;
   tags?: string[];
+}
+
+// ─── Safety Screening Types ───
+
+export interface PARQQuestion {
+  id: string;
+  text: string;
+  category: 'cardiovascular' | 'musculoskeletal' | 'general';
+  followUp?: string;
+  referralUrgency: 'immediate' | 'recommended' | 'informational';
+}
+
+export interface PARQResult {
+  completed: boolean;
+  completedDate: string;
+  passed: boolean;
+  responses: Record<string, boolean>;
+  referralRecommended: boolean;
+  referralReasons: string[];
+  restrictions: string[];
+  acknowledgedRisks: boolean;
+}
+
+export interface ExerciseModification {
+  exercise: string;
+  modification: string;
+  contraindicated: boolean;
+  substitute?: string;
+}
+
+export interface PreExistingCondition {
+  id: string;
+  name: string;
+  category: 'joint' | 'spine' | 'shoulder' | 'cardiovascular' | 'neurological' | 'other';
+  modifications: ExerciseModification[];
+}
+
+export interface PainReport {
+  timestamp: string;
+  exercise: string;
+  location: string;
+  type: 'sharp' | 'dull' | 'burning' | 'pressure' | 'none';
+  intensity: number;
+  onset: 'during_set' | 'after_set' | 'pre_existing';
 }

@@ -91,6 +91,21 @@ const CORRECTIVE_EXERCISES: Record<string, CorrectiveExercise[]> = {
     { name: 'Single-Leg Leg Press', description: 'Use one leg at a time on the leg press to identify and fix strength imbalances.', sets: '3x10 each side' },
     { name: 'Side-Lying Hip Abduction', description: 'Lie on your side and raise your top leg slowly. Strengthens hip stabilizers.', sets: '3x15 each side' },
   ],
+  bracing_reminder: [
+    { name: 'Supine Belly Breathing', description: 'Lie on your back with a hand on your belly. Breathe so your hand rises (belly breath, not chest). Practice filling your trunk with 360 degrees of pressure.', sets: '10 breaths before each session', videoUrl: 'https://www.youtube.com/watch?v=0Ua9bOsZTYg' },
+    { name: 'Standing Brace Practice', description: 'Stand and practice bracing without a bar — take a big belly breath, brace your abs as if about to be punched, hold 5 seconds. Release and repeat.', sets: '10 reps before working sets' },
+    { name: 'Plank with Breathing', description: 'Hold a plank while practicing bracing breaths. Breathe into your belly without losing core tension. Builds the ability to maintain bracing under load.', sets: '3x20 sec' },
+  ],
+  lateral_shift: [
+    { name: 'Bulgarian Split Squats', description: 'Place one foot on a bench behind you. Squat on the front leg to build single-leg strength. Do the weak side first, then match reps on the strong side.', sets: '3x8 each side', videoUrl: 'https://www.youtube.com/watch?v=2C-uNgKwPLE' },
+    { name: 'Single-Leg Leg Press', description: 'Use one leg at a time on the leg press to identify and fix strength imbalances between sides.', sets: '3x10 each side' },
+    { name: 'Single-Leg Romanian Deadlift', description: 'Stand on one leg and hinge forward with a dumbbell. Builds unilateral hip and hamstring strength to correct side-to-side imbalances.', sets: '3x8 each side', videoUrl: 'https://www.youtube.com/watch?v=_1els2E0YcY' },
+  ],
+  cervical_hyperextension: [
+    { name: 'Broomstick Posture Check', description: 'Hold a broomstick behind your back touching your head, upper back, and tailbone simultaneously. Practice squatting while maintaining all three contact points. If your head pulls away, you are extending.', sets: '3x5 with empty bar' },
+    { name: 'Wall Slides', description: 'Stand with your back against a wall, arms up in a goalpost position. Slide your arms up and down while keeping your head, upper back, and hips touching the wall. Trains neutral head position.', sets: '3x10', videoUrl: 'https://www.youtube.com/watch?v=gL1Nuqb1KeE' },
+    { name: 'Chin Tucks', description: 'Stand or sit tall and gently pull your chin straight back (make a double chin). Hold for 5 seconds. Strengthens deep neck flexors that maintain neutral head position under load.', sets: '3x10, 5 sec hold' },
+  ],
   incomplete_lockout: [
     { name: 'Glute Bridges', description: 'Lie on your back with knees bent. Drive hips up and squeeze glutes hard at the top.', sets: '3x12', svg: SVG_GLUTE_BRIDGE, videoUrl: 'https://www.youtube.com/watch?v=OUgsJ8-Vi0E' },
     { name: 'Hip Thrusts', description: 'With your upper back on a bench, drive hips up and hold the top position for a second.', sets: '3x10', videoUrl: 'https://www.youtube.com/watch?v=xDmFkJxPzeM' },
@@ -305,6 +320,21 @@ export const PROGRESSION_DATABASE: Record<string, ExerciseProgression[]> = {
     { level: 'Start here', exercise: 'Glute Bridges (3x12)', criteria: 'Full hip extension at top' },
     { level: 'Progress to', exercise: 'Hip Thrusts (3x10)', criteria: 'Strong lockout with pause' },
     { level: 'Goal', exercise: 'Full lockout every rep', criteria: 'Complete hip and knee extension at top' },
+  ],
+  bracing_reminder: [
+    { level: 'Start here', exercise: 'Practice belly breathing — watch YouTube video on bracing', criteria: 'Can perform 10 belly breaths with hand on stomach rising' },
+    { level: 'Progress to', exercise: 'Practice bracing with empty bar', criteria: 'Can brace and hold for 5 seconds before each rep' },
+    { level: 'Goal', exercise: 'Automatic bracing before every rep', criteria: 'Bracing is habitual — no conscious thought needed' },
+  ],
+  lateral_shift: [
+    { level: 'Start here', exercise: 'Bulgarian Split Squats (3x8 each side)', criteria: 'Can complete all reps with even form on both sides' },
+    { level: 'Progress to', exercise: 'Single-Leg Leg Press (3x10 each side)', criteria: 'Equal weight and control on both sides' },
+    { level: 'Goal', exercise: 'Centered squat with no lateral shift', criteria: 'Bar stays level and body stays centered throughout every rep' },
+  ],
+  cervical_hyperextension: [
+    { level: 'Start here', exercise: 'Broomstick posture check (3x5)', criteria: 'Can maintain head contact with broomstick during bodyweight squat' },
+    { level: 'Progress to', exercise: 'Chin tucks during warm-up sets', criteria: 'Neutral head position with light weight' },
+    { level: 'Goal', exercise: 'Automatic neutral head position', criteria: 'Head stays in line with spine at working weight without conscious effort' },
   ],
 
   // ─── Deadlift Progressions ───

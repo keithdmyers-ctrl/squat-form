@@ -50,7 +50,8 @@ function renderChat(container: HTMLElement, messages: CoachMessage[]): void {
   if (messages.length === 0) {
     html += `
       <div class="coach-welcome">
-        <p>I'm your AI lifting coach. I have access to your form analysis scores, training history, PRs, and program data.</p>
+        <p class="coach-welcome-intro">I have access to your form scores and training data. Ask me anything about your training.</p>
+        <p class="coach-welcome-heading">Quick questions:</p>
         <div class="coach-suggestions">
           <button class="coach-suggestion" data-q="How's my form?">How's my form?</button>
           <button class="coach-suggestion" data-q="How am I progressing?">How am I progressing?</button>
@@ -290,26 +291,42 @@ export function injectCoachStyles(): void {
       color: var(--text-secondary);
       font-size: var(--font-sm);
     }
+    .coach-welcome-intro {
+      color: var(--text-primary);
+      font-size: var(--font-sm);
+      line-height: 1.5;
+      margin-bottom: var(--space-md);
+    }
+    .coach-welcome-heading {
+      font-size: var(--font-sm);
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-xs);
+    }
     .coach-suggestions {
       display: flex;
       flex-wrap: wrap;
-      gap: var(--space-xs);
+      gap: var(--space-sm);
       justify-content: center;
-      margin-top: var(--space-md);
+      margin-top: var(--space-sm);
     }
     .coach-suggestion {
-      padding: var(--space-xs) var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
       border-radius: 999px;
-      border: 1px solid var(--border);
+      border: 2px solid var(--accent);
       background: var(--bg-card);
-      color: var(--text-secondary);
-      font-size: var(--font-xs);
+      color: var(--text-primary);
+      font-size: var(--font-sm);
+      font-weight: 600;
       cursor: pointer;
-      transition: border-color var(--transition-fast), color var(--transition-fast);
+      transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
     }
     .coach-suggestion:hover {
+      background: var(--accent);
+      color: var(--bg-primary);
       border-color: var(--accent);
-      color: var(--accent);
     }
     .coach-memory-badge {
       font-size: var(--font-2xs);

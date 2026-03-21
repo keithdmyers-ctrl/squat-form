@@ -4,6 +4,62 @@
 
 import type { SetAnalysis } from './types';
 import type { SessionRecord } from './types';
+import type { VersionedData, MigrationFn } from './storage-migration';
+import { migrateData } from './storage-migration';
+
+// ─── Storage Versioning ───
+
+const SESSION_STORAGE_VERSION = 1;
+const SETTINGS_STORAGE_VERSION = 1;
+
+// ─── Migration Registries ───
+
+const SESSION_MIGRATIONS: Record<number, MigrationFn> = {
+  // version 0 -> 1: ensure each session has all expected fields
+  0: (data: any) => {
+    if (Array.isArray(data)) {
+      return data.map((session: any) => ({
+        ...session,
+        id: session.id ?? Date.now().toString(36) + Math.random().toString(36).slice(2),
+        date: session.date ?? new Date().toISOString(),
+        squat_type: session.squat_type ?? 'high_bar',
+        experience_level: session.experience_level ?? 'beginner',
+        rep_count: session.rep_count ?? 0,
+        overall_score: session.overall_score ?? 0,
+        grade: session.grade ?? 'N/A',
+        top_issue: session.top_issue ?? null,
+        positive_count: session.positive_count ?? 0,
+        exercise_type: session.exercise_type ?? 'squat',
+        exercise_variant: session.exercise_variant ?? undefined,
+        competition: session.competition ?? false,
+      }));
+    }
+    return data;
+  },
+};
+
+const SETTINGS_MIGRATIONS: Record<number, MigrationFn> = {
+  // version 0 -> 1: ensure all settings fields exist with defaults
+  0: (data: any) => ({
+    ...data,
+    squat_type: data.squat_type ?? 'high_bar',
+    experience_level: data.experience_level ?? 'beginner',
+    weight: data.weight ?? '',
+    weight_unit: data.weight_unit ?? 'lbs',
+    exercise_type: data.exercise_type ?? 'squat',
+    deadlift_type: data.deadlift_type ?? 'conventional',
+    bench_type: data.bench_type ?? 'flat',
+    ohp_type: data.ohp_type ?? 'strict',
+    row_type: data.row_type ?? 'bent_over',
+    lunge_type: data.lunge_type ?? 'forward',
+    bodyweight: data.bodyweight ?? '',
+    bodyweight_unit: data.bodyweight_unit ?? 'lbs',
+    rpe: data.rpe ?? '',
+    training_phase: data.training_phase ?? '',
+  }),
+};
+
+// ─── Storage Keys and Constants ───
 
 export const STORAGE_KEY = 'squat_form_sessions';
 export const SETTINGS_KEY = 'squat_form_settings';
@@ -69,14 +125,22 @@ export function saveSession(
   });
   if (sessions.length > MAX_SESSIONS) sessions.length = MAX_SESSIONS;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    const wrapped: VersionedData<SessionRecord[]> = {
+      version: SESSION_STORAGE_VERSION,
+      data: sessions,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(wrapped));
   } catch {
     // Storage quota exceeded -- strip snapshots and retry
     for (const s of sessions) {
       if (s.snapshots) delete s.snapshots;
     }
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+      const wrapped: VersionedData<SessionRecord[]> = {
+        version: SESSION_STORAGE_VERSION,
+        data: sessions,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(wrapped));
     } catch {
       // Still full -- show warning
       const warning = document.getElementById('storage-warning');
@@ -91,8 +155,31 @@ export function saveSession(
 
 export function getSessions(): SessionRecord[] {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  } catch { return []; }
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    const { data, migrated, fromVersion } = migrateData<SessionRecord[]>(
+      parsed, SESSION_STORAGE_VERSION, SESSION_MIGRATIONS
+    );
+
+    if (migrated) {
+      console.info(`Migrated session storage from v${fromVersion} to v${SESSION_STORAGE_VERSION}`);
+      // Re-save in versioned format so migration only runs once
+      try {
+        const wrapped: VersionedData<SessionRecord[]> = {
+          version: SESSION_STORAGE_VERSION,
+          data,
+          migratedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(wrapped));
+      } catch { /* ignore save failure during migration */ }
+    }
+
+    return data;
+  } catch {
+    return [];
+  }
 }
 
 export function saveSettings(
@@ -103,7 +190,7 @@ export function saveSettings(
   trainingPhase?: string,
 ): void {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+    const settings = {
       squat_type: squatType,
       experience_level: experienceLevel,
       weight: weight ?? '',
@@ -118,7 +205,12 @@ export function saveSettings(
       bodyweight_unit: bodyweightUnit ?? 'lbs',
       rpe: rpe ?? '',
       training_phase: trainingPhase ?? '',
-    }));
+    };
+    const wrapped: VersionedData<typeof settings> = {
+      version: SETTINGS_STORAGE_VERSION,
+      data: settings,
+    };
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(wrapped));
   } catch {
     document.dispatchEvent(new CustomEvent('storage-warning', { detail: 'Storage is full. Some data may not be saved.' }));
   }
@@ -132,8 +224,31 @@ export function loadSettings(): {
   training_phase?: string;
 } | null {
   try {
-    return JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
-  } catch { return null; }
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    const { data, migrated, fromVersion } = migrateData<ReturnType<typeof loadSettings> & object>(
+      parsed, SETTINGS_STORAGE_VERSION, SETTINGS_MIGRATIONS
+    );
+
+    if (migrated) {
+      console.info(`Migrated settings storage from v${fromVersion} to v${SETTINGS_STORAGE_VERSION}`);
+      // Re-save in versioned format so migration only runs once
+      try {
+        const wrapped: VersionedData<typeof data> = {
+          version: SETTINGS_STORAGE_VERSION,
+          data,
+          migratedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(wrapped));
+      } catch { /* ignore save failure during migration */ }
+    }
+
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 export function hasCompletedPrescreen(): boolean {

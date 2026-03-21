@@ -34,130 +34,152 @@ export interface BenchConfig {
   competitionMode: boolean;
 }
 
+// ─── Bench Pause Detection ───
+
+export interface BenchPauseResult {
+  /** Was there a discernible pause at the bottom? */
+  detected: boolean;
+  /** How long the pause lasted in milliseconds. */
+  durationMs: number;
+  /** How many frames the bar was stationary at the bottom. */
+  durationFrames: number;
+  /** Is the pause long enough for competition (>= ~1 second)? */
+  isCompetitionLegal: boolean;
+  /** The elbow angle during the pause (average across pause frames). */
+  elbowAngleAtPause: number;
+  /** 0-100 stability score — less angular change during pause = higher. */
+  stability: number;
+}
+
+/** Minimum angular change per frame (degrees) to be considered "motionless". */
+const PAUSE_VELOCITY_THRESHOLD = 1.5;
+/** Minimum number of consecutive low-velocity frames to count as a pause. */
+const MIN_PAUSE_FRAMES = 2;
+/** Minimum pause duration in seconds to be considered "detected". */
+const MIN_PAUSE_DURATION_S = 0.1;
+/** Minimum pause duration for competition legality (seconds). */
+const COMPETITION_LEGAL_PAUSE_S = 1.0;
+
+/**
+ * Detect a pause at the bottom of a bench press rep.
+ *
+ * Scans the elbow angle sequence around the bottom position. A pause is
+ * a contiguous run of frames where the per-frame angular change stays
+ * below PAUSE_VELOCITY_THRESHOLD. The longest such run within the bottom
+ * region is used.
+ */
+export function detectBenchPause(
+  elbowAngles: number[],
+  bottomRelIdx: number,
+  fps: number,
+): BenchPauseResult {
+  const noPause: BenchPauseResult = {
+    detected: false,
+    durationMs: 0,
+    durationFrames: 0,
+    isCompetitionLegal: false,
+    elbowAngleAtPause: elbowAngles[bottomRelIdx] ?? 0,
+    stability: 0,
+  };
+
+  if (elbowAngles.length < 3 || fps <= 0) return noPause;
+
+  // Define the search region: from when we're near the bottom until the
+  // elbow starts clearly opening. We look from a few frames before the
+  // bottom index to a window after it.
+  const minAngle = elbowAngles[bottomRelIdx] ?? 180;
+  const nearBottomThreshold = minAngle + 10; // within 10 degrees of minimum
+
+  // Find the start of the bottom region (first frame within threshold before bottomRelIdx)
+  let regionStart = bottomRelIdx;
+  for (let i = bottomRelIdx - 1; i >= 0; i--) {
+    if (elbowAngles[i] <= nearBottomThreshold) {
+      regionStart = i;
+    } else {
+      break;
+    }
+  }
+
+  // Find the end of the bottom region (last frame within threshold after bottomRelIdx)
+  let regionEnd = bottomRelIdx;
+  for (let i = bottomRelIdx + 1; i < elbowAngles.length; i++) {
+    if (elbowAngles[i] <= nearBottomThreshold) {
+      regionEnd = i;
+    } else {
+      break;
+    }
+  }
+
+  if (regionEnd - regionStart < MIN_PAUSE_FRAMES) return noPause;
+
+  // Scan the bottom region for the longest run of low-velocity frames
+  let bestRunStart = -1;
+  let bestRunLen = 0;
+  let currentRunStart = regionStart;
+  let currentRunLen = 1; // first frame in region always counts
+
+  for (let i = regionStart + 1; i <= regionEnd; i++) {
+    const delta = Math.abs(elbowAngles[i] - elbowAngles[i - 1]);
+    if (delta < PAUSE_VELOCITY_THRESHOLD) {
+      currentRunLen++;
+    } else {
+      if (currentRunLen > bestRunLen) {
+        bestRunLen = currentRunLen;
+        bestRunStart = currentRunStart;
+      }
+      currentRunStart = i;
+      currentRunLen = 1;
+    }
+  }
+  // Check final run
+  if (currentRunLen > bestRunLen) {
+    bestRunLen = currentRunLen;
+    bestRunStart = currentRunStart;
+  }
+
+  if (bestRunLen < MIN_PAUSE_FRAMES || bestRunStart < 0) return noPause;
+
+  const durationS = bestRunLen / fps;
+  if (durationS < MIN_PAUSE_DURATION_S) return noPause;
+
+  // Compute average elbow angle and stability during the pause
+  const pauseAngles = elbowAngles.slice(bestRunStart, bestRunStart + bestRunLen);
+  const avgAngle = pauseAngles.reduce((s, v) => s + v, 0) / pauseAngles.length;
+
+  // Stability: average absolute per-frame change during the pause
+  let totalDelta = 0;
+  for (let i = 1; i < pauseAngles.length; i++) {
+    totalDelta += Math.abs(pauseAngles[i] - pauseAngles[i - 1]);
+  }
+  const avgDelta = pauseAngles.length > 1 ? totalDelta / (pauseAngles.length - 1) : 0;
+  // Map avg delta to 0-100 stability: 0 delta = 100, threshold delta = 0
+  const stability = clamp(Math.round((1 - avgDelta / PAUSE_VELOCITY_THRESHOLD) * 100), 0, 100);
+
+  return {
+    detected: true,
+    durationMs: Math.round(durationS * 1000),
+    durationFrames: bestRunLen,
+    isCompetitionLegal: durationS >= COMPETITION_LEGAL_PAUSE_S,
+    elbowAngleAtPause: Math.round(avgAngle * 10) / 10,
+    stability,
+  };
+}
+
 // ─── Phase Detection (elbow angle driven) ───
 
-const EXTENDED_ELBOW_ANGLE = 155;   // Arms mostly straight
-const DESCENDING_THRESHOLD = 2.0;
-const BOTTOM_VELOCITY_THRESHOLD = 1.5;
-const ASCENDING_THRESHOLD = 2.0;
-const MIN_REP_FRAMES = 6;
-const SMOOTHING_WINDOW = 5;
-const HISTORY_WINDOW = 3;
+import { detectRepsGeneric } from '../phase-detector';
+import type { PhaseDetectorConfig } from '../phase-detector';
 
-function smoothAngle(buffer: number[], newValue: number, windowSize: number): number {
-  buffer.push(newValue);
-  if (buffer.length > windowSize) buffer.shift();
-  return buffer.reduce((sum, v) => sum + v, 0) / buffer.length;
-}
-
-class BenchPhaseDetector {
-  private phase: SquatPhase = SquatPhase.STANDING; // STANDING = arms extended
-  private smoothBuffer: number[] = [];
-  private smoothedHistory: number[] = [];
-  private prevSmoothedAngle: number | null = null;
-  private bottomHoldCount = 0;
-
-  reset(): void {
-    this.phase = SquatPhase.STANDING;
-    this.smoothBuffer = [];
-    this.smoothedHistory = [];
-    this.prevSmoothedAngle = null;
-    this.bottomHoldCount = 0;
-  }
-
-  private cumulativeDelta(): number {
-    if (this.smoothedHistory.length < 2) return 0;
-    return this.smoothedHistory[this.smoothedHistory.length - 1] - this.smoothedHistory[0];
-  }
-
-  update(elbowAngle: number): SquatPhase {
-    const smoothed = smoothAngle(this.smoothBuffer, elbowAngle, SMOOTHING_WINDOW);
-    this.smoothedHistory.push(smoothed);
-    if (this.smoothedHistory.length > HISTORY_WINDOW + 1) this.smoothedHistory.shift();
-
-    const delta = this.prevSmoothedAngle !== null ? smoothed - this.prevSmoothedAngle : 0;
-    const cumDelta = this.cumulativeDelta();
-
-    switch (this.phase) {
-      case SquatPhase.STANDING: // Arms extended
-        this.bottomHoldCount = 0;
-        if (smoothed < EXTENDED_ELBOW_ANGLE && cumDelta < -DESCENDING_THRESHOLD) {
-          this.phase = SquatPhase.DESCENDING; // Lowering bar
-        }
-        break;
-
-      case SquatPhase.DESCENDING: // Lowering
-        if (Math.abs(delta) < BOTTOM_VELOCITY_THRESHOLD) {
-          this.bottomHoldCount++;
-          if (this.bottomHoldCount >= 2) {
-            this.phase = SquatPhase.BOTTOM; // Bar on chest
-            this.bottomHoldCount = 0;
-          }
-        } else if (delta > 0) {
-          this.phase = SquatPhase.BOTTOM;
-          this.bottomHoldCount = 0;
-        } else {
-          this.bottomHoldCount = 0;
-        }
-        break;
-
-      case SquatPhase.BOTTOM: // Bar on chest
-        if (cumDelta > ASCENDING_THRESHOLD) {
-          this.phase = SquatPhase.ASCENDING; // Pressing
-        }
-        break;
-
-      case SquatPhase.ASCENDING: // Pressing
-        if (smoothed >= EXTENDED_ELBOW_ANGLE) {
-          this.phase = SquatPhase.STANDING; // Lockout
-        }
-        break;
-    }
-
-    this.prevSmoothedAngle = smoothed;
-    return this.phase;
-  }
-
-  getCurrentPhase(): SquatPhase {
-    return this.phase;
-  }
-}
+const BENCH_PHASE_CONFIG: PhaseDetectorConfig = {
+  standingAngle: 155,       // Arms mostly straight
+  descendingThreshold: 2.0,
+  bottomVelocityThreshold: 1.5,
+  ascendingThreshold: 2.0,
+  minRepFrames: 6,
+};
 
 function detectBenchReps(elbowAngles: number[]): RepRange[] {
-  const detector = new BenchPhaseDetector();
-  const reps: RepRange[] = [];
-  let repStart = -1;
-  let bottomIdx = -1;
-  let minAngleInRep = 180;
-
-  for (let i = 0; i < elbowAngles.length; i++) {
-    const prevPhase = detector.getCurrentPhase();
-    const phase = detector.update(elbowAngles[i]);
-
-    if (prevPhase === SquatPhase.STANDING && phase === SquatPhase.DESCENDING) {
-      repStart = i;
-      minAngleInRep = elbowAngles[i];
-      bottomIdx = i;
-    }
-
-    if (repStart >= 0 && (phase === SquatPhase.DESCENDING || phase === SquatPhase.BOTTOM)) {
-      if (elbowAngles[i] < minAngleInRep) {
-        minAngleInRep = elbowAngles[i];
-        bottomIdx = i;
-      }
-    }
-
-    if (prevPhase === SquatPhase.ASCENDING && phase === SquatPhase.STANDING && repStart >= 0) {
-      if ((i - repStart) >= MIN_REP_FRAMES) {
-        reps.push({ start: repStart, end: i, bottomIndex: bottomIdx });
-      }
-      repStart = -1;
-      bottomIdx = -1;
-      minAngleInRep = 180;
-    }
-  }
-
-  return reps;
+  return detectRepsGeneric(elbowAngles, BENCH_PHASE_CONFIG);
 }
 
 // ─── Bench Scoring ───
@@ -262,11 +284,41 @@ export function scoreBenchPause(bottomDuration: number, config: BenchConfig): nu
   return clamp(90 - (bottomDuration - 2.0) * 10, 0, 100);
 }
 
+/**
+ * Score the bench pause using the detailed BenchPauseResult.
+ * Provides finer-grained scoring than the simple duration-based version.
+ *
+ * Score tiers:
+ *   No detectable pause (< 0.3s): 0
+ *   Brief pause (0.3-0.7s):       40
+ *   Adequate pause (0.7-1.2s):    70
+ *   Good pause (1.2-2.0s):        90
+ *   Long pause (2.0-4.0s):        95  (diminishing returns)
+ *   Excessive pause (> 4.0s):     80  (energy leak)
+ *
+ * In competition mode, no pause caps the total rep score at 50 ("No Lift").
+ */
+export function scoreBenchPauseDetailed(
+  pauseResult: BenchPauseResult,
+  config: BenchConfig,
+): number {
+  const durationS = pauseResult.durationMs / 1000;
+
+  if (!pauseResult.detected || durationS < 0.3) return 0;
+  if (durationS < 0.7) return 40;
+  if (durationS < 1.2) return 70;
+  if (durationS < 2.0) return 90;
+  if (durationS <= 4.0) return 95;
+  // Excessively long pause — energy leak
+  return 80;
+}
+
 // ─── Bench Issue Detection ───
 
 export function detectBenchIssues(
   rep: RepData,
   config: BenchConfig,
+  pauseResult?: BenchPauseResult,
 ): FormIssue[] {
   const issues: FormIssue[] = [];
 
@@ -377,6 +429,37 @@ export function detectBenchIssues(
     });
   }
 
+  // 8. No pause at chest (detailed pause detection)
+  if (pauseResult) {
+    const pauseDurationS = pauseResult.durationMs / 1000;
+    if (!pauseResult.detected || pauseDurationS < 0.3) {
+      issues.push({
+        name: 'no_pause_bench',
+        severity: config.competitionMode ? 'high' : 'low',
+        description: config.competitionMode
+          ? 'No pause detected at the chest — this would be a "No Lift" in competition'
+          : 'The bar should come to a complete stop on the chest before pressing',
+        value: pauseDurationS,
+        threshold: config.competitionMode ? 1.0 : 0.3,
+        phase: SquatPhase.BOTTOM,
+        frame: rep.bottomFrame,
+      });
+    }
+
+    // 9. Unstable pause (pause detected but bar was moving)
+    if (pauseResult.detected && pauseResult.stability < 50) {
+      issues.push({
+        name: 'unstable_pause_bench',
+        severity: 'low',
+        description: 'The bar is moving slightly during the pause — in competition, the bar must be "motionless on the chest"',
+        value: pauseResult.stability,
+        threshold: 50,
+        phase: SquatPhase.BOTTOM,
+        frame: rep.bottomFrame,
+      });
+    }
+  }
+
   return issues;
 }
 
@@ -425,6 +508,18 @@ const BENCH_CUE_DATABASE: Record<string, { cue: string; priority: number; explan
     explanation: 'The bar stalled during the press, which usually happens about 2-3 inches off the chest. Build strength at this point with pause reps, Spoto press, or board press.',
     explanationBeginner: 'The bar got stuck partway up. This is the hardest point in the bench press and totally normal! Try to push as fast as you can right from the start — the extra speed helps carry you through. If it keeps happening, use a slightly lighter weight.',
   },
+  no_pause_bench: {
+    cue: 'Touch and hold — imagine gluing the bar to your chest for a beat',
+    priority: 1,
+    explanation: 'In competition, you must hold the bar motionless on your chest until the head judge gives the "Press" command. Even in training, a brief pause builds strength off the chest and teaches control.',
+    explanationBeginner: 'In competition, you have to hold the bar still on your chest and wait for the judge to say "Press." Even in training, a brief pause helps build strength off the chest. Try counting "one" before you push.',
+  },
+  unstable_pause_bench: {
+    cue: 'Squeeze the bar into your chest — lock your lats and hold',
+    priority: 5,
+    explanation: 'The bar is moving slightly during the pause. In competition, the bar must be "motionless on the chest." Pull the bar down into your chest with your lats and think about absorbing it before you explode up.',
+    explanationBeginner: 'Try to keep the bar completely still on your chest. Think about squeezing the bar into your chest with your back muscles (lats). Once it is totally still, then push it up.',
+  },
 };
 
 export function getBenchCues(issues: FormIssue[], experienceLevel?: string): CoachingCue[] {
@@ -461,12 +556,18 @@ export function getBenchPositiveFeedback(scores: {
 
 // ─── Rep Building & Scoring ───
 
+/** Result from buildBenchRepData including the pause detection. */
+interface BenchRepBuildResult {
+  repData: RepData;
+  pauseResult: BenchPauseResult;
+}
+
 function buildBenchRepData(
   repRange: RepRange,
   frameAnglesMap: Map<number, FrameAngles>,
   frameIndices: number[],
   fps: number,
-): RepData {
+): BenchRepBuildResult {
   const { start, end, bottomIndex } = repRange;
   const repFrameAngles: FrameAngles[] = [];
   for (let i = start; i <= end && i < frameIndices.length; i++) {
@@ -492,32 +593,39 @@ function buildBenchRepData(
   const bottomRelIdx = bottomIndex - start;
   const velocity = computeVelocityMetrics(elbowAngles, bottomRelIdx, fps);
 
+  // Pause detection
+  const pauseResult = detectBenchPause(elbowAngles, bottomRelIdx, fps);
+
   return {
-    repNumber: 0,
-    startFrame: frameIndices[start] ?? 0,
-    endFrame: frameIndices[end] ?? 0,
-    bottomFrame: frameIndices[bottomIndex] ?? 0,
-    minKneeAngle: 180,  // Not relevant for bench
-    minHipAngle: 180,
-    maxTrunkAngle: 0,
-    descentDuration,
-    bottomDuration,
-    ascentDuration,
-    frameAngles: repFrameAngles,
-    heelRise: false,
-    buttWink: false,
-    goodMorning: false,
-    kneeValgus: false,
-    trunkAngleChangeOnAscent: 0,
-    pelvicTiltAtBottom: 0,
-    stickingPoints: [],
-    velocity,
+    repData: {
+      repNumber: 0,
+      startFrame: frameIndices[start] ?? 0,
+      endFrame: frameIndices[end] ?? 0,
+      bottomFrame: frameIndices[bottomIndex] ?? 0,
+      minKneeAngle: 180,  // Not relevant for bench
+      minHipAngle: 180,
+      maxTrunkAngle: 0,
+      descentDuration,
+      bottomDuration,
+      ascentDuration,
+      frameAngles: repFrameAngles,
+      heelRise: false,
+      buttWink: false,
+      goodMorning: false,
+      kneeValgus: false,
+      trunkAngleChangeOnAscent: 0,
+      pelvicTiltAtBottom: 0,
+      stickingPoints: [],
+      velocity,
+    },
+    pauseResult,
   };
 }
 
 function scoreBenchRep(
   rep: RepData,
   config: BenchConfig,
+  pauseResult?: BenchPauseResult,
 ): RepScore {
   const minElbow = Math.min(...rep.frameAngles.map(fa => fa.elbowAngle ?? 180));
   const rom = scoreBenchROM(minElbow, config);
@@ -525,7 +633,11 @@ function scoreBenchRep(
   const control = scoreBenchControl(rep);
   const symmetry = scoreBenchSymmetry(rep);
   const tempo = config.competitionMode ? 100 : scoreBenchTempo(rep.descentDuration, rep.ascentDuration);
-  const pause = scoreBenchPause(rep.bottomDuration, config);
+
+  // Use detailed pause scoring when available, otherwise fall back to duration-based
+  const pause = pauseResult
+    ? scoreBenchPauseDetailed(pauseResult, config)
+    : scoreBenchPause(rep.bottomDuration, config);
 
   const w = config.competitionMode ? BENCH_COMPETITION_WEIGHTS : BENCH_WEIGHTS;
 
@@ -541,7 +653,7 @@ function scoreBenchRep(
     0, 100,
   );
 
-  const issues = detectBenchIssues(rep, config);
+  const issues = detectBenchIssues(rep, config, pauseResult);
   const cues = getBenchCues(issues, config.experienceLevel);
   const positiveFeedback = getBenchPositiveFeedback({
     rom, lockout, control, symmetry, tempo, pause,
@@ -550,6 +662,11 @@ function scoreBenchRep(
   let totalScore = overall;
   const highCount = issues.filter(i => i.severity === 'high').length;
   if (highCount > 0) totalScore = Math.max(0, totalScore - highCount * 5);
+
+  // Competition mode: cap score at 50 if no pause detected (like depth gate for squats)
+  if (config.competitionMode && pauseResult && (!pauseResult.detected || pauseResult.durationMs < 300)) {
+    totalScore = Math.min(totalScore, 50);
+  }
 
   // Aggregate landmark confidence across all frames in this rep
   const confidenceValues = rep.frameAngles
@@ -639,9 +756,9 @@ export function analyzeBenchSequence(
 
   for (let r = 0; r < repRanges.length; r++) {
     const range = repRanges[r];
-    const repData = buildBenchRepData(range, frameAnglesMap, frameIndices, fps);
+    const { repData, pauseResult } = buildBenchRepData(range, frameAnglesMap, frameIndices, fps);
     repData.repNumber = r + 1;
-    const score = scoreBenchRep(repData, config);
+    const score = scoreBenchRep(repData, config, pauseResult);
     repScores.push(score);
   }
 

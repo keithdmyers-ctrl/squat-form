@@ -407,3 +407,94 @@ export function generateSpecificPositives(reps: RepScore[], _calibration: Calibr
 
   return positives;
 }
+
+// ─── Task 6.6: Butt Wink Severity Assessment ───
+
+/**
+ * Determine butt wink severity based on context.
+ *
+ * Per DPT review: "Mild posterior pelvic tilt at the very bottom of a deep squat
+ * is often a benign finding related to hip morphology (Vigotsky et al. 2019, Sports Med).
+ * For unloaded squats, butt wink at MODERATE severity may alarm beginners unnecessarily."
+ *
+ * Rules:
+ * - Beginners with mild butt wink (< 10 degrees pelvic tilt): not flagged at all
+ * - Unloaded (weight = 0 or not provided): downgrade MODERATE to LOW
+ * - Add contextual note about hip structure
+ */
+export interface ButtWinkAssessment {
+  /** Whether to flag the butt wink as an issue at all */
+  shouldFlag: boolean;
+  /** Adjusted severity: 'high' | 'moderate' | 'low' */
+  severity: 'high' | 'moderate' | 'low';
+  /** Explanation string, potentially including the reassuring note */
+  explanation: string;
+  /** The reassuring note about hip morphology */
+  note: string;
+}
+
+export function assessButtWinkSeverity(
+  pelvicTiltDegrees: number,
+  options: {
+    experienceLevel: ExperienceLevel;
+    weight?: number;          // 0 or undefined = bodyweight/unloaded
+    hasButtWink: boolean;     // whether the threshold was crossed
+  },
+): ButtWinkAssessment {
+  const morphologyNote = 'Note: Some hip tucking at the bottom is normal and related to your hip structure. It\'s only a concern under heavy loading.';
+  const isUnloaded = !options.weight || options.weight === 0;
+  const isBeginner = options.experienceLevel === 'beginner';
+  const isMild = pelvicTiltDegrees < 10;
+
+  // Not flagged at all: butt wink wasn't detected
+  if (!options.hasButtWink) {
+    return {
+      shouldFlag: false,
+      severity: 'low',
+      explanation: '',
+      note: morphologyNote,
+    };
+  }
+
+  // Beginners with mild butt wink (< 10 degrees): don't flag at all
+  if (isBeginner && isMild) {
+    return {
+      shouldFlag: false,
+      severity: 'low',
+      explanation: '',
+      note: morphologyNote,
+    };
+  }
+
+  // Determine base severity
+  let severity: 'high' | 'moderate' | 'low';
+  if (pelvicTiltDegrees > 20) {
+    severity = 'high';
+  } else if (pelvicTiltDegrees > 8) {
+    severity = 'moderate';
+  } else {
+    severity = 'low';
+  }
+
+  // Unloaded squats: downgrade MODERATE to LOW
+  if (isUnloaded && severity === 'moderate') {
+    severity = 'low';
+  }
+
+  // Build explanation based on severity
+  let explanation: string;
+  if (severity === 'high') {
+    explanation = `Pronounced lower back rounding at the bottom (${Math.round(pelvicTiltDegrees)}° pelvic tilt). Under heavier loads this becomes a concern for disc health. Limit your depth to where your back stays neutral.`;
+  } else if (severity === 'moderate') {
+    explanation = `Pelvis tucked under at the bottom position (${Math.round(pelvicTiltDegrees)}° pelvic tilt). ${morphologyNote}`;
+  } else {
+    explanation = `Slight pelvic tilt at the bottom (${Math.round(pelvicTiltDegrees)}°). ${morphologyNote}`;
+  }
+
+  return {
+    shouldFlag: true,
+    severity,
+    explanation,
+    note: morphologyNote,
+  };
+}

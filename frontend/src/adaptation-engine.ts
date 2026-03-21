@@ -16,7 +16,7 @@ import type { ProgramDefinition, UserProfile, EquipmentLevel } from './workout-p
 import { PROGRAMS, EXERCISE_SLOTS, getExerciseName, recommendPrograms } from './workout-programs';
 import type { ProgramState, LiftProgress, WorkoutLog, ReadinessData, SessionDifficulty } from './workout-storage';
 import { loadWorkoutLogs } from './workout-storage';
-import { roundToPlate } from './progression-engine';
+import { roundToPlate, enforceBarMinimum } from './progression-engine';
 
 // ─── Utilities ───
 
@@ -66,6 +66,33 @@ export interface AdaptationDecision {
 }
 
 /**
+ * A weight change recommendation that may or may not be auto-applied.
+ * Form-score-based reductions are presented as recommendations (autoApply: false)
+ * so the user can confirm or dismiss them. Injury and RPE adjustments
+ * are auto-applied for safety or because they use user-reported data.
+ */
+export interface WeightRecommendation {
+  lift: string;
+  currentWeight: number;
+  recommendedWeight: number;
+  reason: string;
+  severity: 'suggestion' | 'warning' | 'urgent';
+  source: 'form_score' | 'rpe' | 'fatigue' | 'injury';
+  autoApply: boolean;
+}
+
+/**
+ * Result from the adaptation engine containing both applied decisions
+ * and pending recommendations that require user confirmation.
+ */
+export interface AdaptationResult {
+  /** Decisions that have been applied or are informational */
+  decisions: AdaptationDecision[];
+  /** Weight change recommendations pending user confirmation */
+  recommendations: WeightRecommendation[];
+}
+
+/**
  * Core adaptation engine: processes all feedback signals and returns
  * a list of adaptation decisions. Some are applied automatically,
  * others are recommendations for the user.
@@ -92,10 +119,27 @@ export function processAdaptations(
   readiness: ReadinessData | undefined,
   recentLogs: WorkoutLog[],
   formScores?: Record<string, number>,
-): AdaptationDecision[] {
+): AdaptationDecision[];
+export function processAdaptations(
+  state: ProgramState,
+  feedback: PostWorkoutFeedback,
+  readiness: ReadinessData | undefined,
+  recentLogs: WorkoutLog[],
+  formScores: Record<string, number> | undefined,
+  returnResult: true,
+): AdaptationResult;
+export function processAdaptations(
+  state: ProgramState,
+  feedback: PostWorkoutFeedback,
+  readiness: ReadinessData | undefined,
+  recentLogs: WorkoutLog[],
+  formScores?: Record<string, number>,
+  returnResult?: boolean,
+): AdaptationDecision[] | AdaptationResult {
   const decisions: AdaptationDecision[] = [];
+  const recommendations: WeightRecommendation[] = [];
   const program = PROGRAMS[state.programId];
-  if (!program) return decisions;
+  if (!program) return returnResult ? { decisions, recommendations } : decisions;
 
   // ═══ SIGNAL 0: Red Flag Screening (absolute highest priority) ═══
   for (const injury of feedback.injuries) {
@@ -198,33 +242,61 @@ export function processAdaptations(
   }
 
   // ═══ SIGNAL 2: Form Scores from CV Analysis ═══
+  // Form-score-based reductions are generated as RECOMMENDATIONS (not auto-applied)
+  // so the user can confirm or dismiss them. The rationale: form scores come from
+  // computer vision which can be noisy, and the user should have final say on
+  // whether to reduce weight based on technique feedback.
   if (formScores) {
     for (const [lift, score] of Object.entries(formScores)) {
       const progress = state.liftProgress[lift];
       if (!progress) continue;
 
       if (score < 60) {
-        // Severe form breakdown — aggressive weight reduction
-        const reducedWeight = roundToPlate(progress.currentWeight * 0.88, progress.unit);
-        progress.currentWeight = reducedWeight;
+        // Severe form breakdown — recommend aggressive weight reduction
+        const reducedWeight = enforceBarMinimum(
+          roundToPlate(progress.currentWeight * 0.88, progress.unit),
+          progress.unit,
+        );
+        const reason = `${capitalize(lift)} form score ${score}/100 indicates significant technique breakdown. ` +
+          `Recommending ${reducedWeight} ${progress.unit} (-12%) to rebuild movement quality. ` +
+          `Focus on controlled tempo and full range of motion for the next 2-3 sessions before progressing.`;
+        recommendations.push({
+          lift,
+          currentWeight: progress.currentWeight,
+          recommendedWeight: reducedWeight,
+          reason,
+          severity: 'urgent',
+          source: 'form_score',
+          autoApply: false,
+        });
         decisions.push({
           type: 'weight_decrease',
           lift,
-          description: `${capitalize(lift)} form score ${score}/100 indicates significant technique breakdown. ` +
-            `Reducing to ${reducedWeight} ${progress.unit} (-12%) to rebuild movement quality. ` +
-            `Focus on controlled tempo and full range of motion for the next 2-3 sessions before progressing.`,
+          description: reason,
           citation: 'Helms et al. (2016): Technique degradation under load indicates the weight exceeds current neuromuscular capacity. Reduce load to re-establish motor patterns.',
-          applied: true,
+          applied: false,
         });
       } else if (score < 70) {
-        const reducedWeight = roundToPlate(progress.currentWeight * 0.92, progress.unit);
-        progress.currentWeight = reducedWeight;
+        const reducedWeight = enforceBarMinimum(
+          roundToPlate(progress.currentWeight * 0.92, progress.unit),
+          progress.unit,
+        );
+        const reason = `${capitalize(lift)} form score ${score}/100 — recommending ${reducedWeight} ${progress.unit} (-8%) for technique reinforcement.`;
+        recommendations.push({
+          lift,
+          currentWeight: progress.currentWeight,
+          recommendedWeight: reducedWeight,
+          reason,
+          severity: 'warning',
+          source: 'form_score',
+          autoApply: false,
+        });
         decisions.push({
           type: 'weight_decrease',
           lift,
-          description: `${capitalize(lift)} form score ${score}/100 — reducing to ${reducedWeight} ${progress.unit} (-8%) for technique reinforcement.`,
+          description: reason,
           citation: 'Helms et al. (2016): Sub-70 form scores warrant load reduction.',
-          applied: true,
+          applied: false,
         });
       } else if (score >= 90) {
         decisions.push({
@@ -288,7 +360,20 @@ export function processAdaptations(
   const advanceDecision = checkPhaseAdvancement(state, recentLogs, program);
   if (advanceDecision) decisions.push(advanceDecision);
 
-  return decisions;
+  return returnResult ? { decisions, recommendations } : decisions;
+}
+
+/**
+ * Apply a pending weight recommendation (called when user confirms).
+ * Updates the lift progress with the recommended weight.
+ */
+export function applyWeightRecommendation(
+  state: ProgramState,
+  recommendation: WeightRecommendation,
+): void {
+  const progress = state.liftProgress[recommendation.lift];
+  if (!progress) return;
+  progress.currentWeight = enforceBarMinimum(recommendation.recommendedWeight, progress.unit);
 }
 
 // ─── Difficulty Feedback Processing ───
@@ -328,7 +413,10 @@ function processDifficultyFeedback(
       if (recentTooHard >= 2) {
         // Multiple "too hard" sessions — reduce by 5%
         for (const [lift, progress] of Object.entries(state.liftProgress)) {
-          progress.currentWeight = roundToPlate(progress.currentWeight * 0.95, progress.unit);
+          progress.currentWeight = enforceBarMinimum(
+            roundToPlate(progress.currentWeight * 0.95, progress.unit),
+            progress.unit,
+          );
           adjustedLifts.add(lift);
         }
         decisions.push({
@@ -355,7 +443,10 @@ function processDifficultyFeedback(
     case 'could_not_finish': {
       // Force deload
       for (const [lift, progress] of Object.entries(state.liftProgress)) {
-        progress.currentWeight = roundToPlate(progress.currentWeight * 0.9, progress.unit);
+        progress.currentWeight = enforceBarMinimum(
+          roundToPlate(progress.currentWeight * 0.9, progress.unit),
+          progress.unit,
+        );
         adjustedLifts.add(lift);
       }
       decisions.push({
@@ -520,7 +611,10 @@ function checkForcedDeload(
   if (fatigueSignals >= 3) {
     // Apply deload to all lifts
     for (const progress of Object.values(state.liftProgress)) {
-      progress.currentWeight = roundToPlate(progress.currentWeight * 0.85, progress.unit);
+      progress.currentWeight = enforceBarMinimum(
+        roundToPlate(progress.currentWeight * 0.85, progress.unit),
+        progress.unit,
+      );
     }
 
     return {
@@ -687,7 +781,10 @@ export function autoregulate(
     if (avgFormScore < 70) {
       const progress = state.liftProgress[liftKey];
       if (progress) {
-        const reducedWeight = roundToPlate(progress.currentWeight * 0.92, progress.unit);
+        const reducedWeight = enforceBarMinimum(
+          roundToPlate(progress.currentWeight * 0.92, progress.unit),
+          progress.unit,
+        );
         messages.push(
           `${capitalize(liftKey)}: Average form score ${Math.round(avgFormScore)}/100 across recent sessions. ` +
           `Reducing weight to ${reducedWeight} ${progress.unit} to rebuild technique. ` +

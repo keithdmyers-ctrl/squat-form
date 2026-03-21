@@ -35,128 +35,19 @@ export interface LungeConfig {
 
 // ─── Phase Detection (knee angle driven) ───
 
-const STANDING_KNEE_ANGLE = 155;
-const DESCENDING_THRESHOLD = 2.0;
-const BOTTOM_VELOCITY_THRESHOLD = 1.5;
-const ASCENDING_THRESHOLD = 2.0;
-const MIN_REP_FRAMES = 8;
-const SMOOTHING_WINDOW = 5;
-const HISTORY_WINDOW = 3;
+import { detectRepsGeneric } from '../phase-detector';
+import type { PhaseDetectorConfig } from '../phase-detector';
 
-function smoothAngle(buffer: number[], newValue: number, windowSize: number): number {
-  buffer.push(newValue);
-  if (buffer.length > windowSize) buffer.shift();
-  return buffer.reduce((sum, v) => sum + v, 0) / buffer.length;
-}
-
-class LungePhaseDetector {
-  private phase: SquatPhase = SquatPhase.STANDING;
-  private smoothBuffer: number[] = [];
-  private smoothedHistory: number[] = [];
-  private prevSmoothedAngle: number | null = null;
-  private bottomHoldCount = 0;
-
-  reset(): void {
-    this.phase = SquatPhase.STANDING;
-    this.smoothBuffer = [];
-    this.smoothedHistory = [];
-    this.prevSmoothedAngle = null;
-    this.bottomHoldCount = 0;
-  }
-
-  private cumulativeDelta(): number {
-    if (this.smoothedHistory.length < 2) return 0;
-    return this.smoothedHistory[this.smoothedHistory.length - 1] - this.smoothedHistory[0];
-  }
-
-  update(kneeAngle: number): SquatPhase {
-    const smoothed = smoothAngle(this.smoothBuffer, kneeAngle, SMOOTHING_WINDOW);
-    this.smoothedHistory.push(smoothed);
-    if (this.smoothedHistory.length > HISTORY_WINDOW + 1) this.smoothedHistory.shift();
-
-    const delta = this.prevSmoothedAngle !== null ? smoothed - this.prevSmoothedAngle : 0;
-    const cumDelta = this.cumulativeDelta();
-
-    switch (this.phase) {
-      case SquatPhase.STANDING:
-        this.bottomHoldCount = 0;
-        if (smoothed < STANDING_KNEE_ANGLE && cumDelta < -DESCENDING_THRESHOLD) {
-          this.phase = SquatPhase.DESCENDING;
-        }
-        break;
-
-      case SquatPhase.DESCENDING:
-        if (Math.abs(delta) < BOTTOM_VELOCITY_THRESHOLD) {
-          this.bottomHoldCount++;
-          if (this.bottomHoldCount >= 2) {
-            this.phase = SquatPhase.BOTTOM;
-            this.bottomHoldCount = 0;
-          }
-        } else if (delta > 0) {
-          this.phase = SquatPhase.BOTTOM;
-          this.bottomHoldCount = 0;
-        } else {
-          this.bottomHoldCount = 0;
-        }
-        break;
-
-      case SquatPhase.BOTTOM:
-        if (cumDelta > ASCENDING_THRESHOLD) {
-          this.phase = SquatPhase.ASCENDING;
-        }
-        break;
-
-      case SquatPhase.ASCENDING:
-        if (smoothed >= STANDING_KNEE_ANGLE) {
-          this.phase = SquatPhase.STANDING;
-        }
-        break;
-    }
-
-    this.prevSmoothedAngle = smoothed;
-    return this.phase;
-  }
-
-  getCurrentPhase(): SquatPhase {
-    return this.phase;
-  }
-}
+const LUNGE_PHASE_CONFIG: PhaseDetectorConfig = {
+  standingAngle: 155,
+  descendingThreshold: 2.0,
+  bottomVelocityThreshold: 1.5,
+  ascendingThreshold: 2.0,
+  minRepFrames: 8,
+};
 
 function detectLungeReps(kneeAngles: number[]): RepRange[] {
-  const detector = new LungePhaseDetector();
-  const reps: RepRange[] = [];
-  let repStart = -1;
-  let bottomIdx = -1;
-  let minAngleInRep = 180;
-
-  for (let i = 0; i < kneeAngles.length; i++) {
-    const prevPhase = detector.getCurrentPhase();
-    const phase = detector.update(kneeAngles[i]);
-
-    if (prevPhase === SquatPhase.STANDING && phase === SquatPhase.DESCENDING) {
-      repStart = i;
-      minAngleInRep = kneeAngles[i];
-      bottomIdx = i;
-    }
-
-    if (repStart >= 0 && (phase === SquatPhase.DESCENDING || phase === SquatPhase.BOTTOM)) {
-      if (kneeAngles[i] < minAngleInRep) {
-        minAngleInRep = kneeAngles[i];
-        bottomIdx = i;
-      }
-    }
-
-    if (prevPhase === SquatPhase.ASCENDING && phase === SquatPhase.STANDING && repStart >= 0) {
-      if ((i - repStart) >= MIN_REP_FRAMES) {
-        reps.push({ start: repStart, end: i, bottomIndex: bottomIdx });
-      }
-      repStart = -1;
-      bottomIdx = -1;
-      minAngleInRep = 180;
-    }
-  }
-
-  return reps;
+  return detectRepsGeneric(kneeAngles, LUNGE_PHASE_CONFIG);
 }
 
 // ─── Lunge Scoring ───

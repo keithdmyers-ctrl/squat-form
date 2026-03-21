@@ -81,6 +81,109 @@ function pt(p: Point): [number, number, number] {
   return [p.x, p.y, p.z];
 }
 
+/**
+ * Compute lateral trunk shift: the horizontal displacement of the midpoint
+ * between shoulders relative to the midpoint between hips.
+ * A value of 0 means perfectly centered; positive means shifted right.
+ *
+ * The result is normalized by torso height (shoulder-to-hip distance) for
+ * scale independence.
+ *
+ * Reference: Cholewicki et al. (2005) — lateral trunk flexion as spine injury predictor
+ *
+ * @param landmarks Dict mapping landmark names to Point objects.
+ * @returns Normalized lateral shift value, or 0 if required landmarks are missing.
+ */
+export function computeLateralShift(landmarks: Record<string, Point>): number {
+  const leftShoulder = landmarks['left_shoulder'];
+  const rightShoulder = landmarks['right_shoulder'];
+  const leftHip = landmarks['left_hip'];
+  const rightHip = landmarks['right_hip'];
+
+  if (!leftShoulder || !rightShoulder || !leftHip || !rightHip) {
+    return 0;
+  }
+
+  const shoulderMidX = (leftShoulder.x + rightShoulder.x) / 2;
+  const shoulderMidY = (leftShoulder.y + rightShoulder.y) / 2;
+  const hipMidX = (leftHip.x + rightHip.x) / 2;
+  const hipMidY = (leftHip.y + rightHip.y) / 2;
+
+  // Torso height for normalization (vertical distance from shoulder mid to hip mid)
+  const torsoHeight = Math.sqrt(
+    (shoulderMidX - hipMidX) ** 2 + (shoulderMidY - hipMidY) ** 2,
+  );
+
+  if (torsoHeight < 1e-9) {
+    return 0;
+  }
+
+  const lateralShift = shoulderMidX - hipMidX;
+  return lateralShift / torsoHeight;
+}
+
+/**
+ * Compute the angle of the head/neck relative to the trunk.
+ * Uses ear-to-shoulder angle relative to the trunk line.
+ *
+ * Returns the neck extension angle in degrees.
+ * ~0 = neutral, positive = extended (looking up), negative = flexed (looking down)
+ *
+ * @param landmarks Dict mapping landmark names to Point objects.
+ * @returns Neck extension angle in degrees, or 0 if required landmarks are missing.
+ */
+export function computeNeckAngle(landmarks: Record<string, Point>): number {
+  const leftEar = landmarks['left_ear'];
+  const rightEar = landmarks['right_ear'];
+  const leftShoulder = landmarks['left_shoulder'];
+  const rightShoulder = landmarks['right_shoulder'];
+  const leftHip = landmarks['left_hip'];
+  const rightHip = landmarks['right_hip'];
+
+  // Need at least one ear, one shoulder, and one hip on the same side
+  const hasLeft = leftEar && leftShoulder && leftHip;
+  const hasRight = rightEar && rightShoulder && rightHip;
+
+  if (!hasLeft && !hasRight) {
+    return 0;
+  }
+
+  // Use the side with better visibility, or whichever is available
+  let ear: Point, shoulder: Point, hip: Point;
+  if (hasLeft && hasRight) {
+    const leftVis = leftEar.visibility + leftShoulder.visibility;
+    const rightVis = rightEar.visibility + rightShoulder.visibility;
+    if (leftVis >= rightVis) {
+      ear = leftEar;
+      shoulder = leftShoulder;
+      hip = leftHip;
+    } else {
+      ear = rightEar!;
+      shoulder = rightShoulder!;
+      hip = rightHip!;
+    }
+  } else if (hasLeft) {
+    ear = leftEar!;
+    shoulder = leftShoulder!;
+    hip = leftHip!;
+  } else {
+    ear = rightEar!;
+    shoulder = rightShoulder!;
+    hip = rightHip!;
+  }
+
+  // Trunk angle from vertical (shoulder -> hip direction)
+  const trunkAngleFromVertical = angleFromVertical(pt(shoulder), pt(hip));
+
+  // Neck/head angle from vertical (ear -> shoulder direction)
+  const neckAngleFromVertical = angleFromVertical(pt(ear), pt(shoulder));
+
+  // Relative neck extension = neck angle - trunk angle
+  // Positive means head is tilted back (extended) relative to the trunk
+  // Negative means head is tilted forward (flexed) relative to the trunk
+  return neckAngleFromVertical - trunkAngleFromVertical;
+}
+
 /** Pick the side (left/right) with better average visibility. */
 export function pickSide(landmarks: Record<string, Point>): 'left' | 'right' {
   const leftKeys = Object.keys(landmarks).filter((k) => k.startsWith('left_'));
@@ -127,6 +230,8 @@ export function computeFrameAngles(
       shinAngle: 0,
       kneeWidthRatio: null,
       hipSymmetry: null,
+      lateralShift: 0,
+      neckAngle: 0,
     };
   }
 
@@ -209,6 +314,12 @@ export function computeFrameAngles(
   const coreVisibilities = [shoulder.visibility, hip.visibility, knee.visibility, ankle.visibility];
   const landmarkConfidence = coreVisibilities.reduce((sum, v) => sum + v, 0) / coreVisibilities.length;
 
+  // Lateral trunk shift (frontal view — requires both sides)
+  const lateralShift = computeLateralShift(landmarks);
+
+  // Neck extension angle (requires ear landmarks)
+  const neckAngle = computeNeckAngle(landmarks);
+
   return {
     kneeAngle,
     hipAngle,
@@ -221,5 +332,7 @@ export function computeFrameAngles(
     elbowAngle,
     shoulderAngle,
     landmarkConfidence,
+    lateralShift,
+    neckAngle,
   };
 }

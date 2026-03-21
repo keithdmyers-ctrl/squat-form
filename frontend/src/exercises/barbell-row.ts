@@ -35,24 +35,13 @@ export interface BarBellRowConfig {
 
 // ─── Phase Detection (elbow angle driven, hip angle position) ───
 
-const EXTENDED_ELBOW_ANGLE = 150;   // Arms mostly straight (start position)
-const DESCENDING_THRESHOLD = 2.0;    // Used as "pulling" threshold (elbow angle decreasing)
-const BOTTOM_VELOCITY_THRESHOLD = 1.5;
-const ASCENDING_THRESHOLD = 2.0;     // Used as "lowering" threshold (elbow angle increasing)
-const MIN_REP_FRAMES = 6;
-const SMOOTHING_WINDOW = 5;
-const HISTORY_WINDOW = 3;
-
-function smoothAngle(buffer: number[], newValue: number, windowSize: number): number {
-  buffer.push(newValue);
-  if (buffer.length > windowSize) buffer.shift();
-  return buffer.reduce((sum, v) => sum + v, 0) / buffer.length;
-}
+import { detectRepsGeneric } from '../phase-detector';
+import type { PhaseDetectorConfig } from '../phase-detector';
 
 /**
- * Phase detector for barbell rows.
+ * Phase detection for barbell rows uses elbow angle.
  * STANDING = start position (elbows extended, hips hinged)
- * DESCENDING = pulling (elbows flexing — angle decreasing)
+ * DESCENDING = pulling (elbows flexing -- angle decreasing)
  * BOTTOM = top of row (elbows fully flexed, bar at torso)
  * ASCENDING = lowering (elbows extending back down)
  *
@@ -61,114 +50,16 @@ function smoothAngle(buffer: number[], newValue: number, windowSize: number): nu
  * - "DESCENDING" in elbow angle = pulling up
  * - "ASCENDING" in elbow angle = lowering down
  */
-class RowPhaseDetector {
-  private phase: SquatPhase = SquatPhase.STANDING;
-  private smoothBuffer: number[] = [];
-  private smoothedHistory: number[] = [];
-  private prevSmoothedAngle: number | null = null;
-  private bottomHoldCount = 0;
-
-  reset(): void {
-    this.phase = SquatPhase.STANDING;
-    this.smoothBuffer = [];
-    this.smoothedHistory = [];
-    this.prevSmoothedAngle = null;
-    this.bottomHoldCount = 0;
-  }
-
-  private cumulativeDelta(): number {
-    if (this.smoothedHistory.length < 2) return 0;
-    return this.smoothedHistory[this.smoothedHistory.length - 1] - this.smoothedHistory[0];
-  }
-
-  update(elbowAngle: number): SquatPhase {
-    const smoothed = smoothAngle(this.smoothBuffer, elbowAngle, SMOOTHING_WINDOW);
-    this.smoothedHistory.push(smoothed);
-    if (this.smoothedHistory.length > HISTORY_WINDOW + 1) this.smoothedHistory.shift();
-
-    const delta = this.prevSmoothedAngle !== null ? smoothed - this.prevSmoothedAngle : 0;
-    const cumDelta = this.cumulativeDelta();
-
-    switch (this.phase) {
-      case SquatPhase.STANDING: // Arms extended, bent over
-        this.bottomHoldCount = 0;
-        if (smoothed < EXTENDED_ELBOW_ANGLE && cumDelta < -DESCENDING_THRESHOLD) {
-          this.phase = SquatPhase.DESCENDING; // Pulling (elbow angle decreasing)
-        }
-        break;
-
-      case SquatPhase.DESCENDING: // Pulling
-        if (Math.abs(delta) < BOTTOM_VELOCITY_THRESHOLD) {
-          this.bottomHoldCount++;
-          if (this.bottomHoldCount >= 2) {
-            this.phase = SquatPhase.BOTTOM; // Top of row (bar at torso)
-            this.bottomHoldCount = 0;
-          }
-        } else if (delta > 0) {
-          this.phase = SquatPhase.BOTTOM;
-          this.bottomHoldCount = 0;
-        } else {
-          this.bottomHoldCount = 0;
-        }
-        break;
-
-      case SquatPhase.BOTTOM: // Bar at torso
-        if (cumDelta > ASCENDING_THRESHOLD) {
-          this.phase = SquatPhase.ASCENDING; // Lowering (elbow angle increasing)
-        }
-        break;
-
-      case SquatPhase.ASCENDING: // Lowering
-        if (smoothed >= EXTENDED_ELBOW_ANGLE) {
-          this.phase = SquatPhase.STANDING; // Back to start
-        }
-        break;
-    }
-
-    this.prevSmoothedAngle = smoothed;
-    return this.phase;
-  }
-
-  getCurrentPhase(): SquatPhase {
-    return this.phase;
-  }
-}
+const ROW_PHASE_CONFIG: PhaseDetectorConfig = {
+  standingAngle: 150,       // Arms mostly straight (start position)
+  descendingThreshold: 2.0,
+  bottomVelocityThreshold: 1.5,
+  ascendingThreshold: 2.0,
+  minRepFrames: 6,
+};
 
 export function detectRowReps(elbowAngles: number[]): RepRange[] {
-  const detector = new RowPhaseDetector();
-  const reps: RepRange[] = [];
-  let repStart = -1;
-  let bottomIdx = -1;
-  let minAngleInRep = 180;
-
-  for (let i = 0; i < elbowAngles.length; i++) {
-    const prevPhase = detector.getCurrentPhase();
-    const phase = detector.update(elbowAngles[i]);
-
-    if (prevPhase === SquatPhase.STANDING && phase === SquatPhase.DESCENDING) {
-      repStart = i;
-      minAngleInRep = elbowAngles[i];
-      bottomIdx = i;
-    }
-
-    if (repStart >= 0 && (phase === SquatPhase.DESCENDING || phase === SquatPhase.BOTTOM)) {
-      if (elbowAngles[i] < minAngleInRep) {
-        minAngleInRep = elbowAngles[i];
-        bottomIdx = i;
-      }
-    }
-
-    if (prevPhase === SquatPhase.ASCENDING && phase === SquatPhase.STANDING && repStart >= 0) {
-      if ((i - repStart) >= MIN_REP_FRAMES) {
-        reps.push({ start: repStart, end: i, bottomIndex: bottomIdx });
-      }
-      repStart = -1;
-      bottomIdx = -1;
-      minAngleInRep = 180;
-    }
-  }
-
-  return reps;
+  return detectRepsGeneric(elbowAngles, ROW_PHASE_CONFIG);
 }
 
 // ─── Barbell Row Scoring ───

@@ -12,10 +12,47 @@ import {
   suggestNextPhase,
   PHASE_DESCRIPTIONS,
 } from './programming';
-import { computeDOTS } from './one-rm';
+import { computeDOTS, calculateWilks2, calculateGLPoints, check1RMSafety } from './one-rm';
 import { generateAttemptPlan } from './competition';
 import { generateMeetPrepPlan } from './meet-prep-plan';
 import type { MeetPrepPlan } from './meet-prep-plan';
+import { getStrengthLevel, getNextMilestone, renderStrengthCard } from './strength-standards';
+
+// ─── Styles ───
+
+const UT_STYLES = `
+.ut-dots-panel-spaced { margin-top: var(--space-sm); }
+.ut-milestone-hint { margin-top: var(--space-xs); color: var(--accent); }
+.ut-safety-panel { border-color: var(--warning); background: rgba(251, 191, 36, 0.08); margin-top: var(--space-sm); }
+.ut-safety-heading { color: var(--warning); }
+.ut-safety-text { color: var(--warning); }
+.ut-score-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.35rem; }
+.ut-score-chip { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.5rem; border-radius: var(--radius-sm, 6px); background: var(--bg-card, #1a1a1a); border: 1px solid var(--border, #333); font-size: var(--font-xs, 0.75rem); color: var(--text-secondary, #b0b0b0); }
+.ut-score-chip strong { color: var(--accent, #00d4ff); font-weight: 700; }
+.ut-collapsible { margin-top: var(--space-sm); }
+.ut-collapsible-summary { cursor: pointer; font-size: var(--font-sm, 0.875rem); font-weight: 600; color: var(--text-secondary, #b0b0b0); padding: 0.35rem 0; list-style: none; }
+.ut-collapsible-summary::-webkit-details-marker { display: none; }
+.ut-collapsible-summary::before { content: '\\25B6'; display: inline-block; margin-right: 0.4rem; font-size: 0.65rem; transition: transform 0.15s ease; }
+.ut-collapsible[open] > .ut-collapsible-summary::before { transform: rotate(90deg); }
+.ut-meet-future-msg { font-size: var(--font-sm); color: var(--text-muted); }
+.ut-meet-weeks-out { font-size: var(--font-xs, 0.75rem); color: var(--text-muted, #808080); margin-bottom: 0.5rem; }
+.ut-meet-grid { display: grid; gap: 0.35rem; }
+.ut-meet-week-row { padding: 0.4rem 0.6rem; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border, #333); display: flex; justify-content: space-between; align-items: center; font-size: var(--font-sm, 0.875rem); }
+.ut-meet-week-row--current { border: 1px solid var(--accent, #00d4ff); background: var(--accent-glow, rgba(0,212,255,0.15)); }
+.ut-meet-week-label { color: var(--text-secondary, #b0b0b0); }
+.ut-meet-week-value { color: var(--text-primary, #e0e0e0); font-weight: 600; }
+.ut-date-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+.ut-date-label { font-size: var(--font-sm, 0.875rem); color: var(--text-secondary, #b0b0b0); }
+.ut-date-input { padding: 0.3rem 0.5rem; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border, #333); background: var(--bg-input, #1e1e1e); color: var(--text-primary, #e0e0e0); font-size: var(--font-sm, 0.875rem); }
+`;
+
+function injectUTStyles(): void {
+  if (document.getElementById('ut-extra-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'ut-extra-styles';
+  style.textContent = UT_STYLES;
+  document.head.appendChild(style);
+}
 
 // ─── Training Recommendations ───
 
@@ -25,6 +62,8 @@ export function renderTrainingRecommendations(
   sessions?: SessionRecord[],
   exerciseType?: string,
 ): void {
+  injectUTStyles();
+
   const existing = document.getElementById('training-recommendations');
   if (existing) existing.remove();
 
@@ -122,6 +161,8 @@ export function renderTrainingRecommendations(
 // ─── 1RM Estimation Card ───
 
 export function renderOneRMEstimate(estimate: OneRMEstimate): void {
+  injectUTStyles();
+
   const scoresPanel = document.querySelector('.scores-panel');
   if (!scoresPanel) return;
 
@@ -143,8 +184,9 @@ export function renderOneRMEstimate(estimate: OneRMEstimate): void {
       </div>
     `).join('');
 
-  // DOTS score: read bodyweight and sex from DOM
-  let dotsHtml = '';
+  // Read bodyweight and sex from DOM (shared by strength + scoring sections)
+  let strengthClassHtml = '';
+  let strengthScoresHtml = '';
   const bwInput = document.getElementById('bodyweight-input') as HTMLInputElement | null;
   const bwUnitSelect = document.getElementById('bodyweight-unit') as HTMLSelectElement | null;
   const rawBw = bwInput ? parseFloat(bwInput.value) : 0;
@@ -152,27 +194,80 @@ export function renderOneRMEstimate(estimate: OneRMEstimate): void {
   if (rawBw > 0 && estimate.average > 0) {
     const isMaleBtn = document.querySelector('.sex-toggle-btn.active') as HTMLElement | null;
     const isMale = isMaleBtn?.dataset.sex !== 'female';
+    const sex: 'male' | 'female' = isMale ? 'male' : 'female';
     // Convert to kg if needed for DOTS computation
     const bwKg = bwUnit === 'lbs' ? rawBw * 0.453592 : rawBw;
     const totalKg = estimate.unit === 'lbs' ? estimate.average * 0.453592 : estimate.average;
     const dotsResult = computeDOTS(totalKg, bwKg, isMale);
-    if (dotsResult) {
-      const level = dotsResult.score >= 500 ? 'Elite' : dotsResult.score >= 400 ? 'Advanced' : dotsResult.score >= 300 ? 'Intermediate' : 'Novice';
-      const levelColor = dotsResult.score >= 500 ? 'var(--danger)' : dotsResult.score >= 400 ? 'var(--warning)' : dotsResult.score >= 300 ? 'var(--accent)' : 'var(--text-muted)';
-      dotsHtml = `
+
+    // Calculate all scoring systems
+    const wilks2 = calculateWilks2(totalKg, bwKg, sex);
+    const glPoints = calculateGLPoints(totalKg, bwKg, sex);
+
+    // --- Strength Classification (shown FIRST, most meaningful to users) ---
+    const exerciseType = document.getElementById('exercise-type')?.querySelector('input:checked')?.getAttribute('value')
+      ?? (document.querySelector('[name="exercise-type"]:checked') as HTMLInputElement)?.value
+      ?? 'squat';
+    const liftKey = exerciseType === 'bench_press' ? 'bench' : exerciseType === 'overhead_press' ? 'ohp' : exerciseType;
+    if (['squat', 'bench', 'deadlift', 'ohp'].includes(liftKey)) {
+      const weightInLift = estimate.average;
+      const strengthLevel = getStrengthLevel(weightInLift, rawBw, liftKey, sex);
+      const milestone = getNextMilestone(weightInLift, rawBw, liftKey, sex);
+      const levelColors: Record<string, string> = {
+        untrained: '#9e9e9e', beginner: '#81c784', novice: '#4fc3f7',
+        intermediate: '#7c4dff', advanced: '#ff9800', elite: '#f44336',
+      };
+      strengthClassHtml = `
         <div class="dots-panel">
-          <div class="dots-heading">DOTS Score</div>
+          <div class="dots-heading">Strength Classification</div>
           <div class="dots-score-row">
-            <span class="dots-score-value">${dotsResult.score.toFixed(1)}</span>
-            <span class="dots-level" style="color: ${levelColor};">${level}</span>
+            <span class="dots-score-value" style="color: ${levelColors[strengthLevel] ?? 'var(--text-primary)'}; font-size: 1.25rem;">${strengthLevel.charAt(0).toUpperCase() + strengthLevel.slice(1)}</span>
           </div>
-          <div class="dots-subtitle">Relative strength at ${rawBw} ${escapeHtml(bwUnit)} (${isMale ? 'male' : 'female'})</div>
+          <div class="dots-subtitle">At ${rawBw} ${escapeHtml(bwUnit)} bodyweight (${sex})</div>
+          ${milestone ? `<div class="dots-subtitle ut-milestone-hint">Next: ${milestone.level.charAt(0).toUpperCase() + milestone.level.slice(1)} at ${Math.round(milestone.targetWeight)} ${escapeHtml(estimate.unit)} (+${Math.round(milestone.deficit)})</div>` : ''}
+        </div>
+      `;
+    }
+
+    // --- Relative Strength Scores (compact row: DOTS / Wilks / GL) ---
+    if (dotsResult) {
+      const scoreParts: string[] = [];
+      scoreParts.push(`<span class="ut-score-chip">DOTS <strong>${dotsResult.score.toFixed(1)}</strong></span>`);
+      if (wilks2 !== null) {
+        scoreParts.push(`<span class="ut-score-chip">Wilks-2 <strong>${wilks2.toFixed(1)}</strong></span>`);
+      }
+      if (glPoints !== null) {
+        scoreParts.push(`<span class="ut-score-chip">GL <strong>${glPoints.toFixed(1)}</strong></span>`);
+      }
+
+      strengthScoresHtml = `
+        <div class="dots-panel ut-dots-panel-spaced">
+          <div class="dots-heading">Relative Strength Scores</div>
+          <div class="ut-score-row">${scoreParts.join('')}</div>
         </div>
       `;
     }
   }
 
-  // Attempt plan: show whenever 1RM data is available and weight was entered
+  // 1RM safety check
+  let safetyHtml = '';
+  if (estimate.average > 0) {
+    const exerciseType = document.getElementById('exercise-type')?.querySelector('input:checked')?.getAttribute('value')
+      ?? (document.querySelector('[name="exercise-type"]:checked') as HTMLInputElement)?.value
+      ?? 'squat';
+    const liftKey = exerciseType === 'bench_press' ? 'bench' : exerciseType === 'overhead_press' ? 'ohp' : exerciseType;
+    const safetyCheck = check1RMSafety(estimate.average, liftKey, rawBw > 0 ? rawBw : undefined);
+    if (!safetyCheck.plausible && safetyCheck.warning) {
+      safetyHtml = `
+        <div class="dots-panel ut-safety-panel">
+          <div class="dots-heading ut-safety-heading">Safety Notice</div>
+          <div class="dots-subtitle ut-safety-text">${escapeHtml(safetyCheck.warning)}</div>
+        </div>
+      `;
+    }
+  }
+
+  // Attempt plan: collapsed by default inside a <details>
   let attemptHtml = '';
   const compModeCheckbox = document.getElementById('competition-mode') as HTMLInputElement | null;
   const weightInputEl = document.getElementById('weight-input') as HTMLInputElement | null;
@@ -182,23 +277,35 @@ export function renderOneRMEstimate(estimate: OneRMEstimate): void {
     const isCompMode = compModeCheckbox?.checked ?? false;
     const planLabel = isCompMode ? 'Competition Meet Attempts' : 'Estimated Meet Attempts';
     attemptHtml = `
-      <div class="one-rm-panel">
-        <div class="one-rm-panel-heading">${escapeHtml(planLabel)}</div>
-        <div class="one-rm-row">
-          <span class="attempt-row-label">Opener (~88%)</span>
-          <span class="attempt-opener">${plan.opener} ${escapeHtml(estimate.unit)}</span>
+      <details class="ut-collapsible">
+        <summary class="ut-collapsible-summary">${escapeHtml(planLabel)}</summary>
+        <div class="one-rm-panel">
+          <div class="one-rm-row">
+            <span class="attempt-row-label">Opener (~88%)</span>
+            <span class="attempt-opener">${plan.opener} ${escapeHtml(estimate.unit)}</span>
+          </div>
+          <div class="one-rm-row">
+            <span class="attempt-row-label">2nd Attempt (~94%)</span>
+            <span class="attempt-second">${plan.second} ${escapeHtml(estimate.unit)}</span>
+          </div>
+          <div class="one-rm-row">
+            <span class="attempt-row-label">3rd Attempt (~100%)</span>
+            <span class="attempt-third">${plan.third} ${escapeHtml(estimate.unit)}</span>
+          </div>
         </div>
-        <div class="one-rm-row">
-          <span class="attempt-row-label">2nd Attempt (~94%)</span>
-          <span class="attempt-second">${plan.second} ${escapeHtml(estimate.unit)}</span>
-        </div>
-        <div class="one-rm-row">
-          <span class="attempt-row-label">3rd Attempt (~100%)</span>
-          <span class="attempt-third">${plan.third} ${escapeHtml(estimate.unit)}</span>
-        </div>
-      </div>
+      </details>
     `;
   }
+
+  // Training percentages: collapsed by default inside a <details>
+  const percentagesHtml = `
+    <details class="ut-collapsible">
+      <summary class="ut-collapsible-summary">Training Percentages</summary>
+      <div class="one-rm-panel">
+        ${tableRows}
+      </div>
+    </details>
+  `;
 
   section.innerHTML = `
     <details>
@@ -212,12 +319,11 @@ export function renderOneRMEstimate(estimate: OneRMEstimate): void {
           <div class="one-rm-subtitle">Based on ${estimate.reps} reps at ${estimate.weight} ${escapeHtml(estimate.unit)}</div>
           <div class="one-rm-methods">Epley: ${estimate.epley} | Brzycki: ${estimate.brzycki}</div>
         </div>
-        ${dotsHtml}
+        ${safetyHtml}
+        ${strengthClassHtml}
+        ${strengthScoresHtml}
+        ${percentagesHtml}
         ${attemptHtml}
-        <div class="one-rm-panel">
-          <div class="one-rm-panel-heading">Training Percentages</div>
-          ${tableRows}
-        </div>
       </div>
     </details>
   `;
@@ -262,6 +368,8 @@ export function renderMeetPrepPlan(
   phase?: TrainingPhase,
   oneRMEstimate?: OneRMEstimate | null,
 ): void {
+  injectUTStyles();
+
   const existing = document.getElementById('meet-prep-plan');
   if (existing) existing.remove();
 
@@ -287,17 +395,17 @@ export function renderMeetPrepPlan(
   card.appendChild(desc);
 
   const dateRow = document.createElement('div');
-  dateRow.style.cssText = 'display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;';
+  dateRow.className = 'ut-date-row';
 
   const dateLabel = document.createElement('label');
   dateLabel.textContent = 'Meet date:';
-  dateLabel.style.cssText = 'font-size: var(--font-sm, 0.875rem); color: var(--text-secondary, #b0b0b0);';
+  dateLabel.className = 'ut-date-label';
   dateLabel.setAttribute('for', 'meet-date-input');
 
   const dateInput = document.createElement('input');
   dateInput.type = 'date';
   dateInput.id = 'meet-date-input';
-  dateInput.style.cssText = 'padding: 0.3rem 0.5rem; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border, #333); background: var(--bg-input, #1e1e1e); color: var(--text-primary, #e0e0e0); font-size: var(--font-sm, 0.875rem);';
+  dateInput.className = 'ut-date-input';
 
   // Restore saved date
   const savedDate = loadMeetPrepDate();
@@ -327,20 +435,20 @@ export function renderMeetPrepPlan(
     const plan = generateMeetPrepPlan(meetDate, oneRMEstimate.average, oneRMEstimate.unit);
 
     if (plan.weeks.length === 0) {
-      gridContainer.innerHTML = '<p style="font-size: var(--font-sm); color: var(--text-muted);">Meet date must be in the future.</p>';
+      gridContainer.innerHTML = '<p class="ut-meet-future-msg">Meet date must be in the future.</p>';
       return;
     }
 
-    let html = `<div style="font-size: var(--font-xs, 0.75rem); color: var(--text-muted, #808080); margin-bottom: 0.5rem;">${plan.weeksOut} weeks out</div>`;
-    html += '<div style="display: grid; gap: 0.35rem;">';
+    let html = `<div class="ut-meet-weeks-out">${plan.weeksOut} weeks out</div>`;
+    html += '<div class="ut-meet-grid">';
 
     for (const week of plan.weeks) {
       const isCurrentWeek = week.weekNumber === plan.weeksOut;
-      const highlightStyle = isCurrentWeek ? 'border: 1px solid var(--accent, #00d4ff); background: var(--accent-glow, rgba(0,212,255,0.15));' : 'border: 1px solid var(--border, #333);';
+      const rowClass = isCurrentWeek ? 'ut-meet-week-row ut-meet-week-row--current' : 'ut-meet-week-row';
       html += `
-        <div style="padding: 0.4rem 0.6rem; border-radius: var(--radius-sm, 6px); ${highlightStyle} display: flex; justify-content: space-between; align-items: center; font-size: var(--font-sm, 0.875rem);">
-          <span style="color: var(--text-secondary, #b0b0b0);">${escapeHtml(week.label)}</span>
-          <span style="color: var(--text-primary, #e0e0e0); font-weight: 600;">
+        <div class="${rowClass}">
+          <span class="ut-meet-week-label">${escapeHtml(week.label)}</span>
+          <span class="ut-meet-week-value">
             ${week.sets}x${escapeHtml(week.reps)} @ ${week.intensityPct}%${week.weight ? ` (${week.weight} ${escapeHtml(oneRMEstimate.unit)})` : ''}
           </span>
         </div>

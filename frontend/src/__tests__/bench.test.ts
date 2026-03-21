@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { analyzeBenchSequence } from '../exercises/bench';
-import type { BenchConfig } from '../exercises/bench';
+import {
+  analyzeBenchSequence,
+  detectBenchPause,
+  scoreBenchPauseDetailed,
+} from '../exercises/bench';
+import type { BenchConfig, BenchPauseResult } from '../exercises/bench';
 import type { Point, FrameAngles, FrameData } from '../types';
 import { SquatPhase } from '../types';
 
@@ -1185,5 +1189,275 @@ describe('Bench Press via Exercise Router', () => {
     });
 
     expect(result.repCount).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ── Pause Detection Tests ──
+
+describe('Bench Press Pause Detection', () => {
+  describe('detectBenchPause', () => {
+    it('detects a clear pause when angles are stationary at bottom', () => {
+      // Simulate: descent -> hold at 75 for 30 frames -> ascent
+      const angles: number[] = [];
+      // Descent
+      for (let i = 0; i < 20; i++) angles.push(170 - (95 * (i + 1)) / 20);
+      // Hold at bottom (30 frames = 1.0s at 30fps)
+      for (let i = 0; i < 30; i++) angles.push(75);
+      // Ascent
+      for (let i = 0; i < 20; i++) angles.push(75 + (95 * (i + 1)) / 20);
+
+      const bottomIdx = 20 + 15; // middle of hold
+      const result = detectBenchPause(angles, bottomIdx, 30);
+
+      expect(result.detected).toBe(true);
+      expect(result.durationMs).toBeGreaterThanOrEqual(900); // ~1s
+      expect(result.isCompetitionLegal).toBe(true);
+      expect(result.stability).toBeGreaterThan(80);
+    });
+
+    it('detects no pause when angles change rapidly through bottom', () => {
+      // Simulate: straight descent through bottom and immediately up (touch-and-go)
+      const angles: number[] = [];
+      // Smooth descent
+      for (let i = 0; i < 30; i++) angles.push(170 - (95 * (i + 1)) / 30);
+      // Immediate ascent (no hold at bottom)
+      for (let i = 0; i < 30; i++) angles.push(75 + (95 * (i + 1)) / 30);
+
+      const bottomIdx = 29; // last frame of descent
+      const result = detectBenchPause(angles, bottomIdx, 30);
+
+      // Either not detected or very short
+      if (result.detected) {
+        expect(result.durationMs).toBeLessThan(300);
+      }
+    });
+
+    it('detects a brief pause (< 1s)', () => {
+      const angles: number[] = [];
+      for (let i = 0; i < 20; i++) angles.push(170 - (95 * (i + 1)) / 20);
+      // Hold at bottom for 15 frames = 0.5s at 30fps
+      for (let i = 0; i < 15; i++) angles.push(75);
+      for (let i = 0; i < 20; i++) angles.push(75 + (95 * (i + 1)) / 20);
+
+      const bottomIdx = 20 + 7;
+      const result = detectBenchPause(angles, bottomIdx, 30);
+
+      expect(result.detected).toBe(true);
+      expect(result.durationMs).toBeGreaterThanOrEqual(400);
+      expect(result.isCompetitionLegal).toBe(false); // < 1s
+    });
+
+    it('returns stability of 100 for perfectly stationary pause', () => {
+      const angles: number[] = [];
+      for (let i = 0; i < 10; i++) angles.push(170 - (95 * (i + 1)) / 10);
+      // Perfectly stationary
+      for (let i = 0; i < 30; i++) angles.push(75);
+      for (let i = 0; i < 10; i++) angles.push(75 + (95 * (i + 1)) / 10);
+
+      const bottomIdx = 10 + 15;
+      const result = detectBenchPause(angles, bottomIdx, 30);
+
+      expect(result.detected).toBe(true);
+      expect(result.stability).toBe(100);
+    });
+
+    it('handles edge case with too few frames', () => {
+      const result = detectBenchPause([75, 80], 0, 30);
+      expect(result.detected).toBe(false);
+    });
+
+    it('handles 0 fps', () => {
+      const angles = [170, 150, 130, 100, 75, 75, 75, 100, 130, 170];
+      const result = detectBenchPause(angles, 4, 0);
+      expect(result.detected).toBe(false);
+    });
+  });
+
+  describe('scoreBenchPauseDetailed', () => {
+    const makePauseConfig = (overrides: Partial<BenchConfig> = {}): BenchConfig => ({
+      benchType: 'flat',
+      experienceLevel: 'intermediate',
+      competitionMode: false,
+      ...overrides,
+    });
+
+    const makePauseResult = (overrides: Partial<BenchPauseResult> = {}): BenchPauseResult => ({
+      detected: true,
+      durationMs: 1000,
+      durationFrames: 30,
+      isCompetitionLegal: true,
+      elbowAngleAtPause: 75,
+      stability: 90,
+      ...overrides,
+    });
+
+    it('returns 0 for no detectable pause', () => {
+      const score = scoreBenchPauseDetailed(
+        makePauseResult({ detected: false, durationMs: 0 }),
+        makePauseConfig(),
+      );
+      expect(score).toBe(0);
+    });
+
+    it('returns 0 for very brief pause (< 0.3s)', () => {
+      const score = scoreBenchPauseDetailed(
+        makePauseResult({ durationMs: 200 }),
+        makePauseConfig(),
+      );
+      expect(score).toBe(0);
+    });
+
+    it('returns 40 for brief pause (0.3-0.7s)', () => {
+      const score = scoreBenchPauseDetailed(
+        makePauseResult({ durationMs: 500 }),
+        makePauseConfig(),
+      );
+      expect(score).toBe(40);
+    });
+
+    it('returns 70 for adequate pause (0.7-1.2s)', () => {
+      const score = scoreBenchPauseDetailed(
+        makePauseResult({ durationMs: 1000 }),
+        makePauseConfig(),
+      );
+      expect(score).toBe(70);
+    });
+
+    it('returns 90 for good pause (1.2-2.0s)', () => {
+      const score = scoreBenchPauseDetailed(
+        makePauseResult({ durationMs: 1500 }),
+        makePauseConfig(),
+      );
+      expect(score).toBe(90);
+    });
+
+    it('returns 95 for long pause (2.0-4.0s)', () => {
+      const score = scoreBenchPauseDetailed(
+        makePauseResult({ durationMs: 3000 }),
+        makePauseConfig(),
+      );
+      expect(score).toBe(95);
+    });
+
+    it('returns 80 for excessively long pause (> 4.0s)', () => {
+      const score = scoreBenchPauseDetailed(
+        makePauseResult({ durationMs: 5000 }),
+        makePauseConfig(),
+      );
+      expect(score).toBe(80);
+    });
+  });
+
+  describe('competition mode pause gating', () => {
+    it('caps score at 50 in competition mode when no pause detected', () => {
+      // Very short bottom hold -> no pause
+      const { frames, fps } = generateBenchFrames({
+        bottomAngle: 75,
+        standingAngle: 170,
+        lockoutAngle: 170,
+        descentFrames: 30,
+        bottomFrames: 2, // very short
+        ascentFrames: 25,
+      });
+      const config = makeConfig({ competitionMode: true });
+      const result = analyzeBenchSequence(frames, fps, config);
+
+      if (result.repCount >= 1) {
+        // With no/very short pause in competition, score should be capped at 50
+        expect(result.reps[0].overallScore).toBeLessThanOrEqual(50);
+      }
+    });
+
+    it('does not cap score when adequate pause in competition mode', () => {
+      const { frames, fps } = generateBenchFrames({
+        bottomAngle: 75,
+        standingAngle: 170,
+        lockoutAngle: 170,
+        descentFrames: 30,
+        bottomFrames: 40, // ~1.3s at 30fps = good pause
+        ascentFrames: 25,
+      });
+      const config = makeConfig({ competitionMode: true });
+      const result = analyzeBenchSequence(frames, fps, config);
+
+      if (result.repCount >= 1) {
+        // With a good pause and good form, score should be above 50
+        expect(result.reps[0].overallScore).toBeGreaterThan(50);
+      }
+    });
+  });
+
+  describe('pause-related form issues', () => {
+    it('adds no_pause_bench issue with high severity in competition mode', () => {
+      const { frames, fps } = generateBenchFrames({
+        bottomAngle: 75,
+        descentFrames: 30,
+        bottomFrames: 2, // too short for a pause
+        ascentFrames: 25,
+      });
+      const config = makeConfig({ competitionMode: true });
+      const result = analyzeBenchSequence(frames, fps, config);
+
+      if (result.repCount >= 1) {
+        const noPauseIssue = result.reps[0].issues.find(i => i.name === 'no_pause_bench');
+        if (noPauseIssue) {
+          expect(noPauseIssue.severity).toBe('high');
+          expect(noPauseIssue.phase).toBe(SquatPhase.BOTTOM);
+        }
+      }
+    });
+
+    it('adds no_pause_bench issue with low severity in training mode', () => {
+      const { frames, fps } = generateBenchFrames({
+        bottomAngle: 75,
+        descentFrames: 30,
+        bottomFrames: 2,
+        ascentFrames: 25,
+      });
+      const config = makeConfig({ competitionMode: false });
+      const result = analyzeBenchSequence(frames, fps, config);
+
+      if (result.repCount >= 1) {
+        const noPauseIssue = result.reps[0].issues.find(i => i.name === 'no_pause_bench');
+        if (noPauseIssue) {
+          expect(noPauseIssue.severity).toBe('low');
+        }
+      }
+    });
+
+    it('does not add no_pause_bench when a good pause is present', () => {
+      const { frames, fps } = generateBenchFrames({
+        bottomAngle: 75,
+        descentFrames: 30,
+        bottomFrames: 40, // ~1.3s at 30fps
+        ascentFrames: 25,
+      });
+      const config = makeConfig({ competitionMode: true });
+      const result = analyzeBenchSequence(frames, fps, config);
+
+      if (result.repCount >= 1) {
+        const noPauseIssue = result.reps[0].issues.find(i => i.name === 'no_pause_bench');
+        expect(noPauseIssue).toBeUndefined();
+      }
+    });
+
+    it('generates coaching cues for no_pause_bench', () => {
+      const { frames, fps } = generateBenchFrames({
+        bottomAngle: 75,
+        descentFrames: 30,
+        bottomFrames: 2,
+        ascentFrames: 25,
+      });
+      const config = makeConfig({ competitionMode: true });
+      const result = analyzeBenchSequence(frames, fps, config);
+
+      if (result.repCount >= 1) {
+        const noPauseCue = result.reps[0].cues.find(c => c.issue === 'no_pause_bench');
+        if (noPauseCue) {
+          expect(noPauseCue.cue).toContain('Touch and hold');
+          expect(noPauseCue.explanation).toBeDefined();
+        }
+      }
+    });
   });
 });

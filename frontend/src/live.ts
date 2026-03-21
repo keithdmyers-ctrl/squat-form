@@ -206,6 +206,10 @@ function scoreSquatRepForLive(
 // ─── LiveAnalyzer ───
 
 export class LiveAnalyzer {
+  // Maximum buffer size: ~2.5 minutes at 20fps — enough for the longest reasonable set.
+  // Prevents unbounded memory growth when user stands idle without completing reps.
+  static readonly MAX_BUFFER_SIZE = 3000;
+
   private config: SquatConfig;
   private strategy: LiveExerciseStrategy;
   private calibration: CalibrationData | null = null;
@@ -313,6 +317,18 @@ export class LiveAnalyzer {
     // Buffer frame angles and landmarks
     this.frameBuffer.push(angles);
     this.landmarkBuffer.push(landmarks);
+
+    // Enforce buffer size limits to prevent unbounded memory growth during idle periods.
+    // Only trim when NOT mid-rep — during a rep, repStartIdx references the buffer
+    // and trimming would invalidate those indices.
+    if (!this.inRep && this.frameBuffer.length > LiveAnalyzer.MAX_BUFFER_SIZE) {
+      const excess = this.frameBuffer.length - LiveAnalyzer.MAX_BUFFER_SIZE;
+      this.frameBuffer.splice(0, excess);
+      this.landmarkBuffer.splice(0, excess);
+      // Adjust tracked indices — they shift down by the number of removed elements
+      this.repStartIdx = Math.max(0, this.repStartIdx - excess);
+      this.bottomIdx = Math.max(0, this.bottomIdx - excess);
+    }
 
     this.callbacks.onFrameProcessed(landmarks, angles, phase);
   }

@@ -1,12 +1,18 @@
 /**
  * Meet prep week planner: generates a periodized taper plan
- * leading into a powerlifting meet.
+ * leading into a powerlifting meet, with meet-day adrenaline factor support.
  */
+
+import type { MeetDayStrategy } from './meet-prep';
+import { getMeetDayFactor } from './meet-prep';
 
 export interface MeetPrepPlan {
   meetDate: string;
   weeksOut: number;
   weeks: MeetPrepWeek[];
+  meetDayStrategy?: MeetDayStrategy;
+  meetDayFactor?: number;
+  projectedMeetMax?: number;
 }
 
 export interface MeetPrepWeek {
@@ -21,17 +27,29 @@ export interface MeetPrepWeek {
 /**
  * Generate a meet prep plan with a 4-week taper.
  * If >4 weeks out, fill earlier weeks with a strength phase.
+ *
+ * The meetDayStrategy parameter projects a meet-day performance boost:
+ * - conservative (1.0): no boost — plan conservatively
+ * - moderate (1.03): 3% boost — typical for experienced lifters
+ * - aggressive (1.05): 5% boost — for peaked, confident lifters
+ *
+ * The adrenaline factor affects the projected meet max shown in the plan
+ * and the meet-week opener weight (opener is based on projected meet max).
  */
 export function generateMeetPrepPlan(
   meetDate: string,
   estimated1RM: number,
   unit: string,
   currentDate?: string,
+  meetDayStrategy: MeetDayStrategy = 'moderate',
 ): MeetPrepPlan {
   const now = currentDate ? new Date(currentDate) : new Date();
   const meet = new Date(meetDate);
   const diffMs = meet.getTime() - now.getTime();
   const weeksOut = Math.max(1, Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000)));
+
+  const factor = getMeetDayFactor(meetDayStrategy);
+  const projectedMeetMax = Math.round(estimated1RM * factor * 10) / 10;
 
   const weeks: MeetPrepWeek[] = [];
 
@@ -41,7 +59,7 @@ export function generateMeetPrepPlan(
     return Math.round(w / increment) * increment;
   };
 
-  // 4-week taper template
+  // 4-week taper template (intensities based on gym 1RM)
   const taper: Omit<MeetPrepWeek, 'weekNumber' | 'weight'>[] = [
     { label: 'Heavy singles', sets: 2, reps: '1', intensityPct: 93 },
     { label: 'Heavy doubles', sets: 3, reps: '2', intensityPct: 90 },
@@ -53,18 +71,19 @@ export function generateMeetPrepPlan(
   // Build week plan from meet backwards
   for (let w = 1; w <= weeksOut; w++) {
     if (w === 1) {
-      // Meet week: opener only
+      // Meet week: opener only, based on projected meet max
+      const openerPct = 87;
       weeks.push({
         weekNumber: w,
         label: 'Meet week - opener only',
         sets: 1,
         reps: '1',
-        intensityPct: 87,
-        weight: round(estimated1RM * 0.87),
+        intensityPct: openerPct,
+        weight: round(projectedMeetMax * openerPct / 100),
       });
     } else if (w <= 4) {
-      // Taper weeks (w=2 is week -1, w=3 is week -2, etc.)
-      const taperIdx = w - 2; // 0=heavy singles, 1=heavy doubles, 2=mod triples
+      // Taper weeks based on gym 1RM (not boosted — training is done pre-adrenaline)
+      const taperIdx = w - 2;
       const t = taper[taperIdx];
       weeks.push({
         weekNumber: w,
@@ -91,5 +110,12 @@ export function generateMeetPrepPlan(
   // Reverse so earliest week first (chronological order)
   weeks.reverse();
 
-  return { meetDate, weeksOut, weeks };
+  return {
+    meetDate,
+    weeksOut,
+    weeks,
+    meetDayStrategy,
+    meetDayFactor: factor,
+    projectedMeetMax,
+  };
 }

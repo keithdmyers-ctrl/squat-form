@@ -1,20 +1,50 @@
-# Squat Form Analyzer
+# Lift Coach — AI Powerlifting Coach
 
-AI-powered squat form analysis using computer vision. Get instant, personalized coaching feedback on your squat technique.
+AI-powered multi-exercise form analysis and adaptive training programming. Computer vision form checks, 23 evidence-based programs, and in-workout tracking — all in your browser. Privacy-first: video never leaves your device.
 
 ## Features
 
-- **Multi-exercise support** (frontend): Squats (bodyweight, high bar, low bar, front, goblet, overhead), deadlifts (conventional, sumo, Romanian), and bench press (flat, close-grip, wide-grip) — each scored to type-specific standards. The backend API currently supports squats only.
-- **Anatomy-aware**: Calibrates to your body proportions (femur/tibia ratio) for personalized thresholds
-- **19 form checks across exercises**: Squats (10: depth, knee tracking, trunk angle, butt wink, heel rise, good-morning, tempo, lockout, symmetry, forward knee travel), deadlifts (6: rounded back, hip shoot, hitching, insufficient ROM, asymmetric pull, fast descent), bench press (3: no pause, uneven press, press stall)
-- **Severity-adaptive coaching**: Mild, moderate, and urgent feedback tailored to issue severity
-- **Progress-aware coaching**: Session history comparison and recurring issue tracking
-- **Per-rep narrative**: Best rep identification and fatigue detection across sets
-- **Coaching cues**: Plain-English feedback with root-cause explanations and corrective exercises
-- **Competition mode**: IPF/USAPL depth rules, sticking point detection, bar path analysis, velocity metrics
-- **Mobility assessment**: Self-tests and stretches for detected limitations
-- **Progress tracking**: Session history with trend charts and milestone detection
-- **Privacy-first**: Browser-based analysis — your video never leaves your device
+### Form Analysis (6 Exercises)
+- **Squat** (bodyweight, high bar, low bar, front, goblet, overhead), **Deadlift** (conventional, sumo, Romanian), **Bench Press** (flat, close-grip, wide-grip), **Overhead Press**, **Barbell Row**, **Lunge** — each scored to exercise- and variant-specific standards
+- **35+ form checks** including depth, knee valgus, trunk angle, butt wink, heel rise, good-morning pattern, bench pause detection, lateral trunk shift, bracing reminder, cervical hyperextension
+- **Severity-adaptive coaching**: Mild, moderate, and urgent feedback with beginner-friendly language
+- **Anatomy-aware calibration**: Adjusts thresholds for your body proportions (femur/tibia ratio)
+- **Competition mode**: IPF/USAPL rules, bench pause gate, sticking point detection, attempt planning
+
+### Training Programming (23 Programs)
+- **Beginner**: Starting Strength (5-phase), GZCLP (with auto stage cycling)
+- **Intermediate**: 5/3/1 (Beginner, BBB, FSL), Texas Method, HLM, Candito 6-Week, SBS Hypertrophy/Strength, PPL, nSuns, J&T 2.0, DUP, Upper/Lower, Block Periodization, Powerbuilding
+- **Advanced**: Sheiko #29/#31, Calgary Barbell 16/8-Week, Conjugate
+- **Auto-progression**: LP tracking, stall detection, deload scheduling, program transition recommendations
+- **Autoregulation**: RPE + form score integration, readiness-based adjustments, injury tracking with return-to-training protocols
+
+### Safety & Health
+- **PAR-Q+ health screening** (12 questions, ACSM-compliant, annual re-screening)
+- **Pre-existing condition management** (6+ conditions with per-exercise modifications)
+- **Pregnancy mode** (ACOG 2020 guidelines, modified depth/intensity/exercise substitutions)
+- **Weight safety caps** (world-record-based ceilings, bodyweight-relative sanity checks)
+- **Post-set pain prompts** with red flag detection (numbness, radiating pain → stop recommendation)
+- **Form-score weight suggestions** (recommendations, not auto-applied — user must confirm)
+
+### Competition & Strength
+- **DOTS, Wilks-2, and IPF GL Points** calculators
+- **Strength standards** (Untrained → Elite, 4 lifts × 2 sexes)
+- **Competition total tracking** (S+B+D with all scoring systems)
+- **IPF/USAPL commands reference** (all 3 lifts)
+- **Meet preparation** with attempt selection and meet-day adrenaline factor
+
+### Coaching & Education
+- **AI Coach** (offline heuristic + optional Claude API, integrates form data)
+- **59-term glossary** across 5 categories (Training, Programming, Anatomy, Competition, Nutrition)
+- **Exercise demos** with step-by-step instructions, common mistakes, YouTube links
+- **Volume tracking** with MEV/MAV/MRV zones, mesocycle progression, frequency analysis
+- **Individualized volume landmarks** (adjusted by training age, recovery, age, sex)
+
+### Platform
+- **Privacy-first**: Browser-based — video never leaves your device
+- **Offline-capable**: All features work without internet
+- **iOS app**: Available via Capacitor (native haptics, status bar integration)
+- **Progressive disclosure**: Beginners see simplified UI; complexity reveals with experience
 
 ## Quick Start
 
@@ -95,7 +125,7 @@ squat-form/
 │   ├── static/            # Upload UI
 │   └── requirements.txt
 │
-├── tests/             # 778 tests (518 frontend + 260 backend)
+├── tests/             # 2102 tests (1842 frontend + 260 backend)
 │   ├── standard/      # Unit tests for each module
 │   ├── edge_cases/    # Boundary conditions and degenerate inputs
 │   └── deep/          # Integration and pipeline tests

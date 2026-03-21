@@ -1,10 +1,32 @@
 /**
  * Meet attempt selection helper for competitive powerlifters.
  * Generates opener / second / third attempt recommendations
- * based on training history and estimated 1RM.
+ * based on training history, estimated 1RM, and meet-day arousal factor.
  */
 
 import type { SessionRecord } from './types';
+
+// ─── Meet-Day Adrenaline / Arousal Factor ───
+
+export type MeetDayStrategy = 'conservative' | 'moderate' | 'aggressive';
+
+/**
+ * Get the meet-day performance factor for a given strategy.
+ *
+ * Well-prepared lifters typically perform 2-5% above gym performance on meet day
+ * due to adrenaline, optimal peaking, competition arousal, and crowd effect.
+ *
+ * - conservative (1.0): No boost. Best for first-time competitors or nervous lifters.
+ * - moderate (1.03): 3% boost. Typical for experienced competitors who have peaked properly.
+ * - aggressive (1.05): 5% boost. For peaked, confident lifters with meet experience.
+ */
+export function getMeetDayFactor(strategy: MeetDayStrategy): number {
+  switch (strategy) {
+    case 'conservative': return 1.0;
+    case 'moderate': return 1.03;
+    case 'aggressive': return 1.05;
+  }
+}
 
 export interface AttemptPlan {
   opener: number;
@@ -15,6 +37,8 @@ export interface AttemptPlan {
   thirdRPE: string;
   confidence: 'high' | 'moderate' | 'low';
   rationale: string;
+  meetDayStrategy?: MeetDayStrategy;
+  meetDayFactor?: number;
 }
 
 /**
@@ -48,6 +72,8 @@ function buildRationale(
   third: number,
   confidence: 'high' | 'moderate' | 'low',
   sessionCount: number,
+  meetDayStrategy?: MeetDayStrategy,
+  meetDayFactor?: number,
 ): string {
   const pctOpener = Math.round((opener / estimated1RM) * 100);
   const pctSecond = Math.round((second / estimated1RM) * 100);
@@ -58,6 +84,21 @@ function buildRationale(
     `Based on an estimated 1RM of ${estimated1RM}${unit}, ` +
     `drawn from ${sessionCount} recent training session${sessionCount !== 1 ? 's' : ''}.`,
   );
+
+  if (meetDayStrategy && meetDayFactor && meetDayFactor > 1.0) {
+    const boostPct = Math.round((meetDayFactor - 1.0) * 100);
+    lines.push(
+      `Meet-day strategy: ${meetDayStrategy} (+${boostPct}% adrenaline factor). ` +
+      `Well-prepared lifters typically perform 2-5% above gym performance on meet day ` +
+      `due to adrenaline, optimal peaking, and competition arousal.`,
+    );
+  } else if (meetDayStrategy === 'conservative') {
+    lines.push(
+      `Meet-day strategy: conservative (no adrenaline boost). ` +
+      `Recommended for first-time competitors or lifters who prefer to play it safe.`,
+    );
+  }
+
   lines.push(
     `Opener: ${opener}${unit} (~${pctOpener}% of 1RM) — should feel like an RPE 7, ` +
     `a weight you could triple on your worst day. This secures a total.`,
@@ -96,7 +137,13 @@ function buildRationale(
  * Attempt percentages follow standard powerlifting meet strategy:
  * - Opener: ~87% of estimated 1RM (RPE ~7) — guarantees a total
  * - Second: ~93% of estimated 1RM (RPE ~8.5-9) — builds the total
- * - Third: ~100% of estimated 1RM (RPE 9.5-10) — PR attempt
+ * - Third: ~100-103% of estimated 1RM (RPE 9.5-10) — PR attempt
+ *
+ * The meetDayStrategy parameter applies an adrenaline/arousal factor
+ * to the third attempt:
+ * - conservative (1.0): third at 100% of gym 1RM
+ * - moderate (1.03): third at 103% of gym 1RM (default)
+ * - aggressive (1.05): third at 105% of gym 1RM
  *
  * Returns null if estimated1RM is invalid.
  */
@@ -104,17 +151,23 @@ export function generateAttemptPlan(
   sessions: SessionRecord[],
   estimated1RM: number,
   unit: string,
+  meetDayStrategy: MeetDayStrategy = 'moderate',
 ): AttemptPlan | null {
   if (estimated1RM <= 0 || !isFinite(estimated1RM)) return null;
 
+  const factor = getMeetDayFactor(meetDayStrategy);
+
+  // Opener and second are based on raw gym 1RM (no adrenaline factor)
   const opener = roundToIncrement(estimated1RM * 0.87, unit);
   const second = roundToIncrement(estimated1RM * 0.93, unit);
-  const third = roundToIncrement(estimated1RM * 1.0, unit);
+  // Third attempt uses the meet-day factor
+  const third = roundToIncrement(estimated1RM * factor, unit);
 
   const confidence = assessConfidence(sessions.length);
 
   const rationale = buildRationale(
     estimated1RM, unit, opener, second, third, confidence, sessions.length,
+    meetDayStrategy, factor,
   );
 
   return {
@@ -126,5 +179,7 @@ export function generateAttemptPlan(
     thirdRPE: '~9.5-10',
     confidence,
     rationale,
+    meetDayStrategy,
+    meetDayFactor: factor,
   };
 }

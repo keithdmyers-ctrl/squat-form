@@ -240,7 +240,7 @@ describe('Injury Handling', () => {
 // ─── Form Score Integration Tests ───
 
 describe('Form Score Autoregulation', () => {
-  it('should aggressively reduce weight on very low form score (<60)', () => {
+  it('should recommend (not auto-apply) weight reduction on very low form score (<60)', () => {
     const state = makeState();
     const originalWeight = state.liftProgress.squat.currentWeight;
     const feedback = makeBaseFeedback();
@@ -249,15 +249,15 @@ describe('Form Score Autoregulation', () => {
 
     const decrease = decisions.find(d => d.type === 'weight_decrease' && d.lift === 'squat');
     expect(decrease).toBeDefined();
-    expect(decrease!.applied).toBe(true);
+    // Form-score reductions are now recommendations, not auto-applied
+    expect(decrease!.applied).toBe(false);
     expect(decrease!.description).toContain('-12%');
     expect(decrease!.citation).toContain('Helms');
-    expect(state.liftProgress.squat.currentWeight).toBe(
-      roundToPlate(originalWeight * 0.88, 'lbs')
-    );
+    // Weight should NOT be auto-reduced — it's a recommendation
+    expect(state.liftProgress.squat.currentWeight).toBe(originalWeight);
   });
 
-  it('should moderately reduce weight on low form score (60-69)', () => {
+  it('should recommend (not auto-apply) weight reduction on low form score (60-69)', () => {
     const state = makeState();
     const originalWeight = state.liftProgress.squat.currentWeight;
     const feedback = makeBaseFeedback();
@@ -267,9 +267,8 @@ describe('Form Score Autoregulation', () => {
     const decrease = decisions.find(d => d.type === 'weight_decrease' && d.lift === 'squat');
     expect(decrease).toBeDefined();
     expect(decrease!.description).toContain('-8%');
-    expect(state.liftProgress.squat.currentWeight).toBe(
-      roundToPlate(originalWeight * 0.92, 'lbs')
-    );
+    // Weight should NOT be auto-reduced — it's a recommendation
+    expect(state.liftProgress.squat.currentWeight).toBe(originalWeight);
   });
 
   it('should confirm good form scores without changes', () => {
@@ -482,7 +481,7 @@ describe('Full Adaptive Cycle', () => {
     );
     expect(state.liftProgress.squat.currentWeight).toBe(afterEasyWeight);
 
-    // Session 3: Form breaks down → weight reduced
+    // Session 3: Form breaks down → weight reduction RECOMMENDED (not auto-applied)
     decisions = processAdaptations(
       state,
       makeBaseFeedback({ sessionDifficulty: 'just_right' }),
@@ -490,8 +489,13 @@ describe('Full Adaptive Cycle', () => {
       [],
       { squat: 58 },
     );
-    expect(state.liftProgress.squat.currentWeight).toBeLessThan(afterEasyWeight);
-    const afterFormDropWeight = state.liftProgress.squat.currentWeight;
+    // Form-score reductions are recommendations, not auto-applied
+    const formDecision = decisions.find(d => d.type === 'weight_decrease' && d.lift === 'squat');
+    expect(formDecision).toBeDefined();
+    expect(formDecision!.applied).toBe(false);
+    // Weight stays the same until user confirms the recommendation
+    expect(state.liftProgress.squat.currentWeight).toBe(afterEasyWeight);
+    const afterFormSessionWeight = state.liftProgress.squat.currentWeight;
 
     // Session 4: Knee pain → substitution recommended
     decisions = processAdaptations(
@@ -514,6 +518,6 @@ describe('Full Adaptive Cycle', () => {
       undefined,
     );
     expect(decisions.some(d => d.type === 'force_deload')).toBe(true);
-    expect(state.liftProgress.squat.currentWeight).toBeLessThan(afterFormDropWeight);
+    expect(state.liftProgress.squat.currentWeight).toBeLessThan(afterFormSessionWeight);
   });
 });

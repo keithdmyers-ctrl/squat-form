@@ -88,11 +88,20 @@ export function updateAdvancedSettingsVisibility(): void {
   document.querySelectorAll<HTMLElement>('.advanced-setting').forEach((el) => {
     el.classList.toggle('beginner-hidden', isBeginner);
   });
-  // Always show competition mode -- experienced lifters at any level
-  // should be able to toggle IPF/USAPL judging standards
+  // Hide competition mode for beginners — unnecessary cognitive load
   const compToggle = document.getElementById('competition-toggle-container');
   if (compToggle) {
-    compToggle.style.display = '';
+    if (isBeginner) {
+      compToggle.style.display = 'none';
+      // Turn off competition mode if it was on when switching to beginner
+      const compCheckbox = compToggle.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+      if (compCheckbox && compCheckbox.checked) {
+        compCheckbox.checked = false;
+        compCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    } else {
+      compToggle.style.display = '';
+    }
   }
   // Progressive disclosure: collapse "More options" for beginners, open for intermediate/advanced
   const moreSettings = document.getElementById('more-settings') as HTMLDetailsElement | null;

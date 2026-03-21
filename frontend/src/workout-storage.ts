@@ -5,6 +5,70 @@
  * No dependencies on other program-generator submodules.
  */
 
+import type { VersionedData, MigrationFn } from './storage-migration';
+import { migrateData } from './storage-migration';
+
+// ─── Storage Versioning ───
+
+const WORKOUT_STORAGE_VERSION = 1;
+const WORKOUT_LOG_STORAGE_VERSION = 1;
+const USER_PROFILE_STORAGE_VERSION = 1;
+
+// ─── Migration Registries ───
+
+const PROGRAM_STATE_MIGRATIONS: Record<number, MigrationFn> = {
+  // version 0 -> 1: ensure all expected fields exist with defaults
+  0: (data: any) => ({
+    ...data,
+    programId: data.programId ?? '',
+    startDate: data.startDate ?? new Date().toISOString().slice(0, 10),
+    currentWeek: data.currentWeek ?? 1,
+    currentDay: data.currentDay ?? 0,
+    trainingMaxes: data.trainingMaxes ?? {},
+    liftProgress: data.liftProgress ?? {},
+    workoutsCompleted: data.workoutsCompleted ?? 0,
+    cycleNumber: data.cycleNumber ?? 1,
+    weekInCycle: data.weekInCycle ?? 1,
+    equipment: data.equipment ?? 'full',
+    weightUnit: data.weightUnit ?? 'lbs',
+    lpPhase: data.lpPhase ?? 1,
+    scheduleOverrides: data.scheduleOverrides ?? [],
+    equipmentOverride: data.equipmentOverride ?? undefined,
+    injuryHistory: data.injuryHistory ?? {},
+    formScoreHistory: data.formScoreHistory ?? {},
+  }),
+};
+
+const WORKOUT_LOG_MIGRATIONS: Record<number, MigrationFn> = {
+  // version 0 -> 1: ensure each log entry has all expected fields
+  0: (data: any) => {
+    if (Array.isArray(data)) {
+      return data.map((log: any) => ({
+        ...log,
+        id: log.id ?? Date.now().toString(36) + Math.random().toString(36).slice(2),
+        date: log.date ?? new Date().toISOString(),
+        programId: log.programId ?? '',
+        workoutDayIndex: log.workoutDayIndex ?? 0,
+        workoutDayName: log.workoutDayName ?? '',
+        sets: log.sets ?? [],
+        completed: log.completed ?? false,
+      }));
+    }
+    return data;
+  },
+};
+
+const USER_PROFILE_MIGRATIONS: Record<number, MigrationFn> = {
+  // version 0 -> 1: ensure all expected fields exist
+  0: (data: any) => ({
+    ...data,
+    experienceLevel: data.experienceLevel ?? 'beginner',
+    daysPerWeek: data.daysPerWeek ?? 3,
+    equipment: data.equipment ?? 'full',
+    goal: data.goal ?? 'general_strength',
+  }),
+};
+
 // ─── Workout Log Types ───
 
 export interface WorkoutSet {
@@ -148,13 +212,39 @@ import type { EquipmentLevel } from './workout-programs';
 export function loadProgramState(): ProgramState | null {
   try {
     const raw = localStorage.getItem(PROGRAM_STATE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    const { data, migrated, fromVersion } = migrateData<ProgramState>(
+      parsed, WORKOUT_STORAGE_VERSION, PROGRAM_STATE_MIGRATIONS
+    );
+
+    if (migrated) {
+      console.info(`Migrated workout storage from v${fromVersion} to v${WORKOUT_STORAGE_VERSION}`);
+      // Re-save in versioned format so migration only runs once
+      try {
+        const wrapped: VersionedData<ProgramState> = {
+          version: WORKOUT_STORAGE_VERSION,
+          data,
+          migratedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(PROGRAM_STATE_KEY, JSON.stringify(wrapped));
+      } catch { /* ignore save failure during migration */ }
+    }
+
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 export function saveProgramState(state: ProgramState): void {
   try {
-    localStorage.setItem(PROGRAM_STATE_KEY, JSON.stringify(state));
+    const wrapped: VersionedData<ProgramState> = {
+      version: WORKOUT_STORAGE_VERSION,
+      data: state,
+    };
+    localStorage.setItem(PROGRAM_STATE_KEY, JSON.stringify(wrapped));
   } catch {
     document.dispatchEvent(new CustomEvent('storage-warning', { detail: 'Storage is full. Some data may not be saved.' }));
   }
@@ -163,8 +253,30 @@ export function saveProgramState(state: ProgramState): void {
 export function loadWorkoutLogs(): WorkoutLog[] {
   try {
     const raw = localStorage.getItem(WORKOUT_LOG_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    const { data, migrated, fromVersion } = migrateData<WorkoutLog[]>(
+      parsed, WORKOUT_LOG_STORAGE_VERSION, WORKOUT_LOG_MIGRATIONS
+    );
+
+    if (migrated) {
+      console.info(`Migrated workout logs from v${fromVersion} to v${WORKOUT_LOG_STORAGE_VERSION}`);
+      // Re-save in versioned format so migration only runs once
+      try {
+        const wrapped: VersionedData<WorkoutLog[]> = {
+          version: WORKOUT_LOG_STORAGE_VERSION,
+          data,
+          migratedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(WORKOUT_LOG_KEY, JSON.stringify(wrapped));
+      } catch { /* ignore save failure during migration */ }
+    }
+
+    return data;
+  } catch {
+    return [];
+  }
 }
 
 export function saveWorkoutLogs(logs: WorkoutLog[]): void {
@@ -176,7 +288,11 @@ export function saveWorkoutLogs(logs: WorkoutLog[]): void {
         detail: 'Workout history exceeds 200 entries. Oldest entries have been archived. Export your data regularly.'
       }));
     }
-    localStorage.setItem(WORKOUT_LOG_KEY, JSON.stringify(logs));
+    const wrapped: VersionedData<WorkoutLog[]> = {
+      version: WORKOUT_LOG_STORAGE_VERSION,
+      data: logs,
+    };
+    localStorage.setItem(WORKOUT_LOG_KEY, JSON.stringify(wrapped));
   } catch {
     document.dispatchEvent(new CustomEvent('storage-warning', { detail: 'Storage is full. Some data may not be saved.' }));
   }
@@ -185,13 +301,39 @@ export function saveWorkoutLogs(logs: WorkoutLog[]): void {
 export function loadUserProfile(): UserProfile | null {
   try {
     const raw = localStorage.getItem(USER_PROFILE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    const { data, migrated, fromVersion } = migrateData<UserProfile>(
+      parsed, USER_PROFILE_STORAGE_VERSION, USER_PROFILE_MIGRATIONS
+    );
+
+    if (migrated) {
+      console.info(`Migrated user profile from v${fromVersion} to v${USER_PROFILE_STORAGE_VERSION}`);
+      // Re-save in versioned format so migration only runs once
+      try {
+        const wrapped: VersionedData<UserProfile> = {
+          version: USER_PROFILE_STORAGE_VERSION,
+          data,
+          migratedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(wrapped));
+      } catch { /* ignore save failure during migration */ }
+    }
+
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 export function saveUserProfile(profile: UserProfile): void {
   try {
-    localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(profile));
+    const wrapped: VersionedData<UserProfile> = {
+      version: USER_PROFILE_STORAGE_VERSION,
+      data: profile,
+    };
+    localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(wrapped));
   } catch {
     document.dispatchEvent(new CustomEvent('storage-warning', { detail: 'Storage is full. Some data may not be saved.' }));
   }

@@ -54,6 +54,8 @@ import {
   setQuickStartPending,
 } from './upload-mode';
 import { initNativePlatform, hapticNotification } from './native';
+import { isPARQComplete, isPARQExpired, renderPARQDialog, handlePARQSubmit, savePARQResult, isPregnancyMode, renderPregnancyBanner } from './safety-screening';
+import { initGlossary, openGlossary } from './ui-glossary';
 
 // ─── DOM Elements ───
 const videoInput = document.getElementById('video-input') as HTMLInputElement;
@@ -177,6 +179,151 @@ function initOnboarding(): void {
 
   // Focus trapping and Escape handling
   document.addEventListener('keydown', onboardingKeydownHandler);
+}
+
+// ─── PAR-Q Health Screening ───
+
+function initPARQScreening(): void {
+  // Show PAR-Q if not completed or if expired (ACSM: annually)
+  if (isPARQComplete() && !isPARQExpired()) return;
+  // Don't show if onboarding hasn't been dismissed yet
+  if (!localStorage.getItem(ONBOARDED_KEY)) return;
+
+  const existingOverlay = document.getElementById('parq-overlay');
+  if (existingOverlay) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'parq-overlay';
+  overlay.className = 'onboarding-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Health screening questionnaire');
+  overlay.style.display = 'flex';
+  overlay.innerHTML = renderPARQDialog();
+  document.body.appendChild(overlay);
+
+  // Wire up form submission
+  const form = overlay.querySelector('#ss-parq-form') as HTMLFormElement | null;
+  const skipBtn = overlay.querySelector('#ss-parq-cancel-btn') as HTMLButtonElement | null;
+
+  // Focus trap handler -- stored so it can be removed on dismiss
+  function parqKeydownHandler(e: KeyboardEvent): void {
+    if (e.key === 'Escape') {
+      dismissPARQ();
+      return;
+    }
+
+    // Focus trap: cycle Tab/Shift+Tab within the modal
+    if (e.key === 'Tab') {
+      const dialog = overlay.querySelector('.ss-parq-dialog');
+      if (!dialog) return;
+      const focusable = dialog.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+  }
+
+  function dismissPARQ(): void {
+    document.removeEventListener('keydown', parqKeydownHandler);
+    overlay.remove();
+  }
+
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+      const result = handlePARQSubmit(formData);
+      savePARQResult(result);
+      dismissPARQ();
+
+      // Show referral warning if needed
+      if (result.referralRecommended && result.referralReasons.length > 0) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'card card--static';
+        alertDiv.style.cssText = 'border-color: var(--warning); background: rgba(251, 191, 36, 0.1); margin: var(--space-md); padding: var(--space-lg);';
+        alertDiv.innerHTML = `
+          <h3 style="color: var(--warning); margin-bottom: var(--space-sm);">Health Screening Notice</h3>
+          <p style="margin-bottom: var(--space-sm);">Based on your responses, we recommend consulting a healthcare professional before beginning or continuing an exercise program:</p>
+          <ul style="padding-left: 1.5rem; margin-bottom: var(--space-md);">${result.referralReasons.map(r => `<li>${r}</li>`).join('')}</ul>
+          ${result.restrictions.length > 0 ? `<p style="margin-bottom: var(--space-sm);"><strong>Restrictions applied:</strong></p><ul style="padding-left: 1.5rem;">${result.restrictions.map(r => `<li>${r}</li>`).join('')}</ul>` : ''}
+          <p style="color: var(--text-muted); font-size: var(--font-sm); margin-top: var(--space-md);">You can still use the app, but please get medical clearance for the flagged items.</p>
+          <button class="btn btn-primary" style="margin-top: var(--space-md);" onclick="this.closest('.card').remove()">I Understand</button>
+        `;
+        const main = document.getElementById('main-content');
+        if (main) main.prepend(alertDiv);
+      }
+    });
+  }
+
+  const skipAction = () => {
+    const skippedResult = {
+      completed: true,
+      completedDate: new Date().toISOString(),
+      passed: true,
+      responses: {},
+      referralRecommended: false,
+      referralReasons: [],
+      restrictions: [],
+      acknowledgedRisks: false,
+    };
+    savePARQResult(skippedResult);
+    dismissPARQ();
+  };
+
+  // Wire both skip buttons (top and bottom of form)
+  if (skipBtn) skipBtn.addEventListener('click', skipAction);
+  const bottomSkip = overlay.querySelector('.ss-parq-skip-bottom');
+  if (bottomSkip) bottomSkip.addEventListener('click', skipAction);
+
+  // Focus trapping and Escape handling
+  document.addEventListener('keydown', parqKeydownHandler);
+
+  // Focus the first focusable element (skip button or first radio) on open
+  const firstFocusable = skipBtn || overlay.querySelector<HTMLElement>('input, button, select, textarea');
+  if (firstFocusable) {
+    setTimeout(() => firstFocusable.focus(), 100);
+  }
+}
+
+// ─── Pregnancy Banner ───
+
+function initPregnancyBanner(): void {
+  if (!isPregnancyMode()) return;
+  const main = document.getElementById('main-content');
+  if (!main) return;
+  const banner = document.createElement('div');
+  banner.innerHTML = renderPregnancyBanner();
+  main.prepend(banner);
+}
+
+// ─── Glossary Button ───
+
+// Add glossary button to header subtitle area
+const reshowOnboarding = document.getElementById('reshow-onboarding');
+if (reshowOnboarding?.parentElement) {
+  const glossaryBtn = document.createElement('button');
+  glossaryBtn.className = 'btn-link';
+  glossaryBtn.textContent = 'Glossary';
+  glossaryBtn.setAttribute('aria-label', 'Open glossary of terms');
+  glossaryBtn.addEventListener('click', () => openGlossary());
+  reshowOnboarding.parentElement.insertBefore(document.createTextNode(' | '), reshowOnboarding.nextSibling);
+  reshowOnboarding.parentElement.insertBefore(glossaryBtn, reshowOnboarding.nextSibling?.nextSibling ?? null);
 }
 
 // ─── B2: Pre-Analysis Warmup Card ───
@@ -401,7 +548,7 @@ async function runAnalysis(file: File): Promise<void> {
     }
 
     // Step 2: Initialize MediaPipe PoseProcessor
-    showProgress(5, 'Downloading AI model (first time only, ~5 MB)...');
+    showProgress(5, 'Downloading AI model (first time only, ~5 MB). This takes 10-30 seconds. Once done, analysis works offline.');
     poseProcessor = new PoseProcessor();
     await poseProcessor.init();
 
@@ -1076,6 +1223,9 @@ initOfflineStatus();
 
 // Show onboarding for first-time visitors (prescreen merged in)
 initOnboarding();
+initPARQScreening();
+initGlossary();
+initPregnancyBanner();
 initWarmupCard();
 initQuickStart();
 initExampleVideo();
@@ -1202,7 +1352,22 @@ function initCoachOnce(): void {
 modeUploadBtn?.addEventListener('click', () => setMode('upload'));
 modeLiveBtn?.addEventListener('click', () => setMode('live'));
 modeProgramBtn?.addEventListener('click', () => setMode('program'));
-modeCoachBtn?.addEventListener('click', () => setMode('coach'));
+modeCoachBtn?.addEventListener('click', () => {
+  setMode('coach');
+  // Remove discovery badge after first click
+  const badge = modeCoachBtn?.querySelector('.coach-badge');
+  if (badge) badge.remove();
+  try { localStorage.setItem('squat_form_coach_visited', '1'); } catch {}
+});
+
+// Add discovery badge to Coach tab for users who haven't tried it
+if (modeCoachBtn && !localStorage.getItem('squat_form_coach_visited')) {
+  const badge = document.createElement('span');
+  badge.className = 'coach-badge';
+  badge.textContent = 'AI';
+  badge.style.cssText = 'font-size:0.6rem;background:var(--accent);color:var(--bg-primary);padding:1px 4px;border-radius:4px;margin-left:4px;font-weight:700;vertical-align:super;';
+  modeCoachBtn.appendChild(badge);
+}
 
 // Listen for custom switch-mode events (e.g., from workout planner's "Check My Form" button)
 document.addEventListener('switch-mode', (e: Event) => {

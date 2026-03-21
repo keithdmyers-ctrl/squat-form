@@ -36,128 +36,19 @@ export interface OverheadPressConfig {
 
 // ─── Phase Detection (shoulder angle driven) ───
 
-const STANDING_SHOULDER_ANGLE = 160;  // Arms overhead = lockout
-const DESCENDING_THRESHOLD = 2.0;
-const BOTTOM_VELOCITY_THRESHOLD = 1.5;
-const ASCENDING_THRESHOLD = 2.0;
-const MIN_REP_FRAMES = 6;
-const SMOOTHING_WINDOW = 5;
-const HISTORY_WINDOW = 3;
+import { detectRepsGeneric } from '../phase-detector';
+import type { PhaseDetectorConfig } from '../phase-detector';
 
-function smoothAngle(buffer: number[], newValue: number, windowSize: number): number {
-  buffer.push(newValue);
-  if (buffer.length > windowSize) buffer.shift();
-  return buffer.reduce((sum, v) => sum + v, 0) / buffer.length;
-}
-
-class OHPPhaseDetector {
-  private phase: SquatPhase = SquatPhase.STANDING; // STANDING = arms overhead (lockout)
-  private smoothBuffer: number[] = [];
-  private smoothedHistory: number[] = [];
-  private prevSmoothedAngle: number | null = null;
-  private bottomHoldCount = 0;
-
-  reset(): void {
-    this.phase = SquatPhase.STANDING;
-    this.smoothBuffer = [];
-    this.smoothedHistory = [];
-    this.prevSmoothedAngle = null;
-    this.bottomHoldCount = 0;
-  }
-
-  private cumulativeDelta(): number {
-    if (this.smoothedHistory.length < 2) return 0;
-    return this.smoothedHistory[this.smoothedHistory.length - 1] - this.smoothedHistory[0];
-  }
-
-  update(shoulderAngle: number): SquatPhase {
-    const smoothed = smoothAngle(this.smoothBuffer, shoulderAngle, SMOOTHING_WINDOW);
-    this.smoothedHistory.push(smoothed);
-    if (this.smoothedHistory.length > HISTORY_WINDOW + 1) this.smoothedHistory.shift();
-
-    const delta = this.prevSmoothedAngle !== null ? smoothed - this.prevSmoothedAngle : 0;
-    const cumDelta = this.cumulativeDelta();
-
-    switch (this.phase) {
-      case SquatPhase.STANDING: // Arms overhead (lockout)
-        this.bottomHoldCount = 0;
-        if (smoothed < STANDING_SHOULDER_ANGLE && cumDelta < -DESCENDING_THRESHOLD) {
-          this.phase = SquatPhase.DESCENDING; // Lowering bar to shoulders
-        }
-        break;
-
-      case SquatPhase.DESCENDING: // Lowering
-        if (Math.abs(delta) < BOTTOM_VELOCITY_THRESHOLD) {
-          this.bottomHoldCount++;
-          if (this.bottomHoldCount >= 2) {
-            this.phase = SquatPhase.BOTTOM; // Bar at shoulder level
-            this.bottomHoldCount = 0;
-          }
-        } else if (delta > 0) {
-          this.phase = SquatPhase.BOTTOM;
-          this.bottomHoldCount = 0;
-        } else {
-          this.bottomHoldCount = 0;
-        }
-        break;
-
-      case SquatPhase.BOTTOM: // Bar at shoulders
-        if (cumDelta > ASCENDING_THRESHOLD) {
-          this.phase = SquatPhase.ASCENDING; // Pressing up
-        }
-        break;
-
-      case SquatPhase.ASCENDING: // Pressing up
-        if (smoothed >= STANDING_SHOULDER_ANGLE) {
-          this.phase = SquatPhase.STANDING; // Lockout overhead
-        }
-        break;
-    }
-
-    this.prevSmoothedAngle = smoothed;
-    return this.phase;
-  }
-
-  getCurrentPhase(): SquatPhase {
-    return this.phase;
-  }
-}
+const OHP_PHASE_CONFIG: PhaseDetectorConfig = {
+  standingAngle: 160,       // Arms overhead = lockout
+  descendingThreshold: 2.0,
+  bottomVelocityThreshold: 1.5,
+  ascendingThreshold: 2.0,
+  minRepFrames: 6,
+};
 
 function detectOHPReps(shoulderAngles: number[]): RepRange[] {
-  const detector = new OHPPhaseDetector();
-  const reps: RepRange[] = [];
-  let repStart = -1;
-  let bottomIdx = -1;
-  let minAngleInRep = 180;
-
-  for (let i = 0; i < shoulderAngles.length; i++) {
-    const prevPhase = detector.getCurrentPhase();
-    const phase = detector.update(shoulderAngles[i]);
-
-    if (prevPhase === SquatPhase.STANDING && phase === SquatPhase.DESCENDING) {
-      repStart = i;
-      minAngleInRep = shoulderAngles[i];
-      bottomIdx = i;
-    }
-
-    if (repStart >= 0 && (phase === SquatPhase.DESCENDING || phase === SquatPhase.BOTTOM)) {
-      if (shoulderAngles[i] < minAngleInRep) {
-        minAngleInRep = shoulderAngles[i];
-        bottomIdx = i;
-      }
-    }
-
-    if (prevPhase === SquatPhase.ASCENDING && phase === SquatPhase.STANDING && repStart >= 0) {
-      if ((i - repStart) >= MIN_REP_FRAMES) {
-        reps.push({ start: repStart, end: i, bottomIndex: bottomIdx });
-      }
-      repStart = -1;
-      bottomIdx = -1;
-      minAngleInRep = 180;
-    }
-  }
-
-  return reps;
+  return detectRepsGeneric(shoulderAngles, OHP_PHASE_CONFIG);
 }
 
 // ─── OHP Scoring ───

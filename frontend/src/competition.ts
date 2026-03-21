@@ -1,6 +1,6 @@
 /**
- * Competition-specific analysis: sticking points, bar path, velocity, competition cues.
- * Extracted from analyzer.ts — no behavior changes.
+ * Competition-specific analysis: sticking points, bar path, velocity, competition cues,
+ * competition total tracking, and competition commands reference.
  */
 
 import type {
@@ -12,6 +12,306 @@ import type {
   RepData,
   RepScore,
 } from './types';
+import { computeDOTS, calculateWilks2, calculateGLPoints } from './one-rm';
+
+// ─── Competition Total Tracking ───
+
+export interface CompTotal {
+  squat: number;
+  bench: number;
+  deadlift: number;
+  total: number;
+  bodyweight: number;
+  date: string;
+  dots?: number;
+  wilks2?: number;
+  glPoints?: number;
+  isCompetition: boolean; // gym total vs meet total
+}
+
+const COMP_TOTALS_KEY = 'squat_form_comp_totals';
+
+/**
+ * Calculate the powerlifting total from the three competition lifts.
+ * Returns 0 if any lift is zero (bombed out on that lift).
+ */
+export function calculateCompTotal(squat: number, bench: number, deadlift: number): number {
+  if (squat <= 0 || bench <= 0 || deadlift <= 0) return 0;
+  return squat + bench + deadlift;
+}
+
+/**
+ * Save a competition total to localStorage.
+ */
+export function saveCompTotal(total: CompTotal): void {
+  try {
+    const existing = loadCompTotals();
+    existing.push(total);
+    // Sort by date descending (most recent first)
+    existing.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // Cap at 100 entries to prevent unbounded growth
+    if (existing.length > 100) existing.length = 100;
+    localStorage.setItem(COMP_TOTALS_KEY, JSON.stringify(existing));
+  } catch {
+    // Storage full or unavailable — silently continue
+  }
+}
+
+/**
+ * Load all saved competition totals from localStorage.
+ */
+export function loadCompTotals(): CompTotal[] {
+  try {
+    const raw = localStorage.getItem(COMP_TOTALS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Get the best total by type ('competition', 'gym', or 'all').
+ * Returns the highest total matching the filter, or null if none exist.
+ */
+export function getBestTotal(type?: 'competition' | 'gym' | 'all'): CompTotal | null {
+  const totals = loadCompTotals();
+  if (totals.length === 0) return null;
+
+  const filtered = type === 'competition'
+    ? totals.filter(t => t.isCompetition)
+    : type === 'gym'
+      ? totals.filter(t => !t.isCompetition)
+      : totals;
+
+  if (filtered.length === 0) return null;
+
+  return filtered.reduce((best, current) =>
+    current.total > best.total ? current : best
+  );
+}
+
+/**
+ * Render an HTML card showing a competition total with all scoring systems.
+ */
+export function renderCompTotalCard(total: CompTotal): string {
+  const typeLabel = total.isCompetition ? 'Meet Total' : 'Gym Total';
+  const dateStr = new Date(total.date).toLocaleDateString();
+
+  const scores: string[] = [];
+  if (total.dots != null) scores.push(`DOTS: ${total.dots}`);
+  if (total.wilks2 != null) scores.push(`Wilks-2: ${total.wilks2}`);
+  if (total.glPoints != null) scores.push(`GL: ${total.glPoints}`);
+
+  return `<div class="comp-total-card">
+  <div class="comp-total-header">
+    <span class="comp-total-type">${typeLabel}</span>
+    <span class="comp-total-date">${dateStr}</span>
+  </div>
+  <div class="comp-total-lifts">
+    <div class="comp-lift"><span class="comp-lift-label">Squat</span><span class="comp-lift-value">${total.squat} kg</span></div>
+    <div class="comp-lift"><span class="comp-lift-label">Bench</span><span class="comp-lift-value">${total.bench} kg</span></div>
+    <div class="comp-lift"><span class="comp-lift-label">Deadlift</span><span class="comp-lift-value">${total.deadlift} kg</span></div>
+  </div>
+  <div class="comp-total-total">
+    <span class="comp-total-label">Total</span>
+    <span class="comp-total-value">${total.total} kg</span>
+  </div>
+  <div class="comp-total-bw">BW: ${total.bodyweight} kg</div>
+  ${scores.length > 0 ? `<div class="comp-total-scores">${scores.join(' | ')}</div>` : ''}
+</div>`;
+}
+
+// ─── Competition Commands Reference ───
+
+export interface CompetitionCommand {
+  lift: 'squat' | 'bench' | 'deadlift';
+  command: string;
+  timing: string;
+  description: string;
+  failureConsequence: string;
+}
+
+export const COMPETITION_COMMANDS: CompetitionCommand[] = [
+  {
+    lift: 'squat',
+    command: 'SQUAT',
+    timing: 'After walkout and setup, when lifter is motionless',
+    description: 'Begin the squat descent',
+    failureConsequence: 'Red light — lift not initiated on command',
+  },
+  {
+    lift: 'squat',
+    command: 'RACK',
+    timing: 'After standing up with locked knees and hips',
+    description: 'Return the bar to the rack',
+    failureConsequence: 'Must wait for command — racking early is a no-lift',
+  },
+  {
+    lift: 'bench',
+    command: 'START',
+    timing: 'After lifter takes the bar and arms are locked',
+    description: 'Begin the descent to chest',
+    failureConsequence: 'Red light if you start pressing before command',
+  },
+  {
+    lift: 'bench',
+    command: 'PRESS',
+    timing: 'After bar is motionless on chest',
+    description: 'Press the bar upward',
+    failureConsequence: 'Most common failure — pressing before command is a no-lift',
+  },
+  {
+    lift: 'bench',
+    command: 'RACK',
+    timing: 'After arms are locked at the top',
+    description: 'Return bar to rack with spotter help',
+    failureConsequence: 'Must wait — racking early is a no-lift',
+  },
+  {
+    lift: 'deadlift',
+    command: 'DOWN',
+    timing: 'After standing erect with locked knees and hips',
+    description: 'Return bar to platform under control',
+    failureConsequence: 'Dropping the bar intentionally is a no-lift',
+  },
+];
+
+/**
+ * Get competition commands for a specific lift.
+ */
+export function getCommandsForLift(lift: 'squat' | 'bench' | 'deadlift'): CompetitionCommand[] {
+  return COMPETITION_COMMANDS.filter(cmd => cmd.lift === lift);
+}
+
+/**
+ * Render an HTML reference card showing competition commands.
+ * Uses a responsive card layout that works on mobile (< 500px).
+ * If a lift is specified, shows only that lift's commands. Otherwise shows all.
+ */
+export function renderCommandsReference(lift?: string): string {
+  const validLifts = ['squat', 'bench', 'deadlift'] as const;
+  const liftsToShow = lift && validLifts.includes(lift as typeof validLifts[number])
+    ? [lift as typeof validLifts[number]]
+    : validLifts;
+
+  const sections = liftsToShow.map(l => {
+    const commands = getCommandsForLift(l);
+    const liftTitle = l.charAt(0).toUpperCase() + l.slice(1);
+    const cards = commands.map(cmd => `
+      <div class="cmd-card">
+        <div class="cmd-card-header">
+          <span class="cmd-card-name">"${cmd.command}"</span>
+          <span class="cmd-card-lift-badge">${liftTitle}</span>
+        </div>
+        <div class="cmd-card-body">
+          <div class="cmd-card-row">
+            <span class="cmd-card-label">When given:</span>
+            <span class="cmd-card-value">${cmd.timing}</span>
+          </div>
+          <div class="cmd-card-row">
+            <span class="cmd-card-label">What to do:</span>
+            <span class="cmd-card-value">${cmd.description}</span>
+          </div>
+          <div class="cmd-card-row cmd-card-warning">
+            <span class="cmd-card-label">If missed:</span>
+            <span class="cmd-card-value">${cmd.failureConsequence}</span>
+          </div>
+        </div>
+      </div>`).join('');
+
+    return `<div class="cmd-section">
+      <h4 class="cmd-lift-title">${liftTitle}</h4>
+      <div class="cmd-cards-grid">${cards}</div>
+    </div>`;
+  });
+
+  const styleId = 'cmd-ref-styles';
+  const styles = `<style id="${styleId}">
+    .cmd-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .cmd-card {
+      border: 1px solid var(--border, #ddd);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--bg-card, #fff);
+    }
+    .cmd-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--bg-secondary, #f5f5f5);
+      border-bottom: 1px solid var(--border, #ddd);
+    }
+    .cmd-card-name {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-primary, #111);
+      letter-spacing: 0.02em;
+    }
+    .cmd-card-lift-badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--accent, #2563eb);
+      color: var(--bg-primary, #fff);
+    }
+    .cmd-card-body {
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .cmd-card-row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .cmd-card-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted, #888);
+    }
+    .cmd-card-value {
+      font-size: 0.875rem;
+      line-height: 1.4;
+      color: var(--text-primary, #111);
+    }
+    .cmd-card-warning .cmd-card-value {
+      color: var(--danger, #dc2626);
+      font-weight: 600;
+    }
+    .cmd-lift-title {
+      margin: 16px 0 8px;
+    }
+    @media (max-width: 500px) {
+      .cmd-cards-grid {
+        grid-template-columns: 1fr;
+      }
+      .cmd-card-name {
+        font-size: 1.5rem;
+      }
+    }
+  </style>`;
+
+  return `${styles}
+<div class="competition-commands-reference">
+  <h3>Competition Commands Reference</h3>
+  <p class="cmd-intro">In IPF/USAPL competitions, the head referee issues verbal commands that the lifter must follow. Failure to wait for or obey a command results in a red light (failed lift).</p>
+  ${sections.join('\n')}
+</div>`;
+}
 
 // ─── Sticking Point Detection ───
 

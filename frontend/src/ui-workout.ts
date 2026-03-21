@@ -36,8 +36,13 @@ import { getBeginnerGuide } from './beginner-guide';
 import { renderStrengthCard } from './strength-standards';
 import { renderCompTotalCard, calculateCompTotal, saveCompTotal, loadCompTotals, renderCommandsReference } from './competition';
 import { calculateWilks2, calculateGLPoints, computeDOTS } from './one-rm';
-import { renderPainPrompt, handlePainReport, shouldShowPainPrompt, savePainReport, checkPainRedFlags, CONDITIONS_DATABASE, savePreExistingConditions, loadPreExistingConditions } from './safety-screening';
+import { renderPainPrompt, handlePainReport, shouldShowPainPrompt, incrementPainSetCounter, savePainReport, checkPainRedFlags, CONDITIONS_DATABASE, savePreExistingConditions, loadPreExistingConditions } from './safety-screening';
 import type { WeightRecommendation, AdaptationResult } from './program-generator';
+import { renderMuscleMap, renderSessionMusclesSummary, volumeToMapData, injectMuscleMapStyles, attachMuscleMapListeners } from './muscle-map';
+import { generateWarmupPlan, renderWarmupPlan } from './warmup-calculator';
+import { renderBackupCard, getStorageUsage } from './data-backup';
+import { renderProgressionDashboard, buildE1RMProgression, injectChartStyles } from './progression-charts';
+import { renderWeakPointReport, analyzeFormWeaknesses, getAccessoryRecommendations } from './form-programming-bridge';
 
 // ─── Terminology Glossary ───
 
@@ -169,7 +174,7 @@ function showStorageWarning(container: HTMLElement): void {
 /** Safely save to localStorage with user feedback */
 function safeSaveProgramState(state: ProgramState, container?: HTMLElement): boolean {
   try {
-    localStorage.setItem('squat_form_program_state', JSON.stringify(state));
+    saveProgramState(state);
     return true;
   } catch {
     if (container) showStorageWarning(container);
@@ -180,7 +185,7 @@ function safeSaveProgramState(state: ProgramState, container?: HTMLElement): boo
 function safeSaveWorkoutLogs(logs: WorkoutLog[], container?: HTMLElement): boolean {
   try {
     if (logs.length > 200) logs.length = 200;
-    localStorage.setItem('squat_form_workout_logs', JSON.stringify(logs));
+    saveWorkoutLogs(logs);
     return true;
   } catch {
     if (container) showStorageWarning(container);
@@ -451,6 +456,17 @@ OHP 3x5 @ RPE 7, 1x/week, start 95 lbs, increase 2.5 lbs/week"></textarea>
     });
   }
 
+  // Hide conditions section for beginners
+  const experienceSelect = card.querySelector('#wp-experience') as HTMLSelectElement;
+  const conditionsGroup = card.querySelector('#wp-conditions-group') as HTMLElement;
+  if (experienceSelect && conditionsGroup) {
+    const updateConditionsVisibility = () => {
+      conditionsGroup.style.display = experienceSelect.value === 'beginner' ? 'none' : '';
+    };
+    updateConditionsVisibility(); // Apply on initial render
+    experienceSelect.addEventListener('change', updateConditionsVisibility);
+  }
+
   // Wire up "Find My Program"
   const findBtn = card.querySelector('#wp-find-programs') as HTMLButtonElement;
   findBtn.addEventListener('click', () => {
@@ -630,15 +646,20 @@ function renderProgramRecommendations(
     return;
   }
 
+  const isBeginner = profile.experienceLevel === 'beginner';
+  const BEGINNER_CAP = 3;
+  const visibleCount = isBeginner ? Math.min(BEGINNER_CAP, programs.length) : programs.length;
+
   let html = '<h4 class="section-heading-sm wp-recs-heading">Recommended Programs</h4>';
 
   for (let i = 0; i < programs.length; i++) {
     const program = programs[i];
     const levelClass = `wp-level-${program.level}`;
     const isBestMatch = i === 0;
+    const isHidden = isBeginner && i >= BEGINNER_CAP;
 
     html += `
-      <div class="card program-rec-card${isBestMatch ? ' wp-best-match' : ''}" data-program-id="${escapeHtml(program.id)}" tabindex="0" role="button" aria-label="${isBestMatch ? 'Best match: ' : ''}Select ${escapeHtml(program.name)}: ${escapeHtml(program.description)}">
+      <div class="card program-rec-card${isBestMatch ? ' wp-best-match' : ''}${isHidden ? ' wp-rec-hidden' : ''}" data-program-id="${escapeHtml(program.id)}" tabindex="${isHidden ? -1 : 0}" role="button" aria-label="${isBestMatch ? 'Best match: ' : ''}Select ${escapeHtml(program.name)}: ${escapeHtml(program.description)}"${isHidden ? ' style="display:none"' : ''}>
         ${isBestMatch ? '<div class="wp-best-match-badge">Best Match</div>' : ''}
         <div class="wp-rec-header">
           <h5 class="wp-rec-name">${escapeHtml(program.name)}</h5>
@@ -656,8 +677,31 @@ function renderProgramRecommendations(
     `;
   }
 
+  // Add beginner note and "See all programs" link when capped
+  if (isBeginner && programs.length > BEGINNER_CAP) {
+    html += `
+      <p class="wp-beginner-recs-note">Showing the ${visibleCount} best programs for beginners.</p>
+      <button class="wp-see-all-link" id="wp-see-all-programs" type="button">See all ${programs.length} programs</button>
+    `;
+  }
+
   container.innerHTML = html;
   container.style.display = 'block';
+
+  // Wire up "See all programs" expander for beginners
+  const seeAllBtn = container.querySelector('#wp-see-all-programs') as HTMLButtonElement | null;
+  if (seeAllBtn) {
+    seeAllBtn.addEventListener('click', () => {
+      container.querySelectorAll<HTMLElement>('.wp-rec-hidden').forEach(el => {
+        el.style.display = '';
+        el.classList.remove('wp-rec-hidden');
+        el.setAttribute('tabindex', '0');
+      });
+      seeAllBtn.remove();
+      const note = container.querySelector('.wp-beginner-recs-note');
+      if (note) note.remove();
+    });
+  }
 
   // Wire up program selection
   container.querySelectorAll<HTMLElement>('.program-rec-card').forEach(card => {
@@ -884,6 +928,46 @@ function renderActiveProgram(container: HTMLElement, state: ProgramState): void 
     const undertrained = getUndertrainedMuscles(volumes);
     const overtrained = getOvertrainedMuscles(volumes);
     html += renderVolumeCard(volumes, undertrained, overtrained);
+
+    // Muscle map companion view
+    const mapData = volumeToMapData(volumes);
+    html += `
+      <details class="card card--static wp-volume-card">
+        <summary class="wp-volume-summary">
+          <span>Muscle Map</span>
+        </summary>
+        <div class="wp-volume-content">
+          ${renderMuscleMap(mapData, 'front', 'week')}
+        </div>
+      </details>
+    `;
+  }
+
+  // Progression charts — show after 5 workouts
+  if (state.workoutsCompleted >= 5) {
+    injectChartStyles();
+    const chartLogs = logs.map(l => ({
+      date: l.date,
+      sets: l.sets.map(s => ({ exerciseSlot: s.exerciseSlot, actualWeight: s.actualWeight, actualReps: s.actualReps, completed: s.completed })),
+    }));
+    html += `
+      <details class="card card--static wp-science-card">
+        <summary class="wp-science-summary">Strength Progression</summary>
+        <div>${renderProgressionDashboard(chartLogs)}</div>
+      </details>
+    `;
+  }
+
+  // Form weakness report — show if form data exists
+  const formWeaknesses = analyzeFormWeaknesses();
+  if (formWeaknesses.length > 0) {
+    const accessories = getAccessoryRecommendations(formWeaknesses, state.equipment);
+    html += `
+      <details class="card card--static wp-science-card">
+        <summary class="wp-science-summary">Weak Point Analysis</summary>
+        <div>${renderWeakPointReport(formWeaknesses, accessories)}</div>
+      </details>
+    `;
   }
 
   // Strength Standards card (show if bodyweight known)
@@ -955,7 +1039,19 @@ function renderActiveProgram(container: HTMLElement, state: ProgramState): void 
     </div>
   `;
 
+  // Data backup card
+  html += `
+    <details class="card card--static wp-science-card">
+      <summary class="wp-science-summary">Data Backup &amp; Storage</summary>
+      <div>${renderBackupCard()}</div>
+    </details>
+  `;
+
   container.innerHTML = html;
+
+  // Wire up muscle map interactivity in active program view
+  injectMuscleMapStyles();
+  container.querySelectorAll<HTMLElement>('.mm-container').forEach(mc => attachMuscleMapListeners(mc));
 
   // Wire up readiness form
   wireUpReadinessForm(container);
@@ -1894,7 +1990,7 @@ function renderWorkoutCard(workout: GeneratedWorkout, state: ProgramState): stri
       html += `<div class="wp-prev-hint">Last: ${prevExData.weight} ${escapeHtml(state.weightUnit)} × ${prevExData.reps} ${prevExData.rpe ? `@ RPE ${prevExData.rpe}` : ''}</div>`;
     }
 
-    // Warm-up sets (non-interactive, greyed out)
+    // Warm-up sets with plate loading
     if (exercise.warmupSets && exercise.warmupSets.length > 0) {
       html += `<div class="wp-warmup-section">`;
       html += `<div class="wp-warmup-label">Warm-up</div>`;
@@ -1908,6 +2004,17 @@ function renderWorkoutCard(workout: GeneratedWorkout, state: ProgramState): stri
         `;
       }
       html += `</div>`;
+    } else if (!isAccessory && exercise.sets.length > 0) {
+      // Generate warm-up plan for main lifts without predefined warm-ups
+      const firstWorkingWeight = exercise.sets[0]?.targetWeight ?? 0;
+      if (firstWorkingWeight > 0) {
+        const warmup = generateWarmupPlan(firstWorkingWeight, (state.weightUnit ?? 'lbs') as 'lbs' | 'kg', {
+          exercise: exercise.exerciseSlot,
+        });
+        if (warmup.sets.length > 0) {
+          html += renderWarmupPlan(warmup);
+        }
+      }
     }
 
     // Sets table header
@@ -2473,6 +2580,17 @@ function renderWorkoutComplete(
     </div>
   `;
 
+  // Show session muscle map
+  {
+    const sessionSets: Array<{ exerciseSlot: string; completed: boolean }> = [];
+    for (const ex of workout.exercises) {
+      for (const s of ex.sets) {
+        sessionSets.push({ exerciseSlot: ex.exerciseSlot, completed: true });
+      }
+    }
+    html += `<div class="card card--static">${renderSessionMusclesSummary(sessionSets)}</div>`;
+  }
+
   // Show PRs set during this session
   const prsByLift = getAllPRsByLift();
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -2606,6 +2724,11 @@ function renderWorkoutComplete(
   `;
 
   container.innerHTML = html;
+
+  // Wire up muscle map interactivity
+  injectMuscleMapStyles();
+  const mmContainers = container.querySelectorAll<HTMLElement>('.mm-container');
+  mmContainers.forEach(mc => attachMuscleMapListeners(mc));
 
   const nextBtn = container.querySelector('#wp-next-workout') as HTMLButtonElement;
   if (nextBtn) {
@@ -2976,6 +3099,26 @@ export function injectWorkoutPlannerStyles(): void {
     .wp-level-beginner { background: var(--success); }
     .wp-level-intermediate { background: var(--warning); }
     .wp-level-advanced { background: var(--danger); }
+    .wp-beginner-recs-note {
+      color: var(--text-muted);
+      font-size: var(--font-sm);
+      text-align: center;
+      margin: var(--space-sm) 0 var(--space-xs);
+    }
+    .wp-see-all-link {
+      display: block;
+      margin: 0 auto var(--space-md);
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-size: var(--font-sm);
+      cursor: pointer;
+      text-decoration: underline;
+      padding: var(--space-xs) var(--space-sm);
+    }
+    .wp-see-all-link:hover {
+      color: var(--text-primary);
+    }
 
     /* ===== Science Details ===== */
     .wp-science-details {
@@ -3172,18 +3315,19 @@ export function injectWorkoutPlannerStyles(): void {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 22px;
-      height: 22px;
+      width: 44px;
+      height: 44px;
       border-radius: 50%;
       border: 1px solid var(--accent-dim);
       background: var(--accent-glow);
       color: var(--accent);
-      font-size: var(--font-2xs);
+      font-size: var(--font-sm);
       font-weight: 700;
       cursor: pointer;
       padding: 0;
       line-height: 1;
       flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
     }
     .wp-demo-info-btn:hover {
       background: var(--accent);
