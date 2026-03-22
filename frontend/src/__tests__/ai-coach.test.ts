@@ -86,6 +86,7 @@ import {
   buildCoachContext,
   buildSystemPrompt,
   getOfflineResponse,
+  routeQuestion,
   sendToClaudeAPI,
   getApiKey,
   saveApiKey,
@@ -353,9 +354,7 @@ describe('AI Coach', () => {
   describe('Offline Response - Programming', () => {
     it('suggests setup wizard when no program is selected', () => {
       const ctx = makeContext();
-      // "program" contains "pr" which matches the progress branch first.
-      // Use "routine" or "plan" to hit the program branch without "pr".
-      const resp = getOfflineResponse('What routine should I follow?', ctx);
+      const resp = getOfflineResponse('What program should I follow?', ctx);
       expect(resp.content).toContain('Training tab');
       expect(resp.content).toContain('setup wizard');
     });
@@ -377,8 +376,7 @@ describe('AI Coach', () => {
         currentWeek: 3,
         workoutsCompleted: 8,
       });
-      // Use "plan" to avoid "pr" substring in "program" matching the progress branch
-      const resp = getOfflineResponse('Tell me about my plan', ctx);
+      const resp = getOfflineResponse('Tell me about my program', ctx);
       expect(resp.content).toContain('Starting Strength');
       expect(resp.content).toContain('still early');
       expect(resp.dataSources).toContain('program state');
@@ -481,15 +479,10 @@ describe('AI Coach', () => {
   describe('Offline Response - Technique/Exercise Tips', () => {
     it('returns exercise cues for recognized exercises', () => {
       const ctx = makeContext();
-      // Avoid "properly" which contains "pr" matching the progress branch
-      const resp = getOfflineResponse('How to squat with good form?', ctx);
-      // "how to" triggers technique, "squat" matches exercise
-      // But wait -- "form" triggers the form branch before technique!
-      // So use a question without "form":
-      const resp2 = getOfflineResponse('squat tips', ctx);
-      expect(resp2.content).toContain('Barbell Back Squat');
-      expect(resp2.content).toContain('Drive knees out');
-      expect(resp2.content).toContain('Common mistakes');
+      const resp = getOfflineResponse('squat tips', ctx);
+      expect(resp.content).toContain('Barbell Back Squat');
+      expect(resp.content).toContain('Drive knees out');
+      expect(resp.content).toContain('Common mistakes');
     });
 
     it('incorporates form score context when available', () => {
@@ -502,8 +495,6 @@ describe('AI Coach', () => {
 
     it('returns general help when no exercise is identified', () => {
       const ctx = makeContext();
-      // "how to" triggers technique, but "stronger" matches progress first.
-      // Use "how to lift" which doesn't match progress keywords.
       const resp = getOfflineResponse('How to lift?', ctx);
       // No specific exercise match, so shows the exercise list
       expect(resp.content).toContain('exercise');
@@ -527,9 +518,7 @@ describe('AI Coach', () => {
 
     it('provides evidence-based nutrition recommendations', () => {
       const ctx = makeContext();
-      // Avoid "protein" which contains "pr" matching the progress branch.
-      // Use "eat" or "nutrition" to trigger the nutrition branch directly.
-      const resp = getOfflineResponse('What should I eat?', ctx);
+      const resp = getOfflineResponse('How much protein do I need?', ctx);
       expect(resp.content).toContain('1.6-2.2');
       expect(resp.content).toContain('Morton');
     });
@@ -557,13 +546,11 @@ describe('AI Coach', () => {
       expect(resp.content).toContain('As Many Reps As Possible');
     });
 
-    it('1RM question matches progress branch (contains "1rm" keyword)', () => {
-      // Note: "1rm" in the question triggers the progress branch before terminology.
-      // This is expected behavior -- the progress branch intercepts 1RM queries.
+    it('1RM question routes to progress (domain keyword outweighs question frame)', () => {
+      // "1rm" keyword (progress, 2 pts) outweighs "what's" phrase (terminology, 1 pt)
       const ctx = makeContext({ workoutsCompleted: 1 });
       const resp = getOfflineResponse("What's a 1RM?", ctx);
       expect(resp.role).toBe('coach');
-      // Gets a progress response because q.includes('1rm') matches progress first
       expect(resp.content.length).toBeGreaterThan(0);
     });
 
@@ -575,16 +562,14 @@ describe('AI Coach', () => {
       expect(resp.content).toContain('RPE');
     });
 
-    it('deload question matches deload branch with actual data', () => {
-      // Note: "deload" keyword is intercepted by the deload/fatigue branch
-      // before reaching the terminology branch. This is correct behavior --
-      // the coach gives personalized deload advice based on RPE data.
+    it('deload question routes to deload branch (domain keyword outweighs question frame)', () => {
+      // "deload" keyword (deload, 2 pts) outweighs "what is" phrase (terminology, 1 pt)
+      // The coach gives personalized deload advice based on RPE data.
       const ctx = makeContext({
         recentRPE: [7, 7.5],
         recentDifficulty: ['just_right'],
       });
       const resp = getOfflineResponse('What is a deload?', ctx);
-      // Gets the deload branch response (personalized advice, not a definition)
       expect(resp.content).toContain('deload');
       expect(resp.dataSources).toContain('RPE data');
     });
@@ -633,7 +618,6 @@ describe('AI Coach', () => {
 
     it('provides general plateau advice when no lift specified', () => {
       const ctx = makeContext();
-      // Avoid "progressing" which contains "pr" matching the progress branch
       const resp = getOfflineResponse("I'm stuck at a plateau", ctx);
       expect(resp.content).toContain('General Plateau Advice');
       expect(resp.content).toContain('recovery');
@@ -970,6 +954,146 @@ describe('AI Coach', () => {
       });
       const resp = getOfflineResponse('How is my progress?', ctx);
       expect(resp.content).toContain('180');
+    });
+  });
+
+  // ========================================
+  // Question Routing (scored keyword matching)
+  // ========================================
+
+  describe('Question Routing', () => {
+    describe('routes questions to correct categories', () => {
+      it('"What program should I run?" routes to programming, NOT progress', () => {
+        expect(routeQuestion('What program should I run?')).toBe('programming');
+      });
+
+      it('"How much protein should I eat?" routes to nutrition, NOT progress', () => {
+        expect(routeQuestion('How much protein should I eat?')).toBe('nutrition');
+      });
+
+      it('"How do I press properly?" routes to technique, NOT progress', () => {
+        expect(routeQuestion('How do I press properly?')).toBe('technique');
+      });
+
+      it('"Am I making progress?" routes to progress', () => {
+        expect(routeQuestion('Am I making progress?')).toBe('progress');
+      });
+
+      it('"How am I progressing?" routes to progress', () => {
+        expect(routeQuestion('How am I progressing?')).toBe('progress');
+      });
+
+      it('"I hit a PR today!" routes to progress', () => {
+        expect(routeQuestion('I hit a PR today!')).toBe('progress');
+      });
+
+      it('"I need a new program" routes to programming', () => {
+        expect(routeQuestion('I need a new program')).toBe('programming');
+      });
+    });
+
+    describe('routes edge cases correctly', () => {
+      it('"How do I practice squats?" routes to technique', () => {
+        expect(routeQuestion('How do I practice squats?')).toBe('technique');
+      });
+
+      it('"What\'s the best approach for my pressing?" routes to default (no strong signals)', () => {
+        // "pressing" does not match any category keywords strongly
+        const route = routeQuestion("What's the best approach for my pressing?");
+        // "what's" matches terminology, which is acceptable
+        expect(['technique', 'terminology', 'default']).toContain(route);
+      });
+
+      it('"Should I eat more protein for recovery?" routes to nutrition', () => {
+        // "protein" (nutrition, 2) + "eat" (nutrition, 2) = 4 vs "recovery" (deload, 2)
+        expect(routeQuestion('Should I eat more protein for recovery?')).toBe('nutrition');
+      });
+
+      it('"protein" no longer matches progress via "pr" substring', () => {
+        expect(routeQuestion('protein')).toBe('nutrition');
+        expect(routeQuestion('protein')).not.toBe('progress');
+      });
+
+      it('"program" no longer matches progress via "pr" substring', () => {
+        expect(routeQuestion('program')).toBe('programming');
+        expect(routeQuestion('program')).not.toBe('progress');
+      });
+
+      it('"press" no longer matches progress', () => {
+        // "press" is not a keyword in any route category
+        // Should route to default since no category has strong signals
+        const route = routeQuestion('press');
+        expect(route).not.toBe('progress');
+      });
+
+      it('"properly" no longer matches progress', () => {
+        const route = routeQuestion('Do this exercise properly');
+        expect(route).not.toBe('progress');
+      });
+    });
+
+    describe('priority ordering breaks ties correctly', () => {
+      it('injury keywords outrank other categories in ambiguous questions', () => {
+        // "pain" is an injury keyword checked early in priority
+        expect(routeQuestion('I have pain')).toBe('injury');
+      });
+
+      it('domain keywords (2 pts) outweigh question-frame phrases (1 pt)', () => {
+        // "What is a deload?" -- "deload" keyword (2 pts) vs "what is" phrase (1 pt)
+        expect(routeQuestion('What is a deload?')).toBe('deload');
+      });
+
+      it('multiple keyword matches accumulate score', () => {
+        // "stuck" (2) + "plateau" (2) = 4 for plateau
+        expect(routeQuestion("I'm stuck at a plateau")).toBe('plateau');
+      });
+    });
+  });
+
+  // ========================================
+  // Routing Integration (end-to-end via getOfflineResponse)
+  // ========================================
+
+  describe('Routing Integration', () => {
+    it('"What program should I run?" returns programming response', () => {
+      const ctx = makeContext();
+      const resp = getOfflineResponse('What program should I run?', ctx);
+      expect(resp.content).toContain('Training tab');
+      expect(resp.content).toContain('setup wizard');
+    });
+
+    it('"How much protein should I eat?" returns nutrition response', () => {
+      const ctx = makeContext();
+      const resp = getOfflineResponse('How much protein should I eat?', ctx);
+      expect(resp.content).toContain('1.6-2.2');
+      expect(resp.content).toContain('lifting coach');
+    });
+
+    it('"How do I press properly?" returns technique response', () => {
+      const ctx = makeContext();
+      const resp = getOfflineResponse('How do I press properly?', ctx);
+      // "press" maps to OHP in the exercise list, demo not mocked for OHP
+      expect(resp.role).toBe('coach');
+      expect(resp.content.length).toBeGreaterThan(0);
+    });
+
+    it('"Am I making progress?" returns progress response', () => {
+      const ctx = makeContext({ workoutsCompleted: 1 });
+      const resp = getOfflineResponse('Am I making progress?', ctx);
+      expect(resp.content).toContain('just getting started');
+    });
+
+    it('"How am I progressing?" returns progress response', () => {
+      const ctx = makeContext({ workoutsCompleted: 20, e1rms: { squat: 300 } });
+      const resp = getOfflineResponse('How am I progressing?', ctx);
+      expect(resp.content).toContain('300 lbs');
+      expect(resp.dataSources).toContain('PR tracker');
+    });
+
+    it('"I hit a PR today!" returns progress response', () => {
+      const ctx = makeContext({ workoutsCompleted: 15, e1rms: { bench: 200 } });
+      const resp = getOfflineResponse('I hit a PR today!', ctx);
+      expect(resp.content).toContain('200 lbs');
     });
   });
 });

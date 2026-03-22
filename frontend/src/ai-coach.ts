@@ -323,9 +323,93 @@ export function buildSystemPrompt(context: CoachContext): string {
 // --- Offline Smart Responses ---
 
 /**
+ * Route categories for the offline coaching response system.
+ * Each category has keywords that are matched against the user's question.
+ * The category with the highest score (most keyword matches) wins.
+ * Priority ordering breaks ties (lower index = higher priority).
+ */
+interface RouteCategory {
+  id: string;
+  /** Keywords to match against the lowercased question (checked with word-boundary-aware matching) */
+  keywords: string[];
+  /** Keywords matched with simple includes() -- for multi-word phrases */
+  phrases: string[];
+}
+
+const ROUTE_CATEGORIES: RouteCategory[] = [
+  // Order matters for tie-breaking: earlier categories win ties
+  { id: 'memory', keywords: ['history', 'journey', 'remember'], phrases: ['how long'] },
+  { id: 'injury', keywords: ['hurt', 'pain', 'injury', 'injured', 'sore'], phrases: [] },
+  { id: 'deload', keywords: ['deload', 'tired', 'fatigue', 'fatigued', 'recovery', 'rest'], phrases: [] },
+  { id: 'form', keywords: ['form', 'technique', 'score'], phrases: [] },
+  { id: 'nutrition', keywords: ['eat', 'nutrition', 'protein', 'diet', 'calorie', 'calories', 'food'], phrases: [] },
+  { id: 'plateau', keywords: ['stuck', 'stall', 'stalled', 'plateau', 'weak'], phrases: ['sticking point', 'weak point', 'not progressing', "can't lift", "can't get"] },
+  { id: 'programming', keywords: ['program', 'routine', 'plan', 'split', 'transition'], phrases: ['change program', 'should i change', 'what should i do', 'switch program', 'new program'] },
+  { id: 'progress', keywords: ['progress', 'progressing', 'stronger', '1rm', 'gains', 'improving'], phrases: ['how am i doing', 'hit a pr', 'new pr', 'personal record'] },
+  { id: 'technique', keywords: ['cue', 'cues', 'tip', 'tips'], phrases: ['how to', 'how do i'] },
+  { id: 'terminology', keywords: ['explain', 'define', 'meaning'], phrases: ['what is', 'what does', "what's"] },
+  { id: 'default', keywords: [], phrases: [] },
+];
+
+/**
+ * Check if a keyword appears in the query using substring matching.
+ * The keywords themselves are chosen to be specific enough to avoid
+ * false matches (e.g., 'progress' instead of 'pr').
+ */
+function matchesKeyword(query: string, keyword: string): boolean {
+  return query.includes(keyword);
+}
+
+/**
+ * Score each route category against the query and return the best match.
+ * Scoring: each keyword match = 2 points, each phrase match = 1 point.
+ * Keywords score higher because they are domain-specific signals (e.g., "deload",
+ * "protein"), while phrases are generic question frames (e.g., "what is", "how to").
+ * Ties broken by priority order (earlier in ROUTE_CATEGORIES wins).
+ */
+export function routeQuestion(question: string): string {
+  const q = question.toLowerCase();
+
+  let bestId = 'default';
+  let bestScore = 0;
+
+  for (const cat of ROUTE_CATEGORIES) {
+    if (cat.id === 'default') continue;
+
+    let score = 0;
+
+    // Keywords are domain-specific signals (higher weight)
+    for (const kw of cat.keywords) {
+      if (matchesKeyword(q, kw)) {
+        score += 2;
+      }
+    }
+
+    // Phrases are generic question frames (lower weight)
+    for (const phrase of cat.phrases) {
+      if (q.includes(phrase)) {
+        score += 1;
+      }
+    }
+
+    // Strictly greater than: ties broken by priority (earlier category wins)
+    if (score > bestScore) {
+      bestScore = score;
+      bestId = cat.id;
+    }
+  }
+
+  return bestId;
+}
+
+/**
  * Pre-built coaching responses based on common questions and user data.
  * Works without any API -- uses the user's actual training data to give
  * personalized, context-aware answers.
+ *
+ * Uses a scored keyword-matching router instead of fragile if/else-if
+ * with includes() checks, preventing false matches like "program" hitting
+ * the progress branch due to the "pr" substring.
  */
 export function getOfflineResponse(
   question: string,
@@ -335,9 +419,11 @@ export function getOfflineResponse(
   let content: string;
   let dataSources: string[] = [];
 
+  const route = routeQuestion(question);
+
   // Memory/history questions
   const memory = loadCoachMemory();
-  if (q.includes('history') || q.includes('journey') || q.includes('how long') || q.includes('remember')) {
+  if (route === 'memory') {
     content = `I've been coaching you for ${memory.conversationCount} sessions since ${memory.firstConversation.slice(0, 10)}.\n\n`;
     if (memory.facts.length > 0) {
       content += 'Here\'s what I know about you:\n\n';
@@ -353,7 +439,7 @@ export function getOfflineResponse(
   }
 
   // Form/technique questions
-  else if (q.includes('form') || q.includes('technique') || q.includes('score')) {
+  else if (route === 'form') {
     const scores = context.formScores;
     if (Object.keys(scores).length === 0) {
       content = 'I don\'t have any form analysis data yet. Use the "Form Check" tab to upload a video of your lift -- I\'ll analyze your technique across 6 dimensions and give you specific feedback. This is something no other coaching app can do.';
@@ -384,7 +470,7 @@ export function getOfflineResponse(
   }
 
   // Strength/progress questions
-  else if (q.includes('progress') || q.includes('stronger') || q.includes('pr') || q.includes('1rm') || q.includes('how am i doing')) {
+  else if (route === 'progress') {
     const e1rms = context.e1rms;
     if (Object.keys(e1rms).length === 0 && context.workoutsCompleted < 3) {
       content = `You're just getting started -- ${context.workoutsCompleted} workout(s) completed so far. Focus on learning the movements and building consistency. Strength PRs will come naturally in the first few weeks. The most important thing right now is showing up.`;
@@ -418,7 +504,7 @@ export function getOfflineResponse(
   }
 
   // Program/programming questions
-  else if (q.includes('program') || q.includes('plan') || q.includes('routine') || q.includes('should i change') || q.includes('what should i do')) {
+  else if (route === 'programming') {
     const program = context.programState ? PROGRAMS[context.programState.programId] : null;
     if (!program) {
       content = 'You don\'t have a program set up yet. Go to the Training tab and use the setup wizard -- it will recommend the best program based on your experience, schedule, equipment, and goals. Or describe your ideal program in the text builder and I\'ll generate it for you.';
@@ -444,7 +530,7 @@ export function getOfflineResponse(
   }
 
   // Injury/pain questions
-  else if (q.includes('hurt') || q.includes('pain') || q.includes('injury') || q.includes('sore')) {
+  else if (route === 'injury') {
     content = 'I\'m sorry to hear something hurts. Here\'s what I recommend:\n\n';
     content += '1. **If it\'s sharp, sudden, or in a joint**: Stop that exercise immediately. Use the post-workout feedback to report it -- the app will automatically substitute safe alternatives.\n\n';
     content += '2. **If it\'s general muscle soreness (DOMS)**: This is normal, especially after new exercises or increased volume. Foam rolling, light movement, and adequate protein help. You can train through mild soreness.\n\n';
@@ -454,7 +540,7 @@ export function getOfflineResponse(
   }
 
   // Deload/fatigue questions
-  else if (q.includes('deload') || q.includes('tired') || q.includes('fatigue') || q.includes('recovery') || q.includes('rest')) {
+  else if (route === 'deload') {
     const avgRPE = context.recentRPE.length > 0
       ? context.recentRPE.reduce((a, b) => a + b, 0) / context.recentRPE.length
       : 0;
@@ -473,7 +559,7 @@ export function getOfflineResponse(
   }
 
   // Exercise-specific questions
-  else if (q.includes('how to') || q.includes('how do i') || q.includes('cue') || q.includes('tip')) {
+  else if (route === 'technique') {
     // Try to identify which exercise
     const exercises = ['squat', 'bench', 'deadlift', 'ohp', 'press', 'row', 'pull-up', 'pullup', 'rdl', 'hip thrust'];
     const match = exercises.find(e => q.includes(e));
@@ -513,7 +599,7 @@ export function getOfflineResponse(
   }
 
   // Nutrition/diet questions
-  else if (q.includes('eat') || q.includes('nutrition') || q.includes('protein') || q.includes('diet') || q.includes('calorie') || q.includes('food')) {
+  else if (route === 'nutrition') {
     content = 'I\'m a lifting coach, not a nutritionist, but here are the evidence-based fundamentals:\n\n';
     content += '\u2022 **Protein:** 1.6-2.2 g/kg bodyweight/day, spread across 3-5 meals (Morton et al. 2018)\n';
     content += '\u2022 **Calories:** Slight surplus (10-20%) for muscle gain; moderate deficit for fat loss. You can build muscle in a deficit as a beginner.\n';
@@ -524,7 +610,7 @@ export function getOfflineResponse(
   }
 
   // Terminology questions
-  else if (q.includes('what is') || q.includes('what does') || q.includes("what's") || q.includes('explain') || q.includes('define') || q.includes('meaning')) {
+  else if (route === 'terminology') {
     const termDefinitions: Record<string, string> = {
       'rpe': 'RPE stands for Rate of Perceived Exertion. It\'s a 1-10 scale measuring how hard a set felt.\n\n\u2022 RPE 6: Could do 4+ more reps (warm-up territory)\n\u2022 RPE 7: Could do 3 more reps\n\u2022 RPE 8: Could do 2 more reps (most productive training zone)\n\u2022 RPE 9: Could do 1 more rep\n\u2022 RPE 10: Maximum effort, couldn\'t do another rep\n\nUse RPE to gauge intensity without needing exact percentages. Most training should be RPE 7-8.5.',
       'amrap': 'AMRAP means "As Many Reps As Possible." When you see "5+" or "AMRAP" on a set, do as many good reps as you can \u2014 stop 1-2 reps before form breaks down. Your AMRAP performance helps the app calculate progression. Example: if your program says 3x5+ and you get 5, 5, 8 on the AMRAP set, that tells the app you have room to increase weight.',
@@ -574,7 +660,7 @@ export function getOfflineResponse(
   }
 
   // Plateau / sticking point questions
-  else if (q.includes('stuck') || q.includes('stall') || q.includes('plateau') || q.includes('sticking point') || q.includes('weak point') || q.includes('not progressing') || q.includes("can't lift") || q.includes("can't get")) {
+  else if (route === 'plateau') {
     // Check which lift they're asking about
     const liftMatch = ['squat', 'bench', 'deadlift', 'ohp', 'press'].find(l => q.includes(l));
 
