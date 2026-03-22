@@ -10,7 +10,7 @@ AI-powered multi-exercise form analysis using MediaPipe BlazePose. Browser-based
 cd frontend && npx vite dev          # Dev server
 cd frontend && npx vite build        # Production build
 cd frontend && npx tsc --noEmit      # Type check
-cd frontend && npx vitest run        # Run tests (1973+)
+cd frontend && npx vitest run        # Run tests (3104+)
 
 # iOS (Capacitor)
 cd frontend && npm run ios:build    # Build web + sync to iOS
@@ -142,7 +142,7 @@ cd frontend && npx tsc --noEmit && npx vitest run && cd ../tests && python -m py
 
 ## After Changes
 - Type check with `npx tsc --noEmit`
-- Run both frontend (1973+) and backend (260) tests
+- Run both frontend (3104+) and backend (260) tests
 - Test all exercises (squat, deadlift, bench, OHP, row, lunge) — not just the one changed
 - Verify live mode still works if pose/phase code was touched
 - Check mobile responsiveness for any UI changes

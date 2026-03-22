@@ -125,7 +125,7 @@ squat-form/
 │   ├── static/            # Upload UI
 │   └── requirements.txt
 │
-├── tests/             # 2233 tests (1973 frontend + 260 backend)
+├── tests/             # 3364 tests (3104 frontend + 260 backend)
 │   ├── standard/      # Unit tests for each module
 │   ├── edge_cases/    # Boundary conditions and degenerate inputs
 │   └── deep/          # Integration and pipeline tests
