@@ -163,7 +163,11 @@ export function get531WeekSets(weekInCycle: number): FiveThirtyOneWeekSets {
     case 4: return { weekName: 'Deload', sets: [
       { pct: 40, reps: '5' }, { pct: 50, reps: '5' }, { pct: 60, reps: '5' },
     ] };
-    default: return get531WeekSets(((weekInCycle - 1) % 4) + 1);
+    default: {
+      // Guard against non-positive input (JS modulo of negative is negative → infinite recursion)
+      if (weekInCycle <= 0) return get531WeekSets(1);
+      return get531WeekSets(((weekInCycle - 1) % 4) + 1);
+    }
   }
 }
 
