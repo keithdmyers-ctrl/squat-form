@@ -14,7 +14,6 @@ import { exportSessionsCSV, downloadCSV } from './csv-export';
 import { renderComparisonView } from './ui-comparison';
 import {
   loadGoals,
-  saveGoals,
   createGoal,
   removeGoal,
   getActiveGoals,
@@ -23,7 +22,6 @@ import {
   MAX_ACTIVE_GOALS,
   CONSECUTIVE_HITS_REQUIRED,
 } from './goals';
-import type { GoalRecord } from './goals';
 import { getDimensionLabels } from './exercise-core';
 
 // ─── Chart Mode State ───

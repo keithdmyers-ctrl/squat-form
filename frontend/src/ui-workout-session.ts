@@ -77,7 +77,7 @@ function saveInProgressWorkout(container: HTMLElement, _workout: GeneratedWorkou
   }
 }
 
-export function restoreInProgressWorkout(container: HTMLElement): void {
+export function restoreInProgressWorkout(_container: HTMLElement): void {
   try {
     const raw = localStorage.getItem(IN_PROGRESS_KEY);
     if (!raw) return;

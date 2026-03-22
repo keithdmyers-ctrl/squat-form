@@ -82,7 +82,7 @@ if (isConfigured) {
         // Firestore offline persistence not supported in this browser
       }
     });
-  } catch (e) {
+  } catch {
     // Firebase initialization failed -- app will work in offline-only mode
   }
 }

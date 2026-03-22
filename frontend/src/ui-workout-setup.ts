@@ -6,7 +6,7 @@
 import type { UserProfile, EquipmentLevel, ProgramLevel } from './workout-programs';
 import { PROGRAMS, recommendPrograms } from './workout-programs';
 import {
-  loadUserProfile, saveUserProfile,
+  saveUserProfile,
   initializeProgram,
   saveProgramState,
 } from './program-generator';
@@ -58,7 +58,7 @@ function gatherProfile(card: HTMLElement): UserProfile {
   const experience = (card.querySelector('#wp-experience') as HTMLSelectElement).value as ProgramLevel;
   const days = parseInt((card.querySelector('#wp-days') as HTMLSelectElement).value, 10);
   const equipment = (card.querySelector('#wp-equipment') as HTMLSelectElement).value as EquipmentLevel;
-  const goal = (card.querySelector('#wp-goal') as HTMLSelectElement).value as any;
+  const goal = (card.querySelector('#wp-goal') as HTMLSelectElement).value as UserProfile['goal'];
   const unit = (card.querySelector('input[name="wp-unit"]:checked') as HTMLInputElement)?.value ?? 'lbs';
 
   const sex = (card.querySelector('#wp-sex') as HTMLSelectElement)?.value as 'male' | 'female' | undefined;

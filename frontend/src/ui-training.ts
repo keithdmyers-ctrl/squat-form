@@ -5,7 +5,7 @@
 
 import type { SessionRecord } from './types';
 import type { OneRMEstimate } from './one-rm';
-import { escapeHtml, $ } from './ui-utilities';
+import { escapeHtml } from './ui-utilities';
 import type { TrainingPhase } from './programming';
 import {
   getRecommendation,
@@ -15,8 +15,7 @@ import {
 import { computeDOTS, calculateWilks2, calculateGLPoints, check1RMSafety } from './one-rm';
 import { generateAttemptPlan } from './competition';
 import { generateMeetPrepPlan } from './meet-prep-plan';
-import type { MeetPrepPlan } from './meet-prep-plan';
-import { getStrengthLevel, getNextMilestone, renderStrengthCard } from './strength-standards';
+import { getStrengthLevel, getNextMilestone } from './strength-standards';
 
 // ─── Styles ───
 

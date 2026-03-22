@@ -9,17 +9,16 @@
  * - ui-workout-completion.ts — post-workout feedback, completion screen
  */
 
-import { PROGRAMS, EXERCISE_SLOTS } from './workout-programs';
+import { PROGRAMS } from './workout-programs';
 import {
   loadProgramState, saveProgramState, loadUserProfile,
   loadWorkoutLogs, saveWorkoutLogs,
   initializeProgram, generateWorkout,
   autoregulate, getTransitionRecommendations,
   roundToPlate,
-  getRecentFormScores,
 } from './program-generator';
 import type {
-  ProgramState, WorkoutLog, GeneratedWorkout, TransitionRecommendation,
+  ProgramState, WorkoutLog, TransitionRecommendation,
   ReadinessData,
   ScheduleOverride,
 } from './program-generator';

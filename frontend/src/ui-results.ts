@@ -29,8 +29,7 @@ import { encodeAnalysisUrl, generateShareCard } from './share';
 import type { TrainingPhase } from './programming';
 import { exportAnalysisCSV, downloadCSV } from './csv-export';
 import { loadGoals, saveGoals, checkGoals } from './goals';
-import { exportRepClip, downloadClip, shareClip } from './gif-export';
-import type { ClipExportOptions } from './gif-export';
+import { exportRepClip, shareClip } from './gif-export';
 
 // ─── Imports from sub-modules ───
 
@@ -40,7 +39,6 @@ import {
   renderBeginnerSummary,
   renderFocusSection,
   BEGINNER_DIMENSION_LABELS,
-  beginnerSeverity,
 } from './ui-coaching';
 import { renderTrainingRecommendations, renderOneRMEstimate, renderMeetPrepPlan } from './ui-training';
 import { renderMobilityAssessment, renderWarmUpProtocol } from './ui-warmup-mobility';
@@ -344,7 +342,7 @@ export function showResults(analysis: SetAnalysis, frameData: FrameData, session
  * Check active goals against the most recently saved session.
  * If any goals are newly achieved, show a celebration banner with confetti.
  */
-function checkAndCelebrateGoals(analysis: SetAnalysis, sessions: SessionRecord[]): void {
+function checkAndCelebrateGoals(_analysis: SetAnalysis, _sessions: SessionRecord[]): void {
   const goals = loadGoals();
   if (goals.length === 0) return;
 
@@ -1161,7 +1159,6 @@ async function handleRepExport(
     );
 
     // Use share on mobile, download on desktop
-    const filename = `rep-${repIndex + 1}.webm`;
     await shareClip(clip, `rep-${repIndex + 1}`);
 
     btn.textContent = 'Exported!';
@@ -1221,8 +1218,6 @@ export function renderBarPathMini(barPath: BarPathData): string {
     const py = padding + ((barPath.yPositions[i] - yMin) / yRange) * (height - 2 * padding);
     return `${px.toFixed(1)},${py.toFixed(1)}`;
   });
-
-  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p}`).join(' ');
 
   // Ideal straight line (vertical)
   const midX = width / 2;
@@ -1426,7 +1421,7 @@ export function renderCompetitionBadge(analysis: SetAnalysis): void {
 
 // ─── Competition Depth Judgment ───
 
-export function renderCompetitionDepthJudgment(rep: RepScore, repIdx: number): string {
+export function renderCompetitionDepthJudgment(rep: RepScore, _repIdx: number): string {
   // Use actual competition depth check if available, fall back to score proxy
   const depthPassed = rep.competitionDepthPass !== undefined ? rep.competitionDepthPass : rep.depthScore >= 80;
 
@@ -1549,7 +1544,7 @@ export function renderShareButtons(analysis: SetAnalysis): void {
       a.click();
       URL.revokeObjectURL(url);
       if (btn) { btn.textContent = 'Saved!'; setTimeout(() => { btn.textContent = 'Share Result'; }, 2000); }
-    } catch (err) {
+    } catch {
       // User cancelled share or error
       if (btn) { btn.textContent = 'Share Result'; }
     }
@@ -1891,7 +1886,7 @@ function wrapBeginnerDetailedAnalysis(): void {
 
 // ─── Beginner Full Report Toggle ───
 
-function renderBeginnerFullReportToggle(analysis: SetAnalysis, fps: number, sessions: SessionRecord[]): void {
+function renderBeginnerFullReportToggle(analysis: SetAnalysis, fps: number, _sessions: SessionRecord[]): void {
   const section = $('results-section');
   const existing = document.getElementById('beginner-full-report');
   if (existing) existing.remove();

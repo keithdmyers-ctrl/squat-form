@@ -794,7 +794,7 @@ export async function sendToClaudeAPI(
       timestamp: new Date().toISOString(),
       dataSources: ['Claude API', 'full training context'],
     };
-  } catch (_err) {
+  } catch {
     // Fall back to offline response
     const lastUserMsg = messages.filter(m => m.role === 'user').pop();
     const offlineResponse = getOfflineResponse(lastUserMsg?.content ?? '', context);

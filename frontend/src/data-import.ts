@@ -525,7 +525,7 @@ export function mapExerciseName(name: string): string | null {
 /**
  * Convert imported workouts to WorkoutLog format and save to localStorage.
  */
-export function importToWorkoutLogs(workouts: ImportedWorkout[], unit: string): {
+export function importToWorkoutLogs(workouts: ImportedWorkout[], _unit: string): {
   imported: number;
   skipped: number;
 } {

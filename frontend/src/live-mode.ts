@@ -142,7 +142,7 @@ export function initLiveMode(deps: LiveModeDeps): void {
   let overlayResizeObserver: ResizeObserver | null = null;
   let observedOverlayWidth = 0;
   let observedOverlayHeight = 0;
-  let wakeLockSentinel: any = null;
+  let wakeLockSentinel: WakeLockSentinel | null = null;
   let currentExerciseType: string = 'squat';
 
   // Target ~20 fps for pose processing (50ms interval) — feasible with lite model
@@ -274,7 +274,7 @@ export function initLiveMode(deps: LiveModeDeps): void {
       });
 
       updateMirror(currentFacingMode);
-    } catch (err) {
+    } catch {
       showErrorCard(
         'Could not switch camera. Your device may only have one camera.',
         'generic',
@@ -424,7 +424,7 @@ export function initLiveMode(deps: LiveModeDeps): void {
       // Keep screen on during live session (mobile gym use)
       try {
         if ('wakeLock' in navigator) {
-          wakeLockSentinel = await (navigator as any).wakeLock.request('screen');
+          wakeLockSentinel = await navigator.wakeLock.request('screen');
         }
       } catch {
         // Wake Lock not supported or denied -- not critical
@@ -559,7 +559,7 @@ export function initLiveMode(deps: LiveModeDeps): void {
 
       // Animation loop: process frames and draw overlay
       liveLoopRunning = true;
-      function liveLoop(timestamp: number): void {
+      const liveLoop = (timestamp: number): void => {
         if (!liveLoopRunning || !liveVideo || !liveOverlay || !livePoseProcessor) return;
 
         // Adaptive frame skipping: process less often when standing idle
@@ -588,7 +588,7 @@ export function initLiveMode(deps: LiveModeDeps): void {
         } else {
           liveAnimFrameId = requestAnimationFrame(liveLoop);
         }
-      }
+      };
 
       // Track overlay size via ResizeObserver (avoids getBoundingClientRect every frame)
       observedOverlayWidth = liveOverlay.clientWidth;

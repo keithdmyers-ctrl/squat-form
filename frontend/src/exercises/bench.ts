@@ -5,14 +5,13 @@
  * Camera should be positioned at the side for best results.
  */
 
-import { computeFrameAngles, pickSide } from '../angles';
-import { calibrateFromStanding, detectCameraView } from '../calibration';
+import { computeFrameAngles } from '../angles';
+import { detectCameraView } from '../calibration';
 import { SquatPhase } from '../types';
 import type {
   BenchType,
   ExperienceLevel,
   FrameAngles,
-  CalibrationData,
   FormIssue,
   CoachingCue,
   RepData,
@@ -20,7 +19,6 @@ import type {
   SetAnalysis,
   FrameData,
   RepRange,
-  BaseExerciseConfig,
 } from '../types';
 import { clamp, scoreToGrade } from '../scorer';
 import { computeVelocityMetrics } from '../competition';
@@ -300,7 +298,7 @@ export function scoreBenchPause(bottomDuration: number, config: BenchConfig): nu
  */
 export function scoreBenchPauseDetailed(
   pauseResult: BenchPauseResult,
-  config: BenchConfig,
+  _config: BenchConfig,
 ): number {
   const durationS = pauseResult.durationMs / 1000;
 

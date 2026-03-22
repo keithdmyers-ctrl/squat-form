@@ -10,6 +10,7 @@ export interface VersionedData<T> {
   migratedAt?: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type MigrationFn = (data: any) => any;
 
 /**
@@ -22,6 +23,7 @@ export type MigrationFn = (data: any) => any;
  * @returns The migrated data, whether migration occurred, and the original version
  */
 export function migrateData<T>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   stored: any,
   currentVersion: number,
   migrations: Record<number, MigrationFn>,

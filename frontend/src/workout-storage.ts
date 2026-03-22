@@ -18,6 +18,7 @@ const USER_PROFILE_STORAGE_VERSION = 1;
 
 const PROGRAM_STATE_MIGRATIONS: Record<number, MigrationFn> = {
   // version 0 -> 1: ensure all expected fields exist with defaults
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   0: (data: any) => ({
     ...data,
     programId: data.programId ?? '',
@@ -41,8 +42,10 @@ const PROGRAM_STATE_MIGRATIONS: Record<number, MigrationFn> = {
 
 const WORKOUT_LOG_MIGRATIONS: Record<number, MigrationFn> = {
   // version 0 -> 1: ensure each log entry has all expected fields
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   0: (data: any) => {
     if (Array.isArray(data)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return data.map((log: any) => ({
         ...log,
         id: log.id ?? Date.now().toString(36) + Math.random().toString(36).slice(2),
@@ -60,6 +63,7 @@ const WORKOUT_LOG_MIGRATIONS: Record<number, MigrationFn> = {
 
 const USER_PROFILE_MIGRATIONS: Record<number, MigrationFn> = {
   // version 0 -> 1: ensure all expected fields exist
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   0: (data: any) => ({
     ...data,
     experienceLevel: data.experienceLevel ?? 'beginner',

@@ -235,7 +235,6 @@ export function computeFrameAngles(
     };
   }
 
-  const heel = landmarks[`${side}_heel`] ?? ankle;
   const footIndex = landmarks[`${side}_foot_index`] ?? ankle;
 
   // Knee angle: hip-knee-ankle

@@ -12,7 +12,6 @@ import type {
   RepData,
   RepScore,
 } from './types';
-import { computeDOTS, calculateWilks2, calculateGLPoints } from './one-rm';
 
 // ─── Competition Total Tracking ───
 

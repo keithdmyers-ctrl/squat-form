@@ -4,7 +4,7 @@
  * Supports conventional, sumo, and Romanian deadlift variants.
  */
 
-import { computeFrameAngles, pickSide, segmentLength } from '../angles';
+import { computeFrameAngles } from '../angles';
 import { calibrateFromStanding, detectCameraView } from '../calibration';
 import { SquatPhase } from '../types';
 import type {
@@ -19,10 +19,8 @@ import type {
   SetAnalysis,
   FrameData,
   RepRange,
-  Landmarks,
-  BaseExerciseConfig,
 } from '../types';
-import { clamp, scoreToGrade, redistributeWeights, scoreTempo } from '../scorer';
+import { clamp, scoreToGrade, scoreTempo } from '../scorer';
 import { detectStickingPoints, computeVelocityMetrics } from '../competition';
 import { assessMobility, generateWarmupProtocol } from '../mobility';
 import { detectFatigue, aggregateTopIssues, aggregatePositiveFeedback, computeSetScore, createEmptyAnalysis, buildRepFrameMap } from '../exercise-core';
@@ -89,7 +87,7 @@ export const HIP_HINGE_THRESHOLDS: Record<ExperienceLevel, number> = {
 export function scoreBackPosition(
   maxTrunkAngle: number,
   config: DeadliftConfig,
-  calibration: CalibrationData | null,
+  _calibration: CalibrationData | null,
 ): number {
   const [minExpected, maxExpected] = DEADLIFT_TRUNK_RANGES[config.deadliftType];
   const tolerance = config.experienceLevel === 'advanced' ? 10 : config.experienceLevel === 'intermediate' ? 15 : 20;
@@ -166,7 +164,7 @@ export function scoreDeadliftControl(rep: RepData): number {
 export function detectDeadliftIssues(
   rep: RepData,
   config: DeadliftConfig,
-  calibration: CalibrationData | null,
+  _calibration: CalibrationData | null,
 ): FormIssue[] {
   const issues: FormIssue[] = [];
 
@@ -400,8 +398,8 @@ function buildDeadliftRepData(
   frameAnglesMap: Map<number, FrameAngles>,
   frameIndices: number[],
   fps: number,
-  calibration: CalibrationData | null,
-  allLandmarks: FrameData,
+  _calibration: CalibrationData | null,
+  _allLandmarks: FrameData,
 ): RepData {
   const { start, end, bottomIndex } = repRange;
   const repFrameAngles: FrameAngles[] = [];

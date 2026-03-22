@@ -7,7 +7,7 @@
  * If you feel great, you add paused squats.
  */
 
-import type { GeneratedWorkout, GeneratedExercise } from './progression-engine';
+import type { GeneratedWorkout } from './progression-engine';
 import { EXERCISE_SLOTS } from './workout-programs';
 
 // ─── Types ───

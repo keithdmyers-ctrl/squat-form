@@ -6,10 +6,9 @@
 
 import { PROGRAMS, EXERCISE_SLOTS } from './workout-programs';
 import {
-  loadWorkoutLogs, saveWorkoutLogs,
+  loadWorkoutLogs,
   loadUserProfile,
   recordSetResult, advanceWorkout,
-  saveProgramState,
   recommendAccessories,
   processAdaptations,
   getRecentFormScores,
@@ -23,9 +22,9 @@ import type {
   WeightRecommendation,
 } from './program-generator';
 import { escapeHtml } from './ui-utilities';
-import { addTermTooltips, safeSaveProgramState, safeSaveWorkoutLogs } from './ui-workout';
+import { safeSaveProgramState, safeSaveWorkoutLogs } from './ui-workout';
 import { getAllPRsByLift } from './pr-tracker';
-import { calculateCompTotal, saveCompTotal, loadCompTotals, renderCompTotalCard } from './competition';
+import { calculateCompTotal, saveCompTotal, renderCompTotalCard } from './competition';
 import { calculateWilks2, calculateGLPoints, computeDOTS } from './one-rm';
 import { renderSessionMusclesSummary, injectMuscleMapStyles, attachMuscleMapListeners } from './muscle-map';
 import { stopActiveRestTimer, clearInProgressWorkout } from './ui-workout-session';
@@ -448,7 +447,7 @@ function renderWorkoutComplete(
   {
     const sessionSets: Array<{ exerciseSlot: string; completed: boolean }> = [];
     for (const ex of workout.exercises) {
-      for (const s of ex.sets) {
+      for (const _s of ex.sets) {
         sessionSets.push({ exerciseSlot: ex.exerciseSlot, completed: true });
       }
     }

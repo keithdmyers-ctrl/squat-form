@@ -16,8 +16,10 @@ const SETTINGS_STORAGE_VERSION = 1;
 
 const SESSION_MIGRATIONS: Record<number, MigrationFn> = {
   // version 0 -> 1: ensure each session has all expected fields
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   0: (data: any) => {
     if (Array.isArray(data)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return data.map((session: any) => ({
         ...session,
         id: session.id ?? Date.now().toString(36) + Math.random().toString(36).slice(2),
@@ -40,6 +42,7 @@ const SESSION_MIGRATIONS: Record<number, MigrationFn> = {
 
 const SETTINGS_MIGRATIONS: Record<number, MigrationFn> = {
   // version 0 -> 1: ensure all settings fields exist with defaults
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   0: (data: any) => ({
     ...data,
     squat_type: data.squat_type ?? 'high_bar',

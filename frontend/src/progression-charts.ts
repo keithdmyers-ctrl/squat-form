@@ -180,7 +180,7 @@ export function renderLineChart(config: ChartConfig, width: number = 600, height
   }).join(' ');
 
   // Find PR points (running maximum)
-  let prIndices: Set<number> = new Set();
+  const prIndices: Set<number> = new Set();
   if (highlightPRs) {
     let maxSoFar = -Infinity;
     for (let i = 0; i < points.length; i++) {

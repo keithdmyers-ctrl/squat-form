@@ -10,7 +10,7 @@
 
 import type { ProgramDefinition, UserProfile, EquipmentLevel } from './workout-programs';
 import { PROGRAMS, EXERCISE_SLOTS, getExerciseName } from './workout-programs';
-import type { ProgramState, LiftProgress, WorkoutLog, SessionDifficulty, ScheduleOverride } from './workout-storage';
+import type { ProgramState, LiftProgress, ScheduleOverride } from './workout-storage';
 import { loadWorkoutLogs, loadUserProfile } from './workout-storage';
 
 // ─── Weight Safety Caps ───
@@ -1158,7 +1158,7 @@ export function getEstimated1RMs(state: ProgramState): Record<string, number> {
  */
 export function checkLPTransition(
   state: ProgramState,
-  program: ProgramDefinition,
+  _program: ProgramDefinition,
 ): string | null {
   const exhaustedLifts = Object.values(state.liftProgress)
     .filter(p => p.lpExhausted)

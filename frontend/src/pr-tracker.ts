@@ -182,7 +182,7 @@ export function getAllPRsByLift(): Record<string, PersonalRecord[]> {
 export function getBestE1RMs(): Record<string, number> {
   const prs = loadPRs();
   const result: Record<string, number> = {};
-  for (const [key, pr] of Object.entries(prs)) {
+  for (const [_key, pr] of Object.entries(prs)) {
     if (pr.type === 'e1rm') {
       result[pr.lift] = pr.value;
     }

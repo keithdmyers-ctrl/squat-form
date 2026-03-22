@@ -5,7 +5,6 @@
  */
 
 import { PoseProcessor, prewarmMediaPipe } from './pose';
-import { analyzeSequence } from './analyzer';
 import { computeFrameAngles } from './angles';
 import { analyzeExercise } from './exercises/index';
 import type { ExerciseConfig } from './exercises/index';
@@ -13,17 +12,15 @@ import {
   showProgress,
   hideProgress,
   showResults,
-  showError,
   showErrorCard,
   hideError,
   setupVideoPlayback,
   renderHistorySection,
   showSkeletonLoading,
   hideSkeletonLoading,
-  drawSkeleton,
 } from './ui';
 import { showValidationWarning, hideValidationWarnings } from './ui-progress';
-import type { SquatConfig, SquatType, ExperienceLevel, ExerciseType, DeadliftType, BenchType, OverheadPressType, BarBellRowType, LungeType, FrameData } from './types';
+import type { SquatType, ExperienceLevel, DeadliftType, BenchType, OverheadPressType, BarBellRowType, LungeType, FrameData } from './types';
 import {
   ONBOARDED_KEY,
   PRESCREEN_KEY,
@@ -44,16 +41,14 @@ import {
   getSavedSettings,
   getWeightUnit,
   getExerciseType,
-  persistSettings,
 } from './settings';
 import {
   initUploadMode,
-  getSelectedFile,
   getSelectedFrontFile,
   setSelectedFile,
   setQuickStartPending,
 } from './upload-mode';
-import { initNativePlatform, hapticNotification } from './native';
+import { initNativePlatform } from './native';
 import { isPARQComplete, isPARQExpired, renderPARQDialog, handlePARQSubmit, savePARQResult, isPregnancyMode, renderPregnancyBanner } from './safety-screening';
 import { initGlossary, openGlossary } from './ui-glossary';
 
@@ -653,8 +648,7 @@ async function runAnalysis(file: File): Promise<void> {
         } finally {
           URL.revokeObjectURL(frontUrl);
         }
-      } catch (err) {
-        // Front video processing failed -- continue with side-only analysis
+      } catch {
         // Front video processing failed -- continue with side-only analysis
         analysis.sideViewWarning = 'Front view video could not be processed -- using side view only.';
       }
@@ -723,8 +717,7 @@ async function runAnalysis(file: File): Promise<void> {
           repIndex: s.repIndex,
         }));
       }
-    } catch (err) {
-      // Snapshot capture is optional -- continue without them
+    } catch {
       // Snapshot capture is optional -- continue without them
     }
 
@@ -992,7 +985,7 @@ function renderSessionNotePrompt(): void {
 
 // ─── Exercise Suggestion Engine (G5) ───
 
-function renderExerciseSuggestion(currentExercise: string): void {
+function renderExerciseSuggestion(_currentExercise: string): void {
   const existing = document.getElementById('exercise-suggestion');
   if (existing) existing.remove();
 
@@ -1357,7 +1350,7 @@ modeCoachBtn?.addEventListener('click', () => {
   // Remove discovery badge after first click
   const badge = modeCoachBtn?.querySelector('.coach-badge');
   if (badge) badge.remove();
-  try { localStorage.setItem('squat_form_coach_visited', '1'); } catch {}
+  try { localStorage.setItem('squat_form_coach_visited', '1'); } catch { /* storage full */ }
 });
 
 // Add discovery badge to Coach tab for users who haven't tried it

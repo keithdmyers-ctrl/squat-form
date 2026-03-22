@@ -14,7 +14,7 @@
  * - Helms et al. (2016) — RIR-based training
  */
 
-import type { WorkoutLog, ProgramState, WorkoutSet } from './workout-storage';
+import type { WorkoutLog, ProgramState } from './workout-storage';
 
 // ─── Storage Key ───
 
@@ -71,13 +71,12 @@ export function linearRegression(
   if (n === 0) return { slope: 0, intercept: 0, r2: 0 };
   if (n === 1) return { slope: 0, intercept: points[0][1], r2: 0 };
 
-  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
   for (const [x, y] of points) {
     sumX += x;
     sumY += y;
     sumXY += x * y;
     sumX2 += x * x;
-    sumY2 += y * y;
   }
 
   const denom = n * sumX2 - sumX * sumX;
@@ -389,9 +388,6 @@ function computeIntensityPreference(logs: WorkoutLog[]): number {
     if (completedSets.length === 0) continue;
 
     const completionRate = completedSets.length / log.sets.length;
-    const avgWeight = completedSets.reduce(
-      (sum, s) => sum + (s.actualWeight ?? s.targetWeight), 0,
-    ) / completedSets.length;
     const setCount = completedSets.length;
 
     // Classify session: intensity-focused (fewer sets, heavier) vs volume-focused

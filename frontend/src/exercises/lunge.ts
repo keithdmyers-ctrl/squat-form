@@ -4,7 +4,7 @@
  * Supports forward, reverse, walking, and Bulgarian split squat variants.
  */
 
-import { computeFrameAngles, pickSide } from '../angles';
+import { computeFrameAngles } from '../angles';
 import { calibrateFromStanding, detectCameraView } from '../calibration';
 import { SquatPhase } from '../types';
 import type {
@@ -138,7 +138,7 @@ function scoreLungeLockout(rep: RepData, calibration: CalibrationData | null): n
 function detectLungeIssues(
   rep: RepData,
   config: LungeConfig,
-  calibration: CalibrationData | null,
+  _calibration: CalibrationData | null,
 ): FormIssue[] {
   const issues: FormIssue[] = [];
 
@@ -318,8 +318,8 @@ function buildLungeRepData(
   frameAnglesMap: Map<number, FrameAngles>,
   frameIndices: number[],
   fps: number,
-  calibration: CalibrationData | null,
-  allLandmarks: FrameData,
+  _calibration: CalibrationData | null,
+  _allLandmarks: FrameData,
 ): RepData {
   const { start, end, bottomIndex } = repRange;
   const repFrameAngles: FrameAngles[] = [];
@@ -349,7 +349,6 @@ function buildLungeRepData(
 
   // Velocity metrics based on knee angles
   const bottomRelIdx = bottomIndex - start;
-  const topAngle = kneeAngles.length > 0 ? Math.max(...kneeAngles) : 180;
   const velocity = computeVelocityMetrics(kneeAngles, bottomRelIdx, fps);
 
   return {

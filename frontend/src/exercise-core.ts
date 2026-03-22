@@ -15,14 +15,10 @@ import { severityRank } from './types';
 import type { ExerciseType } from './types';
 import type {
   FormIssue,
-  CoachingCue,
   RepScore,
-  ExperienceLevel,
   BaseExerciseConfig,
   SetAnalysis,
   CalibrationData,
-  MobilityFinding,
-  WarmUpStep,
 } from './types';
 import { clamp, scoreToGrade } from './scorer';
 

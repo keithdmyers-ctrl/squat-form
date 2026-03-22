@@ -8,7 +8,7 @@ import {
   FilesetResolver,
   type PoseLandmarkerResult,
 } from '@mediapipe/tasks-vision';
-import type { Point, Landmarks, FrameData } from './types';
+import type { Landmarks, FrameData } from './types';
 import { LandmarkSmoother } from './smoothing';
 
 /** Callback type for LIVE_STREAM results. */
@@ -105,7 +105,7 @@ async function resolveModelUrl(lite = false): Promise<string> {
 async function loadVisionFileset(wasmUrl: string): Promise<Awaited<ReturnType<typeof FilesetResolver.forVisionTasks>>> {
   try {
     return await FilesetResolver.forVisionTasks(wasmUrl);
-  } catch (err) {
+  } catch {
     if (wasmUrl !== CDN_WASM_URL) {
       // Local WASM load failed, retrying with CDN
       return await FilesetResolver.forVisionTasks(CDN_WASM_URL);
@@ -119,7 +119,7 @@ async function loadVisionFileset(wasmUrl: string): Promise<Awaited<ReturnType<ty
 
 /** Cached WASM fileset and model URLs from pre-warming. */
 let prewarmedVision: Awaited<ReturnType<typeof FilesetResolver.forVisionTasks>> | null = null;
-let prewarmedModelUrlFull: string | null = null;
+const prewarmedModelUrlFull: string | null = null;
 let prewarmedModelUrlLite: string | null = null;
 let prewarmPromise: Promise<void> | null = null;
 
@@ -140,7 +140,7 @@ export function prewarmMediaPipe(): void {
       // Pre-fetch only the lite model (for live mode); full model loads on-demand for video upload
       await fetch(liteModelUrl);
       // Pre-warm complete
-    } catch (err) {
+    } catch {
       // Pre-warm failed (will retry on init)
     }
   })();
@@ -174,7 +174,7 @@ export class PoseProcessor {
         numPoses: 2, // Detect up to 2 poses for multi-person rejection
         minTrackingConfidence: 0.7,
       });
-    } catch (err) {
+    } catch {
       if (modelUrl !== CDN_MODEL_PATH_FULL) {
         // Local model load failed, retrying with CDN
         this.landmarker = await PoseLandmarker.createFromOptions(vision, {
@@ -236,7 +236,7 @@ export class PoseProcessor {
 
     try {
       await createLandmarker(modelUrl);
-    } catch (err) {
+    } catch {
       if (modelUrl !== CDN_MODEL_PATH_LITE) {
         // Local model load failed, retrying with CDN
         await createLandmarker(CDN_MODEL_PATH_LITE);

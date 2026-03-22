@@ -5,7 +5,7 @@
  * Supports pendlay, bent_over, and yates row variants.
  */
 
-import { computeFrameAngles, pickSide } from '../angles';
+import { computeFrameAngles } from '../angles';
 import { calibrateFromStanding, detectCameraView } from '../calibration';
 import { SquatPhase } from '../types';
 import type {
@@ -184,7 +184,7 @@ function scoreTorsoStability(rep: RepData): number {
 
 export function detectRowIssues(
   rep: RepData,
-  config: BarBellRowConfig,
+  _config: BarBellRowConfig,
 ): FormIssue[] {
   const issues: FormIssue[] = [];
 

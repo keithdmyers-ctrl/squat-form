@@ -157,7 +157,7 @@ export function drawPhaseOverlay(
   ctx: CanvasRenderingContext2D,
   phase: SquatPhase,
   repIdx: number,
-  width: number,
+  _width: number,
 ): void {
   const padding = 10;
   const phaseLabel = phase.charAt(0).toUpperCase() + phase.slice(1);

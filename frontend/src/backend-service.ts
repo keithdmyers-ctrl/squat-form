@@ -128,7 +128,7 @@ export async function saveDocument(
         _updatedAt: new Date().toISOString(),
         _uid: currentUser.uid,
       });
-    } catch (err) {
+    } catch {
       // Firestore will queue this for sync when online (offline persistence)
       // Cloud sync failed -- Firestore queues for retry when online
     }
@@ -169,7 +169,7 @@ export async function saveCollection(
       }
 
       await batch.commit();
-    } catch (err) {
+    } catch {
       // Cloud sync failed -- Firestore queues for retry when online
     }
   }
@@ -204,7 +204,7 @@ export async function loadDocument<T>(
         }
         return data;
       }
-    } catch (err) {
+    } catch {
       // Cloud load failed -- fall back to localStorage
     }
   }
@@ -238,7 +238,7 @@ export async function loadCollection<T>(
         try { localStorage.setItem(localStorageKey, JSON.stringify(items)); } catch { document.dispatchEvent(new CustomEvent('storage-warning', { detail: 'Storage is full. Some data may not be saved.' })); }
         return items;
       }
-    } catch (err) {
+    } catch {
       // Cloud load failed -- fall back to localStorage
     }
   }
@@ -257,7 +257,7 @@ export async function deleteDocument(
     try {
       const docRef = doc(db, `users/${currentUser.uid}/${collectionName}`, docId);
       await deleteDoc(docRef);
-    } catch (err) {
+    } catch {
       // Cloud delete failed -- will retry on next sync
     }
   }
@@ -276,7 +276,7 @@ export async function uploadPhoto(
     const photoRef = ref(storage, `users/${currentUser.uid}/photos/${photoId}.jpg`);
     await uploadString(photoRef, dataUrl, 'data_url');
     return await getDownloadURL(photoRef);
-  } catch (err) {
+  } catch {
     // Photo upload failed
     return null;
   }
@@ -291,7 +291,7 @@ export async function deletePhoto(photoId: string): Promise<void> {
   try {
     const photoRef = ref(storage, `users/${currentUser.uid}/photos/${photoId}.jpg`);
     await deleteObject(photoRef);
-  } catch (err) {
+  } catch {
     // Photo delete failed
   }
 }
@@ -328,7 +328,7 @@ async function syncLocalToCloud(): Promise<void> {
       } else {
         await saveDocument(cloudCollection, 'current', data, localKey);
       }
-    } catch (err) {
+    } catch {
       // Sync failed -- will retry on next auth state change
     }
   }

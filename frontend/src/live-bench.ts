@@ -221,8 +221,8 @@ export class BenchLiveStrategy implements LiveExerciseStrategy {
 
   scoreRep(
     rep: RepData,
-    config: SquatConfig,
-    calibration: CalibrationData | null,
+    _config: SquatConfig,
+    _calibration: CalibrationData | null,
   ): RepScore {
     const benchConfig = this.getConfig();
     const isCompetition = this.competitionMode;

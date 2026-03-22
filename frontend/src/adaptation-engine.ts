@@ -381,7 +381,7 @@ export function applyWeightRecommendation(
 function processDifficultyFeedback(
   state: ProgramState,
   feedback: PostWorkoutFeedback,
-  program: ProgramDefinition,
+  _program: ProgramDefinition,
 ): { decisions: AdaptationDecision[]; adjustedLifts: Set<string> } {
   const decisions: AdaptationDecision[] = [];
   const adjustedLifts = new Set<string>();
@@ -474,7 +474,7 @@ function processReadiness(
   state: ProgramState,
   readiness: ReadinessData,
   recentLogs: WorkoutLog[],
-  program: ProgramDefinition,
+  _program: ProgramDefinition,
 ): AdaptationDecision[] {
   const decisions: AdaptationDecision[] = [];
 
@@ -926,7 +926,7 @@ function getTransitionReason(
 function getTransitionFitReason(
   program: ProgramDefinition,
   profile: UserProfile,
-  state: ProgramState,
+  _state: ProgramState,
 ): string {
   switch (program.id) {
     case 'texas_method':
@@ -1082,7 +1082,7 @@ export function getEquipmentExercises(slots: string[], equipment: EquipmentLevel
  * Get exercise substitutions for common injury areas.
  * Returns exercises that avoid loading the injured area.
  */
-function getInjurySubstitutions(bodyArea: string, aggravatingExercise: string, equipment: EquipmentLevel): string[] {
+function getInjurySubstitutions(bodyArea: string, aggravatingExercise: string, _equipment: EquipmentLevel): string[] {
   const substitutions: Record<string, Record<string, string[]>> = {
     lower_back: {
       squat: ['Leg Press', 'Belt Squat', 'Goblet Squat (light)', 'Wall Sit'],
